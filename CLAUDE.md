@@ -237,6 +237,14 @@ transaction load its own copy.
   by a `<scope>test</scope>` entry for the same artifact silently makes it test-only and the main
   build stops compiling. Optional dependencies are already on the declaring module's own compile
   and test classpath.
+- **`@ConditionalOnBean` must not name a bean from its own auto-configuration.** Conditions are
+  evaluated against the beans registered *so far*, so the condition races its own declaration
+  order and usually loses. The outbox relay scheduler was conditional on `OutboxPublisher`, which
+  the same class defines, so the scheduler was silently never created: services started, the
+  outbox accepted rows, and they sat at `PENDING` with zero attempts and **no error at all**,
+  because nothing was asking to publish them. Latent from Phase 2 until Phase 5 needed a real
+  event delivered. Name a bean from an auto-configuration you are explicitly ordered `after`.
+  `OutboxRelayWiringIT` is the regression test: it waits for the relay instead of calling it.
 - **A library auto-configuration must not activate on classes alone.** `@ConditionalOnClass` sees
   JPA on the classpath even in a service with no datasource. Guard on the bean that actually
   matters, e.g. `@ConditionalOnBean(EntityManagerFactory.class)`.
@@ -249,6 +257,8 @@ transaction load its own copy.
   `spring-boot-restclient` to run; it was declared test-scoped for `TestRestTemplate`, so every
   test passed and the container died at startup on `NoClassDefFoundError`. Run the image, not only
   the tests.
+- **`ExponentialBackOffWithMaxRetries` is gone in Spring 7.** Use `ExponentialBackOff` with
+  `setMaxAttempts(long)`.
 - **`HttpHeaders` no longer implements `Map` in Spring 7.** `containsKey` is gone; use
   `getFirst(name) != null` or `containsHeader`.
 - **Set the charset when writing a response by hand.** The servlet default is ISO-8859-1, so a
@@ -275,6 +285,17 @@ transaction load its own copy.
 - **`@PreAuthorize` denials bypass the security filter chain.** They are thrown inside the
   application, so `AccessDeniedHandler` never sees them and a catch-all `@ExceptionHandler` turns
   every 403 into a 500. `SecurityExceptionHandler` in common-lib handles this - do not remove it.
+
+## Testing traps
+
+- **Tests that share a broker must select their own message**, not "the first record on the
+  topic" - which is whichever test got there first.
+- **Tests that share a database must not share a table when one of them has a live scheduler.**
+  A relay running in one Spring context will happily publish rows another test is asserting stay
+  `PENDING`. Give such a context its own schema.
+- **Asynchronous retries continue after an assertion passes.** A second test truncating tables
+  while the first message is still being retried produces rows belonging to neither. Follow one
+  message to its end in one test.
 
 ## Traps specific to this codebase
 

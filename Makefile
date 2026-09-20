@@ -82,7 +82,7 @@ logs: check-env ## Tail one service: make logs svc=postgres
 up: infra-up ## Start infrastructure and all services (gateway on :8080)
 	@# Services come up after the topics exist: broker auto-creation is off, so a producer
 	@# starting first would fail on its first publish rather than waiting.
-	$(DC_ALL) up -d --build --wait auth-service api-gateway
+	$(DC_ALL) up -d --build --wait auth-service notification-service api-gateway
 	@echo
 	@$(DC_ALL) ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}'
 	@echo
@@ -125,7 +125,7 @@ images: check-env ## Rebuild the service images
 	$(DC_ALL) build
 
 service-logs: check-env ## Tail application service logs
-	$(DC_ALL) logs -f auth-service api-gateway
+	$(DC_ALL) logs -f auth-service notification-service api-gateway
 
 ## ---------------------------------------------------------------------------
 ## Build and test

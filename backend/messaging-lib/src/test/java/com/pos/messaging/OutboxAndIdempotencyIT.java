@@ -28,10 +28,6 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.kafka.ConfluentKafkaContainer;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.pos.events.EventEnvelope;
 import com.pos.events.EventJson;
@@ -49,36 +45,12 @@ import com.pos.messaging.outbox.OutboxRecorder;
  * exactly once.
  */
 @SpringBootTest(classes = MessagingTestApplication.class)
-@Testcontainers
 class OutboxAndIdempotencyIT {
-
-    @Container
-    static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer("postgres:16-alpine")
-                    .withDatabaseName("pos")
-                    .withUsername("test")
-                    .withPassword("test");
-
-    /**
-     * Confluent's distribution rather than the apache/kafka image used in docker-compose. Both are
-     * Apache Kafka and speak the same protocol, so what is under test here is unaffected;
-     * Testcontainers' apache/kafka container copies a start script into the container and
-     * immediately executes it, which fails with "Text file busy" on this Docker Desktop/gVisor
-     * setup. The compose stack, which does not use that mechanism, still runs apache/kafka.
-     */
-    @Container
-    static final ConfluentKafkaContainer KAFKA =
-            new ConfluentKafkaContainer("confluentinc/cp-kafka:7.8.0");
-
-    // To debug broker startup, attach:
-    //   .withLogConsumer(new Slf4jLogConsumer(LoggerFactory.getLogger("kafka-container")))
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
+        MessagingContainers.registerDataSource(registry);
+        MessagingContainers.registerKafka(registry);
     }
 
     @Autowired private OutboxRecorder recorder;
@@ -113,7 +85,8 @@ class OutboxAndIdempotencyIT {
         assertThat(published).isEqualTo(1);
         assertThat(statusOf(envelope.eventId())).isEqualTo("PUBLISHED");
 
-        ConsumerRecord<String, String> record = consumeOne(Topics.AUTH_OTP_REQUESTED);
+        ConsumerRecord<String, String> record =
+                consumeFor(Topics.AUTH_OTP_REQUESTED, userId.toString());
         assertThat(record).isNotNull();
         // Keyed by aggregate id, so every event for this user keeps its order.
         assertThat(record.key()).isEqualTo(userId.toString());
@@ -289,9 +262,18 @@ class OutboxAndIdempotencyIT {
         return count == null ? 0 : count;
     }
 
-    private ConsumerRecord<String, String> consumeOne(String topic) {
+    /**
+     * Reads from the beginning until the record with this key appears.
+     *
+     * <p>Not "the first record on the topic": the broker is shared with the other test class in
+     * this module, so the first record is whichever test got there first. Selecting by key makes
+     * the assertion about this test's own message.
+     */
+    private ConsumerRecord<String, String> consumeFor(String topic, String key) {
         Properties props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        props.put(
+                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                MessagingContainers.KAFKA.getBootstrapServers());
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "it-" + UUID.randomUUID());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -303,7 +285,9 @@ class OutboxAndIdempotencyIT {
             while (System.currentTimeMillis() < deadline) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(500));
                 for (ConsumerRecord<String, String> record : records) {
-                    return record;
+                    if (key.equals(record.key())) {
+                        return record;
+                    }
                 }
             }
         }

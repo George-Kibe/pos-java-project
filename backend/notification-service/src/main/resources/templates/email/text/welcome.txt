@@ -1,0 +1,12 @@
+[( ${brandName} )]
+
+Welcome, [( ${recipientName} )].
+
+Your email is verified and your account is active.
+
+A manager needs to assign your role before you can start work. Until then you can sign in, but you
+will not see anything yet - that is expected.
+
+Sign in: [( ${appBaseUrl} )]
+
+Questions? [( ${supportEmail} )]

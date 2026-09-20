@@ -53,6 +53,57 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  notification-service:
+    build:
+      context: ../../backend
+      dockerfile: ../infra/docker/service.Dockerfile
+      args:
+        MODULE: notification-service
+    image: pos/notification-service:dev
+    container_name: pos-notification-service
+    restart: unless-stopped
+    networks: [pos]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8088
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-pos}
+      NOTIFICATION_DB_USER: ${NOTIFICATION_DB_USER:-notification_user}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?required}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+      # Mailpit in development: it accepts everything and shows it in a browser, so no real mail
+      # ever leaves the machine. Production points these at Gmail or Workspace - same code path.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-Supermarket POS <no-reply@example.com>}
+      BRAND_NAME: ${BRAND_NAME:-Supermarket POS}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@example.com}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+    # No published port: reachable only through the gateway.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8088/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   api-gateway:
     build:
       context: ../../backend
@@ -74,6 +125,7 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
       AUTH_SERVICE_URI: http://auth-service:8081
+      NOTIFICATION_SERVICE_URI: http://notification-service:8088
       AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
       JWT_ISSUER: ${JWT_ISSUER:-http://auth-service:8081}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}

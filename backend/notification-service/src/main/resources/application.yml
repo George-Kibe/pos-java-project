@@ -1,0 +1,125 @@
+spring:
+  application:
+    name: notification-service
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:pos}
+    username: ${NOTIFICATION_DB_USER:notification_user}
+    password: ${NOTIFICATION_DB_PASSWORD}
+    hikari:
+      # hibernate.default_schema covers JPA only; the idempotency ledger is written with plain
+      # JDBC and resolves against the connection's search_path.
+      schema: ${DB_SCHEMA:notification}
+      maximum-pool-size: 8
+      minimum-idle: 2
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: notification
+
+  flyway:
+    enabled: true
+    schemas: notification
+    default-schema: notification
+    locations: classpath:db/migration,classpath:db/migration/shared
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Every service validates the token itself; the gateway is not the only line of defence.
+          # Resolved lazily on first use, so this service starts even if auth-service is not up yet.
+          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:notification-service}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Start at the beginning the first time this group runs, so a newly deployed consumer picks
+      # up events already on the topic rather than silently skipping them.
+      auto-offset-reset: earliest
+      # Offsets are committed by the container after the listener returns, so a crash mid-send
+      # redelivers rather than losing the message.
+      enable-auto-commit: false
+      max-poll-records: 10
+    producer:
+      # Only used for publishing to the dead-letter topics.
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+    listener:
+      ack-mode: record
+      concurrency: 3
+
+  mail:
+    # Mailpit locally, Gmail or Workspace in production. Same code path either way.
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:false}
+          starttls:
+            enable: ${SMTP_STARTTLS:false}
+          # Bounded, so a hanging provider fails and retries instead of holding the consumer.
+          connectiontimeout: 5000
+          timeout: 10000
+          writetimeout: 10000
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${SERVER_PORT:8088}
+  error:
+    whitelabel:
+      enabled: false
+
+pos:
+  outbox:
+    # This service consumes only; it never publishes a domain event.
+    enabled: false
+
+  security:
+    public-paths:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+
+  notification:
+    brand-name: ${BRAND_NAME:Supermarket POS}
+    support-email: ${SUPPORT_EMAIL:support@example.com}
+    app-base-url: ${APP_BASE_URL:http://localhost:3000}
+    mail-from: ${MAIL_FROM:Supermarket POS <no-reply@example.com>}
+    # Renders templates on demand; a developer convenience, not a production endpoint. Still
+    # requires authentication when switched on.
+    template-preview-enabled: ${TEMPLATE_PREVIEW_ENABLED:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.pos: INFO

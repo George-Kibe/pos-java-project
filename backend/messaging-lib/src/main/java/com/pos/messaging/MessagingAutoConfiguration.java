@@ -68,21 +68,40 @@ public class MessagingAutoConfiguration {
                 jdbcClient, kafkaTemplate, new TransactionTemplate(transactionManager), properties);
     }
 
-    /** The scheduled relay. Off when {@code pos.outbox.enabled=false}. */
-    @AutoConfiguration
-    @ConditionalOnBean(OutboxPublisher.class)
+    /**
+     * The scheduled relay. Off when {@code pos.outbox.enabled=false}.
+     *
+     * <p>Conditional on {@code KafkaTemplate} rather than on {@code OutboxPublisher}, even though
+     * the publisher is what it actually needs. {@code @ConditionalOnBean} is evaluated against the
+     * beans registered so far, so a condition naming a bean defined by this same auto-configuration
+     * is a race with its own declaration order - which is exactly how this was first written, and
+     * the scheduler silently never existed. Outbox rows piled up as PENDING with zero attempts and
+     * no error, because nothing was ever asking to publish them. KafkaTemplate comes from an
+     * auto-configuration this one is explicitly ordered after, so the condition is deterministic.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(KafkaTemplate.class)
+    @ConditionalOnProperty(
+            prefix = "pos.outbox",
+            name = "enabled",
+            havingValue = "true",
+            matchIfMissing = true)
+    public OutboxRelayScheduler outboxRelayScheduler(OutboxPublisher publisher) {
+        return new OutboxRelayScheduler(publisher);
+    }
+
+    /**
+     * Turns on scheduling support. Separate and unconditional on any bean, because enabling
+     * scheduling when there is nothing scheduled costs nothing, whereas making it depend on the
+     * scheduler bean reintroduces the ordering problem described above.
+     */
+    @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(
             prefix = "pos.outbox",
             name = "enabled",
             havingValue = "true",
             matchIfMissing = true)
     @EnableScheduling
-    public static class RelaySchedulingConfiguration {
-
-        @Bean
-        @ConditionalOnMissingBean
-        public OutboxRelayScheduler outboxRelayScheduler(OutboxPublisher publisher) {
-            return new OutboxRelayScheduler(publisher);
-        }
-    }
+    static class OutboxSchedulingConfiguration {}
 }

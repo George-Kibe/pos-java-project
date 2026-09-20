@@ -1,0 +1,4 @@
+Email HTML is not web HTML. Tables for layout, inline styles, no flexbox or grid, no external
+stylesheets, and a max width around 600px: Outlook and several webmail clients strip or ignore
+anything more modern. Kept deliberately plain so the message renders the same everywhere and
+reaches the inbox rather than the spam folder.

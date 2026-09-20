@@ -13,7 +13,7 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 | 2 | Shared libraries | `common-lib`, `events-lib`, `messaging-lib` | ✅ done |
 | 3 | auth-service | Register → OTP → login → refresh, JWKS | ✅ done |
 | 4 | api-gateway | Single ingress, JWT enforcement, rate limits | ✅ done |
-| 5 | notification-service | Real OTP email; registration loop closes | 2–3 d |
+| 5 | notification-service | Real OTP email; registration loop closes | ✅ done |
 | 6 | catalog-service | Products, barcodes, tax engine, pricing, promos | 4–5 d |
 | 7 | inventory-service | Stock, batches/expiry, FEFO, movements | 4–5 d |
 | 8 | purchasing-service | Suppliers, PO, GRN, costing | 3–4 d |
@@ -259,22 +259,58 @@ and the MDC is thread-local.
 
 ---
 
-## Phase 5 — notification-service
+## Phase 5 — notification-service ✅
 
-**Goal:** the registration loop closes — a real OTP email lands in Mailpit.
+**Goal:** the registration loop closes - a real OTP email lands in Mailpit.
 
-- Kafka consumers for `auth.otp-requested`, `auth.user-registered`, `auth.password-reset-requested`
-- `EmailSender` over Spring `JavaMailSender`: Mailpit SMTP in dev, Gmail/Workspace SMTP in prod —
-  same code, different config
-- Thymeleaf HTML + plaintext templates: OTP, welcome, password reset, receipt, low-stock alert
-- `notification_log` table with status, provider response and retry count
-- Retry with backoff, then DLT; DLT consumer records a permanent failure
-- Template preview endpoint for development
+Delivered:
+- Kafka consumers for `auth.otp-requested`, `auth.user-registered` and
+  `auth.password-reset-requested`, each idempotent and transactional
+- `EmailSender` over `JavaMailSender`, sending `multipart/alternative` with the plain-text part
+  first (least-to-most preferred, or every client shows the plain version); Mailpit locally,
+  Gmail or Workspace in production, same code path
+- Thymeleaf HTML and plain-text templates for all three messages, table-based and inline-styled
+  because email HTML is not web HTML
+- `notification_log` recording recipient, subject, status, attempt count and error - **never the
+  body**, since OTP codes and reset tokens pass through here and would otherwise sit in a second
+  database long after they expired
+- Retry with exponential backoff, then the dead-letter topic; a DLT consumer records the permanent
+  failure so a message nobody received is answerable rather than invisible
+- Template preview endpoint, off by default and authenticated when on
 
-**Done when:** registering through the gateway produces an OTP email visible in Mailpit within
-seconds, verifying it delivers a welcome email, a forced SMTP failure retries then lands in the DLT
-and is visible in `notification_log`, and switching `SMTP_*` to Gmail credentials delivers to a real
-inbox.
+**Verified — 169 tests in the build, 12 here, plus an end-to-end run in Docker:**
+
+| Check | Result |
+|---|---|
+| Register through the gateway → email in Mailpit | ✅ arrived in ~1.5 s |
+| Verify using the code **taken from the email** | ✅ 200 |
+| Welcome email after verification | ✅ |
+| Code in the body, not the subject | ✅ subjects appear on lock screens and in gateway logs |
+| Both an HTML and a plain-text part | ✅ `multipart/alternative` |
+| The code stored anywhere in the log | ✅ zero rows contain it |
+| Redelivered event | ✅ one email, one log row |
+| Undeliverable message | ✅ 4 attempts, backoff, dead-lettered, recorded `PERMANENTLY_FAILED` |
+| Failure record surviving the rollback it happens inside | ✅ |
+| Idempotency marker rolled back on failure | ✅ redelivery is a real retry |
+
+**The bug this phase uncovered, latent since Phase 2:** the outbox relay scheduler was never
+created. Its `@ConditionalOnBean` named a bean defined by the same auto-configuration, so the
+condition was evaluated before that bean existed. Nothing failed anywhere - services started,
+outbox rows accumulated at `PENDING` with zero attempts and no error, because nothing was asking
+to publish them. Every messaging test called `publishDue()` directly for determinism, so none of
+them noticed. It surfaced the moment a consumer downstream was waiting for an email. Fixed, and
+`OutboxRelayWiringIT` now waits for the relay rather than calling it.
+
+The outbox did its job throughout: events queued during the weeks the relay was broken were all
+delivered once it was fixed, which is the guarantee the pattern exists to provide.
+
+**Deferred with reason:** receipt and low-stock alert templates. Their data shape depends on the
+sales and inventory payloads, which are not designed yet, and a template that cannot be rendered
+from a real event has never been tested. They land with the services that produce those events.
+
+**Still needs you:** verifying real delivery through Gmail requires an account with 2FA and a
+16-character App Password. The code path is identical - only `SMTP_*` changes - but I will not
+invent credentials.
 
 ---
 
