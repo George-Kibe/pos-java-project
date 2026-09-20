@@ -240,6 +240,20 @@ transaction load its own copy.
 - **A library auto-configuration must not activate on classes alone.** `@ConditionalOnClass` sees
   JPA on the classpath even in a service with no datasource. Guard on the bean that actually
   matters, e.g. `@ConditionalOnBean(EntityManagerFactory.class)`.
+- **The MDC does not cross a circuit breaker's thread boundary.** Resilience4j enforces its
+  timeout by running the call on its own thread pool, so anything reading the MDC there (a
+  correlation id, for instance) sees nothing and silently invents a new one. Carry such values on
+  the request (a request attribute) rather than the thread. Caught in Phase 4, where every proxied
+  request was getting a fresh correlation id and breaking tracing.
+- **A test-scoped dependency can mask a missing runtime one.** api-gateway needed
+  `spring-boot-restclient` to run; it was declared test-scoped for `TestRestTemplate`, so every
+  test passed and the container died at startup on `NoClassDefFoundError`. Run the image, not only
+  the tests.
+- **`HttpHeaders` no longer implements `Map` in Spring 7.** `containsKey` is gone; use
+  `getFirst(name) != null` or `containsHeader`.
+- **Set the charset when writing a response by hand.** The servlet default is ISO-8859-1, so a
+  hand-written `problem+json` body mangles any non-ASCII text. Always
+  `response.setCharacterEncoding("UTF-8")`.
 - **A null String parameter inside a SQL function breaks PostgreSQL.** `WHERE (:q IS NULL OR
   lower(x) LIKE lower(:q))` fails with `function lower(bytea) does not exist`, because the driver
   sends an untyped null. Use two code paths (`findAll` vs `search`) instead of a null-or branch.

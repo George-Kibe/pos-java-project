@@ -38,6 +38,13 @@ spring:
     # Service migrations start at V1; shared infrastructure occupies V0_*.
     locations: classpath:db/migration,classpath:db/migration/shared
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
     producer:

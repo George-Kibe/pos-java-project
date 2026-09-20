@@ -30,6 +30,7 @@ public class PasswordResetService {
     private final UserRepository users;
     private final PasswordResetTokenRepository tokens;
     private final AuthenticationService authenticationService;
+    private final TokenVersionRegistry tokenVersions;
     private final OutboxRecorder outbox;
     private final AuditService audit;
     private final PasswordEncoder passwordEncoder;
@@ -114,6 +115,7 @@ public class PasswordResetService {
         user.setMustChangePassword(false);
         user.bumpTokenVersion();
         users.save(user);
+        tokenVersions.publish(user);
 
         // Other sessions may be on a device the user no longer trusts, and the token version has
         // changed regardless, so they are ended rather than left in an inconsistent state.
@@ -162,6 +164,7 @@ public class PasswordResetService {
         token.setConsumedAt(Instant.now());
         tokens.save(token);
 
+        tokenVersions.publish(user);
         authenticationService.revokeAllSessions(user.getId(), "password_reset");
 
         audit.recordFor(

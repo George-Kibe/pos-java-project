@@ -52,6 +52,8 @@ public class ProblemAuthenticationEntryPoint implements AuthenticationEntryPoint
 
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        // The servlet default is ISO-8859-1, which mangles any non-ASCII text in a message.
+        response.setCharacterEncoding(java.nio.charset.StandardCharsets.UTF_8.name());
         response.getWriter().write(objectMapper.writeValueAsString(problem));
     }
 }

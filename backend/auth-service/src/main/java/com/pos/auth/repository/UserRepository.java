@@ -1,5 +1,6 @@
 package com.pos.auth.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -51,4 +52,16 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             WHERE u.id IN (SELECT holder.id FROM User holder JOIN holder.roles r WHERE r.id = :roleId)
             """)
     int bumpTokenVersionForRole(@Param("roleId") UUID roleId);
+
+    /** Current token versions of every holder of a role, so each can be published to the cache. */
+    @Query(
+            "SELECT u.id AS id, u.tokenVersion AS tokenVersion FROM User u JOIN u.roles r WHERE r.id = :roleId")
+    List<TokenVersionView> findTokenVersionsByRole(@Param("roleId") UUID roleId);
+
+    /** Projection: just the two fields the token-version cache needs. */
+    interface TokenVersionView {
+        UUID getId();
+
+        int getTokenVersion();
+    }
 }

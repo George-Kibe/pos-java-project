@@ -32,6 +32,7 @@ public class UserAdminService {
     private final RoleRepository roles;
     private final BranchRepository branches;
     private final AuthenticationService authenticationService;
+    private final TokenVersionRegistry tokenVersions;
     private final AuditService audit;
     private final PasswordEncoder passwordEncoder;
 
@@ -121,6 +122,9 @@ public class UserAdminService {
         user.setRoles(resolveRoles(roleCodes));
         user.bumpTokenVersion();
         users.save(user);
+        // Revoking refresh tokens ends the session, but the access token they are holding right
+        // now still carries the old permissions. Publishing the version is what stops it.
+        tokenVersions.publish(user);
         authenticationService.revokeAllSessions(id, "roles_changed");
 
         audit.record(
@@ -139,6 +143,7 @@ public class UserAdminService {
         user.setBranches(resolveBranches(branchIds));
         user.bumpTokenVersion();
         users.save(user);
+        tokenVersions.publish(user);
         authenticationService.revokeAllSessions(id, "branches_changed");
 
         audit.record(
@@ -177,6 +182,7 @@ public class UserAdminService {
         users.save(user);
 
         if (status != UserStatus.ACTIVE) {
+            tokenVersions.publish(user);
             authenticationService.revokeAllSessions(id, "status_" + status.name().toLowerCase());
         }
 

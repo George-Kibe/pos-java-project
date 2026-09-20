@@ -12,7 +12,7 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 | 1 | Repo skeleton & infrastructure | Compose stack up, parent POM builds | ✅ done |
 | 2 | Shared libraries | `common-lib`, `events-lib`, `messaging-lib` | ✅ done |
 | 3 | auth-service | Register → OTP → login → refresh, JWKS | ✅ done |
-| 4 | api-gateway | Single ingress, JWT enforcement, rate limits | 2 d |
+| 4 | api-gateway | Single ingress, JWT enforcement, rate limits | ✅ done |
 | 5 | notification-service | Real OTP email; registration loop closes | 2–3 d |
 | 6 | catalog-service | Products, barcodes, tax engine, pricing, promos | 4–5 d |
 | 7 | inventory-service | Stock, batches/expiry, FEFO, movements | 4–5 d |
@@ -205,24 +205,57 @@ integration test asserts this behaviour explicitly rather than pretending otherw
 
 ---
 
-## Phase 4 — api-gateway
+## Phase 4 — api-gateway ✅
 
 **Goal:** one ingress, and services are no longer reachable directly from outside.
 
-- Spring Cloud Gateway route table for every service, by Docker DNS name
-- JWT validation filter against `auth-service` JWKS (cached, refreshed on unknown `kid`)
-- Public route allowlist (`/auth/register`, `/auth/login`, `/auth/verify-otp`, `/auth/refresh`,
-  health, docs) — everything else authenticated
-- Redis-backed rate limiting: strict per-IP on auth endpoints, per-user elsewhere
-- CORS allowlist, security headers, request size limits
-- Correlation-ID generation, access logging, problem+json error normalisation for gateway-level
-  failures
-- Circuit breakers (Resilience4j) with sensible timeouts per route
-- Aggregated springdoc UI
+Built on the **servlet** gateway (`gateway-server-webmvc`) rather than the reactive one. The
+reactive variant ships a Redis rate limiter this one lacks, which is written by hand here; in
+exchange the gateway keeps the same programming model as every service, so common-lib's
+correlation ids and problem+json error shape apply unchanged, and virtual threads carry the
+concurrency the reactive stack would otherwise be needed for.
 
-**Done when:** every service is reachable only through `:8080`, an expired or tampered token is
-rejected at the edge, rate limits return `429` with `Retry-After`, and a downed service produces a
-clean `503` rather than a hung request.
+Delivered:
+- Route table for all nine services by Docker DNS name, each behind its own circuit breaker
+- JWT validation against auth-service's JWKS, with issuer and expiry validators and a 30s skew;
+  Nimbus refetches on an unknown `kid`, so key rotation needs no restart
+- **Token-version enforcement**, closing the gap left open in Phase 3: auth-service publishes each
+  bump to Redis with a TTL just past the access-token lifetime, and the gateway refuses any older
+  token with a distinct `auth.token_superseded` code
+- Hand-written Redis token-bucket rate limiter evaluated by a Lua script, so read-modify-write
+  cannot interleave across replicas; three classes of traffic keyed differently (credential
+  endpoints by IP at 10/min, authenticated by user at 300/min, anonymous by IP at 60/min), with
+  `Retry-After` and `X-RateLimit-*`. Fails open — a Redis outage must not stop a shop trading
+- Correlation-id propagation to every downstream service, CORS allowlist, security headers,
+  request size limits, and a fallback returning `503` with `Retry-After`
+- `service.Dockerfile` (multi-stage, BuildKit cache mount, non-root, `MaxRAMPercentage`) and
+  `docker-compose.services.yml`; **only the gateway publishes a port**
+
+**Verified — 156 tests in the build, 21 integration tests here, plus an end-to-end run in Docker:**
+
+| Check | Result |
+|---|---|
+| auth-service reachable from the host | ✅ `:8081` refused; only `:8080` is published |
+| Unauthenticated protected route | ✅ 401 problem+json, request never reaches the service |
+| Token signed by an unknown key | ✅ refused |
+| Tampered / expired / wrong-issuer token | ✅ all refused |
+| Superseded token version | ✅ 401 `auth.token_superseded` |
+| Token matching or newer than the published version | ✅ allowed |
+| Credential endpoint flood | ✅ 10 allowed, then 429 with `Retry-After` |
+| Authenticated traffic | ✅ 300/min, separate bucket per user |
+| Health probes | ✅ never rate limited |
+| Service that does not exist yet | ✅ 503 in 86 ms, with `Retry-After` |
+| Downstream 500 | ✅ passed through, not disguised |
+| CORS preflight | ✅ allowed origin only; unknown origin refused |
+| Security headers | ✅ nosniff, DENY, Referrer-Policy (HSTS only over TLS) |
+| Correlation id | ✅ propagated downstream, echoed once, not duplicated per hop |
+| Register → OTP → verify → login → /me, all through `:8080` | ✅ in Docker |
+
+**Two bugs found by running it rather than testing it.** The gateway died at startup in its
+container on a missing `spring-boot-restclient` — declared test-scoped for `TestRestTemplate`, so
+every test passed while the image could not boot. And every proxied request was getting a freshly
+generated correlation id, because the circuit breaker runs the downstream call on its own thread
+and the MDC is thread-local.
 
 ---
 

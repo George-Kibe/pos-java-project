@@ -1,0 +1,17 @@
+# Test overlay, merged on top of the real application.yml by @ActiveProfiles("test").
+# Never name this application.yml: in src/test/resources it shadows the main file instead of
+# merging, which would silently drop the route table and every public path.
+spring:
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          # Routes come from the main configuration; only the targets are redirected, via the
+          # environment variables the main file already reads.
+          enabled: true
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.pos: INFO
+    org.springframework.cloud.gateway: INFO

@@ -238,23 +238,25 @@ git clone <repo-url> && cd pos-java-project
 
 make doctor                     # confirm JDK, Node, Docker are usable
 make env                        # writes .env with generated secrets (never overwrites)
-make infra-up                   # postgres, kafka, redis, mailpit + topic creation
+make up                         # infrastructure + services; gateway on :8080
 make ps                         # container status
-make build                      # backend/mvnw -T1C clean install
+make verify                     # full build: format, tests, integration tests, coverage
 ```
+
+`make infra-up` brings up only the infrastructure, for running a service from your IDE against it.
 
 `make` on its own lists every target. Backend Maven commands run from `backend/`
 (`cd backend && ./mvnw …`); the Makefile targets do this for you.
 
 | URL | What |
 |---|---|
+| http://localhost:8080 | **API gateway — the only way in** (live now) |
 | http://localhost:8025 | Mailpit — catches all dev email (**live now**) |
 | localhost:5432 | PostgreSQL (**live now**) |
 | localhost:29092 | Kafka, from the host (`kafka:9092` inside the network) (**live now**) |
 | localhost:6379 | Redis (**live now**) |
 | http://localhost:3000 | Next.js app (Phase 13) |
-| http://localhost:8080 | API gateway (Phase 4) |
-| http://localhost:8080/swagger-ui.html | Aggregated OpenAPI (Phase 4) |
+| http://localhost:8080/swagger-ui.html | Aggregated OpenAPI |
 | http://localhost:3001 | Grafana (Phase 16) |
 
 Seed data (`make seed`) arrives with the services that own it; it will create one company, two

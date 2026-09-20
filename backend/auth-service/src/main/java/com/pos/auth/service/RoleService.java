@@ -31,6 +31,7 @@ public class RoleService {
     private final PermissionRepository permissions;
     private final UserRepository users;
     private final AuditService audit;
+    private final TokenVersionRegistry tokenVersions;
 
     @Transactional(readOnly = true)
     public List<Role> findAll() {
@@ -92,6 +93,10 @@ public class RoleService {
         roles.save(role);
 
         int affected = users.bumpTokenVersionForRole(id);
+        // Every holder's outstanding access token now carries a permission set that no longer
+        // matches the role, so each new version is published for the gateway to enforce.
+        users.findTokenVersionsByRole(id)
+                .forEach(view -> tokenVersions.publish(view.getId(), view.getTokenVersion()));
 
         audit.record(
                 AuditService.ROLE_UPDATED,

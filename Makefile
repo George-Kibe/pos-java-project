@@ -3,7 +3,9 @@ SHELL := /bin/bash
 
 COMPOSE_FILE := infra/compose/docker-compose.yml
 ENV_FILE     := .env
+SERVICES_FILE := infra/compose/docker-compose.services.yml
 DC           := docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
+DC_ALL       := docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) -f $(SERVICES_FILE)
 MVN          := ./mvnw
 BACKEND      := backend
 
@@ -11,6 +13,7 @@ INFRA_SERVICES := postgres kafka redis mailpit
 
 .DEFAULT_GOAL := help
 .PHONY: help env doctor infra-up infra-down infra-restart infra-logs topics ps logs \
+        up down images service-logs \
         build fmt test it verify psql redis-cli kafka-topics clean nuke check-env
 
 ## ---------------------------------------------------------------------------
@@ -72,6 +75,57 @@ ps: check-env ## Show container status
 logs: check-env ## Tail one service: make logs svc=postgres
 	@test -n "$(svc)" || { echo "Usage: make logs svc=<service>"; exit 1; }
 	$(DC) logs -f $(svc)
+
+## ---------------------------------------------------------------------------
+## Application services
+## ---------------------------------------------------------------------------
+up: infra-up ## Start infrastructure and all services (gateway on :8080)
+	@# Services come up after the topics exist: broker auto-creation is off, so a producer
+	@# starting first would fail on its first publish rather than waiting.
+	$(DC_ALL) up -d --build --wait auth-service api-gateway
+	@echo
+	@$(DC_ALL) ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}'
+	@echo
+	@echo "  Gateway (the only ingress)  http://localhost:8080"
+	@echo "  Mailpit                     http://localhost:8025"
+
+down: check-env ## Stop infrastructure (data volumes are kept)
+	$(DC) down --remove-orphans
+
+infra-restart: infra-down infra-up ## Restart infrastructure
+
+infra-logs: check-env ## Tail infrastructure logs
+	$(DC) logs -f $(INFRA_SERVICES)
+
+topics: check-env ## (Re)create Kafka topics - idempotent
+	$(DC) run --rm kafka-init
+
+ps: check-env ## Show container status
+	@$(DC) ps --format 'table {{.Name}}\t{{.Service}}\t{{.Status}}'
+
+logs: check-env ## Tail one service: make logs svc=postgres
+	@test -n "$(svc)" || { echo "Usage: make logs svc=<service>"; exit 1; }
+	$(DC) logs -f $(svc)
+
+## ---------------------------------------------------------------------------
+## Application services
+## ---------------------------------------------------------------------------
+up: check-env ## Start infrastructure and all services (gateway on :8080)
+	$(DC_ALL) up -d --build --wait
+	@echo
+	@$(DC_ALL) ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}'
+	@echo
+	@echo "  Gateway (the only ingress)  http://localhost:8080"
+	@echo "  Mailpit                     http://localhost:8025"
+
+down: check-env ## Stop services and infrastructure (volumes kept)
+	$(DC_ALL) down --remove-orphans
+
+images: check-env ## Rebuild the service images
+	$(DC_ALL) build
+
+service-logs: check-env ## Tail application service logs
+	$(DC_ALL) logs -f auth-service api-gateway
 
 ## ---------------------------------------------------------------------------
 ## Build and test

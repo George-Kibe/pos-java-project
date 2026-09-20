@@ -1,0 +1,251 @@
+spring:
+  application:
+    name: api-gateway
+
+  threads:
+    virtual:
+      # The gateway is almost entirely waiting on downstream I/O. Virtual threads are what make
+      # the servlet gateway viable here instead of the reactive one.
+      enabled: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Nimbus caches this key set and refetches on an unknown kid, so rotating a signing key
+          # needs no change or restart here.
+          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            # --- auth-service ---------------------------------------------------
+            - id: auth-service
+              uri: ${AUTH_SERVICE_URI:http://localhost:8081}
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/roles/**,/api/v1/permissions/**,/api/v1/branches/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    id: auth-service
+                    fallbackPath: /fallback/service-unavailable
+
+            # Published so a service can verify tokens through the gateway if it has no direct
+            # route to auth-service.
+            - id: auth-service-jwks
+              uri: ${AUTH_SERVICE_URI:http://localhost:8081}
+              predicates:
+                - Path=/.well-known/jwks.json
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    id: auth-service
+                    fallbackPath: /fallback/service-unavailable
+
+            # --- services from later phases -------------------------------------
+            # Routed now so the table is complete and the gateway is the only ingress from the
+            # start. Until each service exists its circuit opens and callers get a clean 503
+            # rather than a hung request.
+            - id: catalog-service
+              uri: ${CATALOG_SERVICE_URI:http://localhost:8082}
+              predicates:
+                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/price-lists/**,/api/v1/promotions/**,/api/v1/tax-classes/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    id: catalog-service
+                    fallbackPath: /fallback/service-unavailable
+
+            - id: inventory-service
+              uri: ${INVENTORY_SERVICE_URI:http://localhost:8083}
+              predicates:
+                - Path=/api/v1/stock/**,/api/v1/batches/**,/api/v1/stock-takes/**,/api/v1/transfers/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    id: inventory-service
+                    fallbackPath: /fallback/service-unavailable
+
+            - id: purchasing-service
+              uri: ${PURCHASING_SERVICE_URI:http://localhost:8084}
+              predicates:
+                - Path=/api/v1/suppliers/**,/api/v1/purchase-orders/**,/api/v1/goods-received/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    id: purchasing-service
+                    fallbackPath: /fallback/service-unavailable
+
+            - id: sales-service
+              uri: ${SALES_SERVICE_URI:http://localhost:8085}
+              predicates:
+                - Path=/api/v1/sales/**,/api/v1/carts/**,/api/v1/shifts/**,/api/v1/returns/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    id: sales-service
+                    fallbackPath: /fallback/service-unavailable
+
+            - id: payment-service
+              uri: ${PAYMENT_SERVICE_URI:http://localhost:8086}
+              predicates:
+                - Path=/api/v1/payments/**,/api/v1/refunds/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    id: payment-service
+                    fallbackPath: /fallback/service-unavailable
+
+            - id: customer-service
+              uri: ${CUSTOMER_SERVICE_URI:http://localhost:8087}
+              predicates:
+                - Path=/api/v1/customers/**,/api/v1/loyalty/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    id: customer-service
+                    fallbackPath: /fallback/service-unavailable
+
+            - id: reporting-service
+              uri: ${REPORTING_SERVICE_URI:http://localhost:8089}
+              predicates:
+                - Path=/api/v1/reports/**,/api/v1/dashboards/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    id: reporting-service
+                    fallbackPath: /fallback/service-unavailable
+
+server:
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
+  error:
+    whitelabel:
+      enabled: false
+  max-http-request-header-size: 16KB
+  tomcat:
+    # Caps how much a caller can push at the gateway. A till posts a batch of offline sales, not
+    # a file, so this is generous for the real traffic and hostile to anything else.
+    max-http-form-post-size: 2MB
+    max-swallow-size: 2MB
+    connection-timeout: 10s
+
+# Trip fast and recover fast. A till that cannot reach the server needs to know in seconds so it
+# can switch to offline mode; waiting out a long timeout is the one thing it must not do.
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+    instances:
+      auth-service:
+        baseConfig: default
+      catalog-service:
+        baseConfig: default
+      inventory-service:
+        baseConfig: default
+      purchasing-service:
+        baseConfig: default
+      sales-service:
+        baseConfig: default
+      payment-service:
+        baseConfig: default
+      customer-service:
+        baseConfig: default
+      reporting-service:
+        baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 8s
+        cancelRunningFuture: true
+    instances:
+      auth-service:
+        baseConfig: default
+      # Payment providers are slow by nature; M-Pesa in particular. A tighter limit here would
+      # abandon requests that were about to succeed.
+      payment-service:
+        timeoutDuration: 30s
+
+pos:
+  security:
+    public-paths:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /fallback/**
+      - /api/v1/auth/register
+      - /api/v1/auth/verify-otp
+      - /api/v1/auth/resend-otp
+      - /api/v1/auth/login
+      - /api/v1/auth/refresh
+      - /api/v1/auth/logout
+      - /api/v1/auth/forgot-password
+      - /api/v1/auth/reset-password
+      - /.well-known/jwks.json
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+
+  gateway:
+    jwt:
+      issuer: ${JWT_ISSUER:http://localhost:8081}
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    rate-limit:
+      enabled: true
+      # Tight: these are the endpoints worth brute forcing, and a person signs in a few times a day.
+      auth:
+        capacity: 10
+        window: PT1M
+      # Generous: a busy lane makes many legitimate requests and must not be throttled.
+      authenticated:
+        capacity: 300
+        window: PT1M
+      anonymous:
+        capacity: 60
+        window: PT1M
+
+springdoc:
+  swagger-ui:
+    # One page listing every service's spec, fetched through the gateway.
+    urls:
+      - name: auth-service
+        url: /v3/api-docs/auth-service
+    disable-swagger-default-url: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.pos: INFO

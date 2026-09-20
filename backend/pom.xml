@@ -27,6 +27,7 @@
     <module>common-lib</module>
     <module>messaging-lib</module>
     <module>auth-service</module>
+    <module>api-gateway</module>
   </modules>
 
   <properties>
@@ -43,6 +44,8 @@
     <archunit.version>1.5.0</archunit.version>
     <!-- Not managed by the Boot BOM; required by Spring Security's Argon2PasswordEncoder. -->
     <bouncycastle.version>1.86</bouncycastle.version>
+    <!-- Not managed by the Boot BOM. -->
+    <wiremock.version>3.13.2</wiremock.version>
 
     <spotless.version>3.10.2</spotless.version>
     <google-java-format.version>1.36.1</google-java-format.version>
@@ -76,6 +79,12 @@
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.wiremock</groupId>
+        <artifactId>wiremock-standalone</artifactId>
+        <version>${wiremock.version}</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>com.tngtech.archunit</groupId>

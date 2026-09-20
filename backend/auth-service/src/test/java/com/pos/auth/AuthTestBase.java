@@ -19,6 +19,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import com.redis.testcontainers.RedisContainer;
+
 import com.pos.events.EventEnvelope;
 import com.pos.events.EventJson;
 import com.pos.events.Topics;
@@ -53,8 +55,12 @@ public abstract class AuthTestBase {
                     .withUsername("test")
                     .withPassword("test");
 
+    /** Token-version publications go here, and the gateway reads them from the same key. */
+    static final RedisContainer REDIS = new RedisContainer("redis:7-alpine");
+
     static {
         POSTGRES.start();
+        REDIS.start();
     }
 
     @DynamicPropertySource
@@ -62,12 +68,15 @@ public abstract class AuthTestBase {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS.getFirstMappedPort());
     }
 
     @LocalServerPort protected int port;
 
     @Autowired protected TestRestTemplate rest;
     @Autowired protected JdbcClient jdbc;
+    @Autowired protected org.springframework.data.redis.core.StringRedisTemplate redis;
 
     protected String baseUrl;
 
@@ -206,6 +215,11 @@ public abstract class AuthTestBase {
     }
 
     /** The bootstrap SUPER_ADMIN created at startup, for tests that need full permissions. */
+    /** The token version auth-service has published for a user, as the gateway would read it. */
+    protected String publishedTokenVersion(java.util.UUID userId) {
+        return redis.opsForValue().get(com.pos.common.security.TokenVersionKeys.forUser(userId));
+    }
+
     protected String adminAccessToken() {
         return loginForAccessToken("bootstrap-admin@pos.test", "BootstrapAdminPassword1");
     }

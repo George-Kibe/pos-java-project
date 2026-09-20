@@ -385,6 +385,76 @@ class AdminManagementIT extends AuthTestBase {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    @Test
+    @DisplayName("a role change publishes every holder's new token version for the gateway")
+    void roleChangesPublishTokenVersionsForTheGateway() {
+        String admin = adminAccessToken();
+
+        String roleCode = "PUBLISHER_" + UUID.randomUUID().toString().substring(0, 8);
+        String roleId =
+                json(post(
+                                "/api/v1/roles",
+                                Map.of(
+                                        "code",
+                                        roleCode,
+                                        "name",
+                                        "Publisher test",
+                                        "permissions",
+                                        List.of("user:view")),
+                                admin))
+                        .get("id")
+                        .asString();
+
+        String email = "publish-" + System.nanoTime() + "@pos.test";
+        String userId =
+                json(post(
+                                "/api/v1/users",
+                                Map.of(
+                                        "email",
+                                        email,
+                                        "temporaryPassword",
+                                        "TemporaryPassword1",
+                                        "fullName",
+                                        "Publish Test",
+                                        "roles",
+                                        List.of(roleCode.toUpperCase(java.util.Locale.ROOT))),
+                                admin))
+                        .get("id")
+                        .asString();
+
+        // Nothing published yet: the account has never had its version bumped.
+        assertThat(publishedTokenVersion(UUID.fromString(userId))).isNull();
+
+        patch(
+                "/api/v1/roles/" + roleId,
+                Map.of("permissions", List.of("user:view", "user:manage")),
+                admin);
+
+        // This is what the gateway reads to refuse the token the user is holding right now.
+        assertThat(publishedTokenVersion(UUID.fromString(userId))).isEqualTo("2");
+    }
+
+    @Test
+    void suspendingAUserPublishesTheirTokenVersion() {
+        String admin = adminAccessToken();
+        String email = "suspend-publish-" + System.nanoTime() + "@pos.test";
+
+        String userId =
+                json(post(
+                                "/api/v1/users",
+                                Map.of(
+                                        "email", email,
+                                        "temporaryPassword", "TemporaryPassword1",
+                                        "fullName", "Suspend Publish"),
+                                admin))
+                        .get("id")
+                        .asString();
+
+        put("/api/v1/users/" + userId + "/status", Map.of("status", "SUSPENDED"), admin);
+
+        assertThat(publishedTokenVersion(UUID.fromString(userId))).isNotNull();
+    }
+
     private static JsonNode json(ResponseEntity<String> response) {
         return EventJson.mapper().readTree(response.getBody());
     }

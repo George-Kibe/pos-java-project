@@ -22,12 +22,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * outside a conservative character set, or longer than {@link #MAX_LENGTH}, is discarded and
  * replaced with a generated id. Without that, a crafted header could inject newlines into the log
  * stream and forge log entries.
+ *
+ * <p>The resolved id is also stored as a request attribute, not only in the MDC. The MDC is
+ * thread-local and does not survive a hand-off - a circuit breaker with a timeout runs the
+ * downstream call on its own thread pool, and anything reading the MDC there sees nothing. Code
+ * that needs the id outside this thread reads {@link #REQUEST_ATTRIBUTE}.
  */
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorrelationIdFilter extends OncePerRequestFilter {
 
     /** Long enough for a UUID or a trace id, short enough not to bloat every log line. */
     public static final int MAX_LENGTH = 64;
+
+    /** Request attribute holding the resolved id, for code running off the request thread. */
+    public static final String REQUEST_ATTRIBUTE = CorrelationIdFilter.class.getName() + ".id";
 
     private static final Pattern SAFE = Pattern.compile("^[A-Za-z0-9._-]+$");
 
@@ -39,6 +47,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
         String correlationId = sanitise(request.getHeader(CorrelationId.HEADER));
         try {
             CorrelationId.set(correlationId);
+            request.setAttribute(REQUEST_ATTRIBUTE, correlationId);
             response.setHeader(CorrelationId.HEADER, correlationId);
             chain.doFilter(request, response);
         } finally {
