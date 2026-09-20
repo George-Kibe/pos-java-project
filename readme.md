@@ -158,8 +158,9 @@ pos-java-project/
 ├── backend/
 │   ├── pom.xml                      # parent POM: versions, plugins, profiles
 │   ├── mvnw, mvnw.cmd, .mvn/        # Maven wrapper (script-only, 3.9.16)
-│   ├── common-lib/
-│   ├── events-lib/
+│   ├── common-lib/                  # errors, correlation, security, auditing, money
+│   ├── events-lib/                  # event envelope, topic names, payloads
+│   ├── messaging-lib/               # transactional outbox, idempotent consumption
 │   ├── api-gateway/
 │   ├── auth-service/
 │   ├── catalog-service/

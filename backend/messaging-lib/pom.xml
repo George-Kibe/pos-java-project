@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.pos</groupId>
+    <artifactId>pos-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>messaging-lib</artifactId>
+  <name>messaging-lib</name>
+  <description>Transactional outbox, idempotent consumption and Kafka wiring</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.pos</groupId>
+      <artifactId>events-lib</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.pos</groupId>
+      <artifactId>common-lib</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!--
+      Plain JDBC rather than JPA on purpose. The outbox is infrastructure, not domain: it has no
+      entity graph, no lazy loading and no auditing. Keeping it on JdbcClient means this library
+      never registers entities or repositories into a consuming service's persistence context,
+      so it cannot disturb that service's entity scanning or flush ordering. It still joins the
+      caller's transaction, which is the only property the pattern actually requires.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-kafka</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-flyway</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      Flyway 10+ ships each database's support as its own module; flyway-core alone rejects
+      PostgreSQL with "Unsupported Database". Every service running migrations needs this.
+    -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-kafka</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

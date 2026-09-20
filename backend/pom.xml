@@ -22,7 +22,11 @@
     Phase 3: auth-service        Phase 4: api-gateway
     Phase 5: notification-service ... etc.
   -->
-  <modules/>
+  <modules>
+    <module>events-lib</module>
+    <module>common-lib</module>
+    <module>messaging-lib</module>
+  </modules>
 
   <properties>
     <java.version>21</java.version>
@@ -194,6 +198,23 @@
               <goal>prepare-agent</goal>
             </goals>
           </execution>
+          <!--
+            Integration tests exercise code that unit tests cannot reach - the outbox relay only
+            means anything against a real database and broker. Both agents append to one exec
+            file so the coverage gate sees the whole picture rather than penalising a module for
+            being tested the honest way.
+          -->
+          <execution>
+            <id>prepare-agent-integration</id>
+            <goals>
+              <goal>prepare-agent-integration</goal>
+            </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco.exec</destFile>
+              <propertyName>failsafeArgLine</propertyName>
+              <append>true</append>
+            </configuration>
+          </execution>
           <execution>
             <id>report</id>
             <goals>
@@ -240,6 +261,7 @@
               <includes>
                 <include>**/*IT.java</include>
               </includes>
+              <argLine>@{failsafeArgLine}</argLine>
             </configuration>
             <executions>
               <execution>

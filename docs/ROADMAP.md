@@ -10,7 +10,7 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 |---|---|---|---|
 | 0 | Prerequisites & accounts | Tools installed, credentials in hand | ✅ done |
 | 1 | Repo skeleton & infrastructure | Compose stack up, parent POM builds | ✅ done |
-| 2 | Shared libraries | `common-lib`, `events-lib`, outbox, idempotency | 2–3 d |
+| 2 | Shared libraries | `common-lib`, `events-lib`, `messaging-lib` | ✅ done |
 | 3 | auth-service | Register → OTP → login → refresh, JWKS | 4–5 d |
 | 4 | api-gateway | Single ingress, JWT enforcement, rate limits | 2 d |
 | 5 | notification-service | Real OTP email; registration loop closes | 2–3 d |
@@ -87,30 +87,64 @@ Delivered:
 
 ---
 
-## Phase 2 — Shared libraries
+## Phase 2 — Shared libraries ✅
 
 **Goal:** the cross-cutting concerns exist once, so no service reinvents them.
 
-`common-lib`:
-- RFC 7807 error model + `@RestControllerAdvice` producing one error shape everywhere
-- Correlation-ID filter (accept or generate, put in MDC, propagate outbound)
-- Structured JSON logging with a masker for tokens, OTPs, passwords and phone numbers
-- OAuth2 resource-server autoconfiguration: JWKS validation, permission → `GrantedAuthority`
-  mapping, `@PreAuthorize` support, `CurrentUser` resolver, `BranchAccessGuard`
-- JPA auditing base entity (`createdAt/By`, `updatedAt/By`, `version`), UUIDv7 generator
-- `PageResponse<T>`, common validators, `Money` helpers
+Delivered as three modules rather than two: `messaging-lib` was split out so that `common-lib`
+carries no Kafka dependency (the gateway needs the error and security wiring but no broker).
 
-`events-lib`:
-- `EventEnvelope<T>`, topic-name constants, all event payload DTOs, Jackson configuration
+**`events-lib`** — no Spring dependency at all
+- `EventEnvelope<T>` with a builder; `eventType` and `schemaVersion` are derived from the topic
+  name so the two cannot drift apart
+- `Topics` — every topic in the catalogue, plus `dlt()`, `eventTypeOf()`, `schemaVersionOf()`
+- Auth event payloads; each later phase adds its own as that domain is designed
+- `EventJson` — one Jackson configuration, unknown properties ignored on read so a consumer on an
+  older build survives a producer that added a field
 
-Outbox & idempotency modules:
-- `outbox` table + `OutboxPublisher` (scheduled relay with backoff, marks published)
-- `processed_event` table + `IdempotentConsumer` wrapper
-- Flyway migration fragments services can apply into their own schema
+**`common-lib`** — web, security and JPA dependencies all optional, wiring `@ConditionalOnClass`
+- RFC 7807 error model: `ApiException`, the `Errors` hierarchy, `GlobalExceptionHandler`, and
+  `SecurityExceptionHandler` for `@PreAuthorize` denials
+- `CorrelationIdFilter` — accepts or generates, sanitises hostile values, echoes on the response
+- `LogMasker` + Logback converter — passwords, OTPs, tokens, JWTs, card PANs, phone numbers
+- Resource-server auto-configuration: JWKS validation, `perms` claim to authorities,
+  `AuthenticatedUser`, `BranchAccessGuard`, problem+json 401/403 handlers
+- `BaseEntity` (UUIDv7 id, audit columns, optimistic lock), `AuthenticatedAuditorAware`
+- `UuidV7`, `Money`, `PageResponse`
 
-**Done when:** a throwaway test service using both libraries starts, rejects an unauthenticated
-call with a problem+json 401, publishes an outbox event that reaches Kafka, and ignores a duplicate
-delivery.
+**`messaging-lib`** — built on `JdbcClient`, not JPA, so it never touches a service's persistence
+context
+- `OutboxRecorder` — refuses to run outside a transaction, so the atomicity guarantee cannot be
+  silently lost
+- `OutboxPublisher` — `FOR UPDATE SKIP LOCKED` batches, exponential backoff, rows parked as
+  `FAILED` after the attempt limit rather than dropped
+- `IdempotentConsumer` — keyed on (event, consumer); marker written before the handler runs so a
+  failed handler rolls back and is retried rather than skipped
+- `V0_001__messaging_infrastructure.sql` — shared migration; shared versions use `V0_*`, service
+  migrations start at `V1`
+
+**Verified — 95 tests, all passing:**
+
+| Check | Result |
+|---|---|
+| Unauthenticated call | ✅ 401 `application/problem+json`, `auth.unauthenticated`, correlation id |
+| `@PreAuthorize` denial | ✅ 403 problem+json, does not name the required permission |
+| Cross-branch access | ✅ 403, does not disclose whether the branch exists |
+| Validation failure | ✅ 400 with field errors, submitted password never echoed |
+| Unexpected exception | ✅ generic 500; host, port and DB user all absent from the response |
+| Hostile correlation header | ✅ discarded; newline log-forging not possible |
+| Outbox → Kafka | ✅ published, keyed by aggregate id, envelope intact |
+| Rolled-back transaction | ✅ no row, no event |
+| Recording outside a transaction | ✅ rejected loudly |
+| Duplicate delivery | ✅ handler ran exactly once |
+| Two consumers, one event | ✅ each ran once |
+| Handler throws | ✅ marker rolled back, redelivery retried |
+| Failed send | ✅ attempts incremented, backed off, still `PENDING` |
+| Repeatedly failed send | ✅ parked as `FAILED`, never auto-retried |
+| Coverage gate (80%) | ✅ common-lib 87.8%; integration-test coverage now counted |
+
+**Deferred:** ArchUnit boundary rules. They need at least one service to be meaningful, so they
+land in Phase 3 alongside `auth-service`.
 
 ---
 

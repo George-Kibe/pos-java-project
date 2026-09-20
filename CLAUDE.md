@@ -180,6 +180,39 @@ Rules:
 - Commit only when asked. Never commit `.env`, keystores, credentials or `.DS_Store`.
 - Keep commits scoped to one concern; migrations ship with the code that needs them.
 
+## Stack traps already hit (do not rediscover these)
+
+- **Boot 4 starter names changed.** `spring-boot-starter-aop` no longer exists - it is
+  `-aspectj`. There are also new `-flyway`, `-kafka`, `-webmvc`,
+  `-security-oauth2-resource-server`, `-micrometer-metrics` and `-opentelemetry` starters.
+- **Jackson 3 is the default.** Core and databind are `tools.jackson.*`; annotations stayed at
+  `com.fasterxml.jackson.annotation`. Importing `com.fasterxml.jackson.databind.ObjectMapper`
+  will not resolve.
+- **Test auto-configuration is split per module.** `@AutoConfigureMockMvc` is now
+  `org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc`, from
+  `spring-boot-starter-webmvc-test`. Not from `spring-boot-starter-test`.
+- **Flyway needs its database module.** `flyway-core` alone rejects Postgres with
+  "Unsupported Database". Every service running migrations must also depend on
+  `org.flywaydb:flyway-database-postgresql`.
+- **Testcontainers 2.x renamed everything.** Artifacts are `testcontainers-postgresql`,
+  `testcontainers-kafka`, `testcontainers-junit-jupiter`; containers live in
+  `org.testcontainers.postgresql` / `org.testcontainers.kafka`; and `PostgreSQLContainer` is no
+  longer generic, so `new PostgreSQLContainer<>(...)` does not compile.
+- **Testcontainers' apache/kafka container fails on this machine** with
+  `/tmp/testcontainers_start.sh: Text file busy` (Docker Desktop + gVisor). Integration tests use
+  `ConfluentKafkaContainer` with `confluentinc/cp-kafka`; Docker Compose still runs
+  `apache/kafka`. Same protocol, so nothing under test is affected.
+- **Never declare a dependency twice in one POM.** An `<optional>true</optional>` entry followed
+  by a `<scope>test</scope>` entry for the same artifact silently makes it test-only and the main
+  build stops compiling. Optional dependencies are already on the declaring module's own compile
+  and test classpath.
+- **A library auto-configuration must not activate on classes alone.** `@ConditionalOnClass` sees
+  JPA on the classpath even in a service with no datasource. Guard on the bean that actually
+  matters, e.g. `@ConditionalOnBean(EntityManagerFactory.class)`.
+- **`@PreAuthorize` denials bypass the security filter chain.** They are thrown inside the
+  application, so `AccessDeniedHandler` never sees them and a catch-all `@ExceptionHandler` turns
+  every 403 into a 500. `SecurityExceptionHandler` in common-lib handles this - do not remove it.
+
 ## Traps specific to this codebase
 
 - A sale's totals are computed **server-side, always.** Client-sent totals are advisory and must be

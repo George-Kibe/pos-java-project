@@ -1,0 +1,22 @@
+# The test probe exercises the web and security contract only. JPA is on this module's test
+# classpath because BaseEntity compiles against it, but there is no database here, so the
+# persistence auto-configuration is switched off rather than pointed at an in-memory stand-in.
+# (Persistence is covered against a real Postgres via Testcontainers in messaging-lib.)
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceInitializationAutoConfiguration
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
+
+pos:
+  security:
+    public-paths:
+      - /actuator/health
+      - /api/v1/public/**
+
+logging:
+  level:
+    com.pos.common.error.GlobalExceptionHandler: "OFF"

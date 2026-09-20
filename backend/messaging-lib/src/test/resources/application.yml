@@ -1,0 +1,17 @@
+spring:
+  flyway:
+    # Only the shared infrastructure migration; a real service would list its own first.
+    locations: classpath:db/migration/shared
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+pos:
+  outbox:
+    # Tests drive the relay explicitly so assertions are deterministic rather than time-dependent.
+    enabled: false
+logging:
+  level:
+    org.testcontainers: WARN
+    com.pos.messaging: DEBUG

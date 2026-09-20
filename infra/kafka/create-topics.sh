@@ -12,12 +12,13 @@ REPLICATION="${TOPIC_REPLICATION:-1}"
 DAY_MS=86400000
 RETENTION_DEFAULT=$((7 * DAY_MS))    # transactional events
 RETENTION_SALES=$((30 * DAY_MS))     # reporting rebuild window
+RETENTION_SECRET=$((1 * DAY_MS))     # payloads carrying a live credential (OTP, reset token)
 
 # topic|retention_ms|cleanup_policy
 TOPICS="
-pos.auth.otp-requested.v1|${RETENTION_DEFAULT}|delete
+pos.auth.otp-requested.v1|${RETENTION_SECRET}|delete
 pos.auth.user-registered.v1|${RETENTION_DEFAULT}|delete
-pos.auth.password-reset-requested.v1|${RETENTION_DEFAULT}|delete
+pos.auth.password-reset-requested.v1|${RETENTION_SECRET}|delete
 pos.auth.user-role-changed.v1|${RETENTION_DEFAULT}|delete
 pos.catalog.product-changed.v1|-1|compact
 pos.catalog.price-changed.v1|${RETENTION_SALES}|delete

@@ -1,0 +1,2 @@
+com.pos.messaging.MessagingAutoConfiguration
+com.pos.messaging.MessagingAutoConfiguration$RelaySchedulingConfiguration
