@@ -11,7 +11,7 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 | 0 | Prerequisites & accounts | Tools installed, credentials in hand | ✅ done |
 | 1 | Repo skeleton & infrastructure | Compose stack up, parent POM builds | ✅ done |
 | 2 | Shared libraries | `common-lib`, `events-lib`, `messaging-lib` | ✅ done |
-| 3 | auth-service | Register → OTP → login → refresh, JWKS | 4–5 d |
+| 3 | auth-service | Register → OTP → login → refresh, JWKS | ✅ done |
 | 4 | api-gateway | Single ingress, JWT enforcement, rate limits | 2 d |
 | 5 | notification-service | Real OTP email; registration loop closes | 2–3 d |
 | 6 | catalog-service | Products, barcodes, tax engine, pricing, promos | 4–5 d |
@@ -148,37 +148,60 @@ land in Phase 3 alongside `auth-service`.
 
 ---
 
-## Phase 3 — auth-service
+## Phase 3 — auth-service ✅
 
-**Goal:** the full identity flow works end to end via HTTP, with OTPs readable from the outbox
-(real email arrives in Phase 5).
+**Goal:** the full identity flow works end to end via HTTP, with OTPs readable from the outbox.
 
-Schema: `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_branches`,
-`branches`, `refresh_tokens`, `otp_codes`, `login_attempts`, `audit_log`, `outbox`.
+Delivered:
+- **Schema** (12 tables): `branches`, `users`, `roles`, `permissions`, `role_permissions`,
+  `user_roles`, `user_branches`, `refresh_tokens`, `otp_codes`, `password_reset_tokens`,
+  `login_attempts`, `audit_log`, plus the shared outbox. Seeded with 41 permissions, 7 roles and a
+  first branch.
+- **Endpoints:** register, verify-otp, resend-otp, login, refresh, logout, forgot-password,
+  reset-password, change-password, `/me`, JWKS, and permission-gated CRUD for users, roles,
+  permissions and branches.
+- **Crypto:** Argon2id passwords behind a `DelegatingPasswordEncoder` so the algorithm can be
+  migrated without a mass reset; RS256 signing from a PKCS12 keystore with `kid`-based rotation
+  (all keys published, one signs); refresh tokens as 256-bit opaque values stored SHA-256 hashed.
+- **Defences:** rotation with reuse detection revoking the whole family, exponential lockout,
+  token-version invalidation on password and role changes, uniform responses on every
+  account-existence path, and a timing-equalised login.
+- **Bootstrap:** a first SUPER_ADMIN created only when the users table is empty, from
+  configuration with no default password, flagged to force a change.
+- **ArchUnit:** 8 boundary rules (deferred from Phase 2, now that a service exists to check).
 
-Endpoints:
-```
-POST /api/v1/auth/register        → PENDING_VERIFICATION, emits otp-requested
-POST /api/v1/auth/verify-otp      → ACTIVE, emits user-registered
-POST /api/v1/auth/resend-otp      → cooldown enforced
-POST /api/v1/auth/login           → access + refresh
-POST /api/v1/auth/refresh         → rotates, detects reuse, revokes family on reuse
-POST /api/v1/auth/logout          → revokes family
-POST /api/v1/auth/forgot-password /reset-password
-GET  /api/v1/auth/me
-GET  /.well-known/jwks.json
-CRUD /api/v1/users /api/v1/roles /api/v1/branches   (permission-gated)
-```
+**Verified — 133 tests across the build, 30 integration tests here against real PostgreSQL:**
 
-Also: Argon2id hashing, RSA keypair loaded from a keystore with a `kid`, key-rotation support,
-account lockout with exponential backoff, token-version invalidation, seeded roles
-(`SUPER_ADMIN`, `BRANCH_MANAGER`, `SUPERVISOR`, `CASHIER`, `STOCK_CONTROLLER`, `ACCOUNTANT`,
-`AUDITOR`) and a bootstrap admin created on first start.
+| Check | Result |
+|---|---|
+| register → OTP → verify → login → /me → refresh | ✅ full walk |
+| Login before verification | ✅ refused |
+| Replayed refresh token | ✅ whole family revoked, both parties signed out |
+| Access token verifies against published JWKS | ✅ by `kid`; no private material published |
+| Registering an existing address | ✅ byte-identical response to a new one |
+| Unknown address vs wrong password | ✅ identical code and status |
+| Wrong OTP ×5 | ✅ code burned; the correct one then fails too |
+| Repeated failed logins | ✅ locked, and all 4 attempts recorded |
+| Password reset | ✅ single-use, ends every session, old password dead |
+| Change own password | ✅ requires current password, clears forced-change, ends sessions |
+| Suspending a user | ✅ sessions ended, sign-in refused, reinstatement works |
+| Admin suspending themselves | ✅ refused |
+| Custom role built at runtime | ✅ grants exactly its permissions, immediately |
+| Widening a role | ✅ holders' tokens invalidated; new sign-in has the new permission |
+| Deleting a built-in role | ✅ refused |
+| Unknown permission in a role | ✅ rejected, not silently dropped |
+| Admin endpoints without permission | ✅ 403; unauthenticated 401 |
+| Coverage gate (80%) | ✅ 89.1% |
 
-**Done when:** a Testcontainers integration test walks register → read OTP → verify → login →
-call `/me` → refresh → replay the old refresh token and watch the family get revoked; JWKS validates
-a produced token; and role/permission CRUD creates a new custom role that immediately changes what a
-token can do.
+**Three bugs the tests caught**, all of the same shape — a state change rolled back by the
+rejection that followed it: the failed-login counter, the OTP attempt counter, and the
+refresh-token family revocation. Each looked correct from outside while doing nothing. Written up
+in [CLAUDE.md](../CLAUDE.md#the-rollback-trap-this-bit-us-three-times-in-one-phase).
+
+**Known limitation, by design:** `tv` (token version) is issued and bumped, but nothing enforces it
+at the edge yet, so an already-issued access token keeps its old permissions until it expires (15
+minutes). Enforcement belongs at the gateway with a Redis-backed version cache — Phase 4. The
+integration test asserts this behaviour explicitly rather than pretending otherwise.
 
 ---
 

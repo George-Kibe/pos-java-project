@@ -26,6 +26,7 @@
     <module>events-lib</module>
     <module>common-lib</module>
     <module>messaging-lib</module>
+    <module>auth-service</module>
   </modules>
 
   <properties>
@@ -40,6 +41,8 @@
     <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
     <springdoc.version>3.1.1</springdoc.version>
     <archunit.version>1.5.0</archunit.version>
+    <!-- Not managed by the Boot BOM; required by Spring Security's Argon2PasswordEncoder. -->
+    <bouncycastle.version>1.86</bouncycastle.version>
 
     <spotless.version>3.10.2</spotless.version>
     <google-java-format.version>1.36.1</google-java-format.version>
@@ -68,6 +71,11 @@
         <groupId>org.springdoc</groupId>
         <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         <version>${springdoc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
       </dependency>
       <dependency>
         <groupId>com.tngtech.archunit</groupId>

@@ -1,5 +1,7 @@
 package com.pos.common;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -48,6 +50,9 @@ import tools.jackson.databind.ObjectMapper;
 @EnableMethodSecurity
 public class PosResourceServerAutoConfiguration {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(PosResourceServerAutoConfiguration.class);
+
     @Bean
     @ConditionalOnMissingBean
     public PermissionsJwtAuthenticationConverter permissionsJwtAuthenticationConverter() {
@@ -90,6 +95,12 @@ public class PosResourceServerAutoConfiguration {
             throws Exception {
 
         String[] publicPaths = properties.getPublicPaths().toArray(String[]::new);
+        // Logged at startup on purpose: the unauthenticated surface is the thing most worth
+        // noticing when it changes, and it is otherwise invisible until something is exploited.
+        log.info(
+                "Security chain active; {} public path(s): {}",
+                publicPaths.length,
+                String.join(", ", publicPaths));
 
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> {})

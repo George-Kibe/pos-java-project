@@ -180,6 +180,37 @@ Rules:
 - Commit only when asked. Never commit `.env`, keystores, credentials or `.DS_Store`.
 - Keep commits scoped to one concern; migrations ship with the code that needs them.
 
+## The rollback trap (this bit us three times in one phase)
+
+**A state change that must survive a rejected request needs its own transaction.** The pattern is
+easy to write and invisible until someone attacks the system:
+
+```java
+// WRONG - the counter is rolled back by the exception that follows it
+@Transactional
+void login(...) {
+    recordFailure(user);          // same transaction
+    throw new UnauthorizedException(...);   // rolls back the record
+}
+```
+
+Caught three times in Phase 3, each looking correct from outside while doing nothing:
+
+| What | Why it was silently broken |
+|---|---|
+| Failed-login counter | Reset on every failure, so lockout could never trigger |
+| OTP attempt counter | Reset on every wrong guess, leaving a 6-digit code brute-forceable |
+| Refresh-token reuse revocation | Request was refused, but the stolen family stayed live and worked next time |
+
+The fix is a `@Transactional(propagation = REQUIRES_NEW)` method **on a different bean** (a
+self-invocation does not go through the proxy). See `LoginAttemptService`, `OtpService.verify` and
+`SessionRevocationService`.
+
+**And never pass a managed JPA entity into that separate transaction.** The inner transaction
+bumps the row's version while the caller still holds the old one, and the caller's next flush dies
+with an optimistic-lock failure on a row it never meant to touch. Pass the id and let the inner
+transaction load its own copy.
+
 ## Stack traps already hit (do not rediscover these)
 
 - **Boot 4 starter names changed.** `spring-boot-starter-aop` no longer exists - it is
@@ -209,6 +240,24 @@ Rules:
 - **A library auto-configuration must not activate on classes alone.** `@ConditionalOnClass` sees
   JPA on the classpath even in a service with no datasource. Guard on the bean that actually
   matters, e.g. `@ConditionalOnBean(EntityManagerFactory.class)`.
+- **A null String parameter inside a SQL function breaks PostgreSQL.** `WHERE (:q IS NULL OR
+  lower(x) LIKE lower(:q))` fails with `function lower(bytea) does not exist`, because the driver
+  sends an untyped null. Use two code paths (`findAll` vs `search`) instead of a null-or branch.
+- **`hibernate.default_schema` does not apply to plain JDBC.** The outbox is written with
+  `JdbcClient`, which resolves unqualified names against the connection's `search_path`. Set
+  `spring.datasource.hikari.schema` so JPA and JDBC agree.
+- **Spring Security has no notion of a wildcard permission.** `hasAuthority('x')` compares strings,
+  so a SUPER_ADMIN carrying only `*` is refused everywhere. `AccessTokenIssuer` expands `*` into
+  the concrete permission list at issue time; do not "fix" this by teaching each check about `*`.
+- **`@Container` stops the container when its test class finishes**, while Spring's context cache
+  keeps handing out the context built for it - so the second test class talks to a dead port and
+  every request 500s. Start the container in a `static {}` block and never stop it.
+- **Never name a test config file `application.yml`.** In `src/test/resources` it shadows the main
+  one instead of merging, silently dropping everything the real config sets. Use
+  `application-test.yml` with `@ActiveProfiles("test")`.
+- **`TestRestTemplate` is opt-in in Boot 4** via `@AutoConfigureTestRestTemplate`, needs
+  `spring-boot-resttestclient`, and its auto-configuration additionally needs
+  `spring-boot-restclient`. PATCH also needs `httpclient5` on the test classpath.
 - **`@PreAuthorize` denials bypass the security filter chain.** They are thrown inside the
   application, so `AccessDeniedHandler` never sees them and a catch-all `@ExceptionHandler` turns
   every 403 into a 500. `SecurityExceptionHandler` in common-lib handles this - do not remove it.

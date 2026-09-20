@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Shipped by common-lib so every service logs through the masker without per-service setup.
+  A service that needs a different layout can provide its own logback-spring.xml, which wins.
+
+  %maskedMsg is %msg passed through LogMasker: passwords, OTPs, tokens, JWTs, card numbers and
+  phone numbers are redacted on the way out. It is a safety net, not permission to log secrets.
+-->
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <conversionRule conversionWord="maskedMsg"
+                  class="com.pos.common.logging.MaskingMessageConverter"/>
+
+  <property name="POS_LOG_PATTERN"
+            value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{correlationId:-no-correlation-id}] %-40.40logger{39} : %maskedMsg%n%wEx"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>${POS_LOG_PATTERN}</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>

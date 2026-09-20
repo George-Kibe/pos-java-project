@@ -1,0 +1,50 @@
+# Test overlay, activated by @ActiveProfiles("test").
+#
+# Deliberately NOT named application.yml: a file of that name in src/test/resources shadows the
+# one in src/main/resources instead of merging with it, which silently drops everything the main
+# file configures - including pos.security.public-paths, which would leave every auth endpoint
+# requiring authentication. As a profile overlay it merges on top of the real configuration.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: auth
+  flyway:
+    schemas: auth
+    default-schema: auth
+    locations: classpath:db/migration,classpath:db/migration/shared
+  kafka:
+    # No broker in these tests. The relay is off, so nothing ever connects; outbox rows are read
+    # straight from the database, which is also how an operator would inspect them.
+    bootstrap-servers: localhost:1
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+pos:
+  outbox:
+    enabled: false
+  jwt:
+    issuer: http://localhost:8081
+    access-token-ttl: PT15M
+    refresh-token-ttl: P7D
+  auth:
+    otp:
+      resend-cooldown: PT1S
+    lockout:
+      max-failures: 3
+      window: PT15M
+      base-duration: PT1M
+      max-duration: PT1H
+    bootstrap:
+      enabled: true
+      email: bootstrap-admin@pos.test
+      password: BootstrapAdminPassword1
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.pos: INFO
+    org.hibernate.SQL: WARN
