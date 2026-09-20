@@ -257,6 +257,22 @@ transaction load its own copy.
   `spring-boot-restclient` to run; it was declared test-scoped for `TestRestTemplate`, so every
   test passed and the container died at startup on `NoClassDefFoundError`. Run the image, not only
   the tests.
+- **Jackson 3 rejects a missing primitive.** `FAIL_ON_NULL_FOR_PRIMITIVES` is on by default, so a
+  request that omits an optional `boolean` is answered "Request body could not be parsed" without
+  naming the field. Use boxed `Boolean` in request DTOs with an explicit default accessor.
+- **Request binding runs before method security.** An invalid body is answered 400 before
+  `@PreAuthorize` is ever reached, so a test asserting 403 must send a *valid* body.
+- **`CHAR(n)` fails Hibernate's schema validation** against a `String` field (`bpchar` vs
+  `varchar`). Use `VARCHAR(n)`; `CHAR` pads with spaces anyway.
+- **An `EXCLUDE` constraint needs `DEFERRABLE INITIALLY DEFERRED`** when the normal way to change
+  a row is close-one-period-open-the-next. Checked per statement, the two writes overlap for an
+  instant whichever order the ORM emits them in.
+- **`CREATE EXTENSION` needs privileges a per-service DB role does not have.** Install extensions
+  in `infra/postgres/init` as the superuser. Note that init scripts only run on an **empty** data
+  directory, so an existing volume needs the extension installed by hand.
+- **Every path a service exposes needs a gateway route.** `/api/v1/units-of-measure` and
+  `/api/v1/pricing` were missing from catalog's `Path=` predicate and 404'd at the edge while the
+  service was healthy and the other paths worked.
 - **`ExponentialBackOffWithMaxRetries` is gone in Spring 7.** Use `ExponentialBackOff` with
   `setMaxAttempts(long)`.
 - **`HttpHeaders` no longer implements `Map` in Spring 7.** `containsKey` is gone; use

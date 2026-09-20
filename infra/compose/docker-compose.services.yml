@@ -53,6 +53,43 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  catalog-service:
+    build:
+      context: ../../backend
+      dockerfile: ../infra/docker/service.Dockerfile
+      args:
+        MODULE: catalog-service
+    image: pos/catalog-service:dev
+    container_name: pos-catalog-service
+    restart: unless-stopped
+    networks: [pos]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8082
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-pos}
+      CATALOG_DB_USER: ${CATALOG_DB_USER:-catalog_user}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?required}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+    # No published port: reachable only through the gateway.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8082/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   notification-service:
     build:
       context: ../../backend
@@ -126,6 +163,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
       AUTH_SERVICE_URI: http://auth-service:8081
       NOTIFICATION_SERVICE_URI: http://notification-service:8088
+      CATALOG_SERVICE_URI: http://catalog-service:8082
       AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
       JWT_ISSUER: ${JWT_ISSUER:-http://auth-service:8081}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}

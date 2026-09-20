@@ -251,6 +251,7 @@ make verify                     # full build: format, tests, integration tests, 
 | URL | What |
 |---|---|
 | http://localhost:8080 | **API gateway — the only way in** (live now) |
+| http://localhost:8080/api/v1/pricing/resolve | Price a basket, with the full tax and discount breakdown |
 | http://localhost:8025 | Mailpit — catches all dev email, OTP codes land here (**live now**) |
 | localhost:5432 | PostgreSQL (**live now**) |
 | localhost:29092 | Kafka, from the host (`kafka:9092` inside the network) (**live now**) |

@@ -12,6 +12,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$DB" <<-SQL
 	REVOKE ALL ON SCHEMA public FROM PUBLIC;
 	REVOKE ALL ON DATABASE "$DB" FROM PUBLIC;
 	CREATE EXTENSION IF NOT EXISTS pgcrypto;
+	-- Needed by catalog's exclusion constraint on tax rate periods. Installed here because a
+	-- per-service role has rights on its own schema only and cannot create an extension.
+	CREATE EXTENSION IF NOT EXISTS btree_gist;
 SQL
 
 for svc in $SERVICES; do

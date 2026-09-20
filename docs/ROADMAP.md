@@ -14,7 +14,7 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 | 3 | auth-service | Register → OTP → login → refresh, JWKS | ✅ done |
 | 4 | api-gateway | Single ingress, JWT enforcement, rate limits | ✅ done |
 | 5 | notification-service | Real OTP email; registration loop closes | ✅ done |
-| 6 | catalog-service | Products, barcodes, tax engine, pricing, promos | 4–5 d |
+| 6 | catalog-service | Products, barcodes, tax engine, pricing, promos | ✅ done |
 | 7 | inventory-service | Stock, batches/expiry, FEFO, movements | 4–5 d |
 | 8 | purchasing-service | Suppliers, PO, GRN, costing | 3–4 d |
 | 9 | sales-service | Shifts, checkout saga, receipts, returns, offline sync | 5–7 d |
@@ -314,27 +314,60 @@ invent credentials.
 
 ---
 
-## Phase 6 — catalog-service
+## Phase 6 — catalog-service ✅
 
 **Goal:** products can be defined, priced and taxed correctly.
 
-- `categories`, `brands`, `units_of_measure`, `products`, `product_barcodes`, `tax_classes`,
-  `tax_rates` (effective-dated), `price_lists`, `price_list_items`, `promotions`, `promotion_rules`
-- Products: SKU, name, category, brand, UoM, sell-by-weight flag, tax class, active status, min/max
-  stock hints, image reference
-- Multiple barcodes per product, plus **scale barcode rules** — configurable EAN-13 prefix patterns
-  that decode an embedded weight or price
-- Tax engine: inclusive or exclusive pricing, rates versioned by `valid_from`/`valid_to`, resolution
-  always "as at" a timestamp so historical receipts stay correct
-- Price lists per branch with fallback to base price
-- Promotions: percentage/amount off, buy-X-get-Y, bundles, time windows, branch scope, member-only;
-  a deterministic `PriceResolver` that returns a fully explained price breakdown
-- Emits `catalog.product-changed`, `catalog.price-changed`
-- Bulk CSV import with row-level validation and an error report
+Delivered:
+- 12 tables: categories (hierarchical), brands, units of measure, tax classes with
+  **effective-dated** rates, products, barcodes, scale barcode rules, price lists and their items,
+  promotions and their rules
+- **Tax engine**: inclusive prices have tax extracted, exclusive have it added, rates resolve "as
+  at" an instant so a reprint uses the rate of the day. Rounding happens once and the third figure
+  is derived, so `net + tax == gross` exactly at every amount
+- **`PriceResolver`**: subtotal, then discounts, then tax - in that order, because a discount
+  changes the taxable amount. Deterministic promotion ordering, sequential stacking, single
+  best-offer when anything is non-stackable, discounts capped at the line. Pure: no Spring, no
+  JPA, no clock
+- **Scale barcodes**: EAN-13 check digit verified, layout driven entirely by configured rules, so
+  a shop changing scale vendors needs no release
+- Price lists per branch with priority and fallback to base price; promotions scoped by product,
+  category or store-wide, by branch, by time window and by membership
+- `product-changed` and `price-changed` events through the outbox; CSV bulk import with per-row
+  transactions and a line-numbered error report
 
-**Done when:** unit tests cover every pricing and tax combination (inclusive vs exclusive, zero-rated
-vs standard, promo stacking rules, weighed items), a scale barcode decodes to the right product and
-weight, and `PriceResolver` returns an identical breakdown to what the receipt will later show.
+**Verified — 251 tests in the build, 70 here, plus an end-to-end run through the gateway:**
+
+| Check | Result |
+|---|---|
+| Inclusive vs exclusive tax | ✅ 116 incl. = 100 + 16; 100 excl. = 100 + 16 |
+| The two are not interchangeable | ✅ 13.79 vs 16.00 on the same 100 |
+| Zero-rated goods | ✅ no tax either way |
+| `net + tax == lineTotal` | ✅ at every amount tested, including awkward weights |
+| Weighed line | ✅ 1.235 kg × 250.00 = 308.75 |
+| Rounding across 1000 lines | ✅ no drift |
+| Percentage, amount, buy-X-get-Y | ✅ incl. part groups (5 units on 3-for-2 gives one free) |
+| Stacking | ✅ two halves off leave a quarter, not nothing |
+| Non-stackable present | ✅ single best offer wins |
+| Discount larger than the line | ✅ capped; a line can be free, never negative |
+| Promotion ordering | ✅ same answer whatever order they arrive in |
+| Member-only / branch / window scoping | ✅ all enforced |
+| Price list priority and fallback | ✅ |
+| Rate change mid-year | ✅ before and after resolve to different rates, same price to the customer |
+| Tax class with no rate in force | ✅ fails loudly rather than charging nothing |
+| Scale barcode | ✅ decodes to the right product and 1.235 kg; bad check digit refused |
+| Ambiguous scale item code | ✅ refused rather than charging for the wrong item |
+| CSV import | ✅ good rows land, bad rows reported with line numbers, re-import updates |
+| Coverage gate | ✅ |
+
+**Bugs found by the build rather than by a person:** `ddl-auto: validate` caught `CHAR(3)` against
+a `String` field; the exclusion constraint on tax rate periods rejected the ordinary
+close-then-open sequence until it was deferred to commit; Jackson 3 rejected requests that merely
+omitted an optional boolean; and the gateway had no route for two of catalog's paths.
+
+**Deferred with reason:** `BUNDLE` promotions are modelled and stored but evaluated in
+sales-service, because deciding whether a bundle is satisfied needs the whole basket and this
+service prices one line at a time. `PriceResolver` skips them explicitly rather than silently.
 
 ---
 
