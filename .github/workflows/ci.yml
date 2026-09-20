@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Spotless `check` is bound to the validate phase, so formatting is
+      # enforced by the build itself rather than a separate step.
+      - name: Build, test and verify coverage
+        working-directory: backend
+        run: ./mvnw -B --no-transfer-progress clean verify -Pintegration
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend/**/target/surefire-reports/**
+            backend/**/target/failsafe-reports/**
+            backend/**/target/site/jacoco/**
+          retention-days: 7
+          if-no-files-found: ignore
+
+  compose:
+    name: Infrastructure stack smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate .env
+        run: make env
+
+      - name: Start infrastructure
+        run: make infra-up
+
+      - name: Assert schemas, roles and topics exist
+        run: |
+          set -a; . ./.env; set +a
+          DC="docker compose --env-file .env -f infra/compose/docker-compose.yml"
+          schemas=$($DC exec -T -e PGPASSWORD="$POSTGRES_SUPERUSER_PASSWORD" postgres \
+            psql -U "$POSTGRES_SUPERUSER" -d "$POSTGRES_DB" -h localhost -tAc \
+            "SELECT count(*) FROM pg_namespace WHERE nspname IN
+             ('auth','catalog','inventory','purchasing','sales','payment','customer','notification','reporting');" </dev/null)
+          echo "schemas: $schemas"; [ "$schemas" = "9" ]
+          topics=$($DC exec -T kafka /opt/kafka/bin/kafka-topics.sh \
+            --bootstrap-server localhost:9092 --list </dev/null | grep -c '^pos\.')
+          echo "topics: $topics"; [ "$topics" -ge 46 ]
+
+      - name: Assert cross-schema access is denied
+        run: |
+          set -a; . ./.env; set +a
+          DC="docker compose --env-file .env -f infra/compose/docker-compose.yml"
+          $DC exec -T -e PGPASSWORD="$AUTH_DB_PASSWORD" postgres \
+            psql -U auth_user -d "$POSTGRES_DB" -h localhost \
+            -c "SELECT 1 FROM sales.anything;" </dev/null 2>&1 \
+            | grep -q "permission denied for schema sales"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose --env-file .env -f infra/compose/docker-compose.yml logs --tail 200
+
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file .env -f infra/compose/docker-compose.yml down -v
+
+  security:
+    name: Security scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Vulnerability scan (dependencies and IaC)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'

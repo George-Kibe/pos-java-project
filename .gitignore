@@ -1,0 +1,65 @@
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.p12
+*.jks
+*.pem
+*.key
+secrets/
+
+# --- Java / Maven ---
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.properties
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+build/
+dist/
+.turbo/
+*.tsbuildinfo
+.pnpm-store/
+coverage/
+playwright-report/
+test-results/
+.playwright/
+
+# --- Docker / infra ---
+docker-compose.override.yml
+.volumes/
+pgdata/
+kafka-data/
+
+# --- IDE ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.settings/
+.project
+.classpath
+.factorypath
+nbproject/private/
+
+# --- OS ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+*~

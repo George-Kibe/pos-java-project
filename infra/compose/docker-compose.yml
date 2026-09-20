@@ -1,0 +1,177 @@
+# Base infrastructure stack: PostgreSQL, Kafka (KRaft), Redis, Mailpit.
+# Application services are layered on in later phases via docker-compose.services.yml.
+#
+# Run through the Makefile from the repository root, which supplies --env-file .env:
+#   make infra-up
+name: pos
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+networks:
+  pos:
+    name: pos-net
+    driver: bridge
+
+volumes:
+  pg_data:
+    name: pos-pg-data
+  kafka_data:
+    name: pos-kafka-data
+  redis_data:
+    name: pos-redis-data
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pos-postgres
+    restart: unless-stopped
+    networks: [pos]
+    <<: *logging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pos}
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-pos_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?POSTGRES_SUPERUSER_PASSWORD is required - run "make env"}
+      # Scram rather than md5 for new installs.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      # Consumed by 01-init-schemas.sh to create one role per service.
+      AUTH_DB_USER: ${AUTH_DB_USER:-auth_user}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?required}
+      CATALOG_DB_USER: ${CATALOG_DB_USER:-catalog_user}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?required}
+      INVENTORY_DB_USER: ${INVENTORY_DB_USER:-inventory_user}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD:?required}
+      PURCHASING_DB_USER: ${PURCHASING_DB_USER:-purchasing_user}
+      PURCHASING_DB_PASSWORD: ${PURCHASING_DB_PASSWORD:?required}
+      SALES_DB_USER: ${SALES_DB_USER:-sales_user}
+      SALES_DB_PASSWORD: ${SALES_DB_PASSWORD:?required}
+      PAYMENT_DB_USER: ${PAYMENT_DB_USER:-payment_user}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?required}
+      CUSTOMER_DB_USER: ${CUSTOMER_DB_USER:-customer_user}
+      CUSTOMER_DB_PASSWORD: ${CUSTOMER_DB_PASSWORD:?required}
+      NOTIFICATION_DB_USER: ${NOTIFICATION_DB_USER:-notification_user}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?required}
+      REPORTING_DB_USER: ${REPORTING_DB_USER:-reporting_user}
+      REPORTING_DB_PASSWORD: ${REPORTING_DB_PASSWORD:?required}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-pos_admin} -d ${POSTGRES_DB:-pos}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: pos-kafka
+    restart: unless-stopped
+    networks: [pos]
+    <<: *logging
+    environment:
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-5L6g3nShT-eMCtK--X86sw}
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # INTERNAL: container-to-container. EXTERNAL: from the host, for tooling and local runs.
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # A typo in a topic name must fail loudly, not silently create a topic.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_HEAP_OPTS: "-Xmx1G -Xms512M"
+    ports:
+      - "${KAFKA_EXTERNAL_PORT:-29092}:29092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+
+  # One-shot: creates the event-catalogue topics, then exits.
+  kafka-init:
+    image: apache/kafka:3.9.0
+    container_name: pos-kafka-init
+    restart: "no"
+    networks: [pos]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      TOPIC_PARTITIONS: ${TOPIC_PARTITIONS:-3}
+      TOPIC_REPLICATION: ${TOPIC_REPLICATION:-1}
+    volumes:
+      - ../kafka/create-topics.sh:/create-topics.sh:ro
+    entrypoint: ["/bin/bash", "/create-topics.sh"]
+
+  redis:
+    image: redis:7-alpine
+    container_name: pos-redis
+    restart: unless-stopped
+    networks: [pos]
+    <<: *logging
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required - run "make env"}
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
+
+  # Development SMTP sink: catches every outbound mail, nothing leaves the machine.
+  # Production points the same SMTP client at Gmail/Workspace instead.
+  mailpit:
+    image: axllent/mailpit:v1.26
+    container_name: pos-mailpit
+    restart: unless-stopped
+    networks: [pos]
+    <<: *logging
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+      MP_MAX_MESSAGES: "2000"
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
