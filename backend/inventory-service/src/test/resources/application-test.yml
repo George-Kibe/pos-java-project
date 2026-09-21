@@ -1,0 +1,26 @@
+# Test overlay merged onto the real application.yml by @ActiveProfiles("test").
+# Never name this application.yml in src/test/resources: it shadows the main file instead of
+# merging, silently dropping the Flyway, Kafka and schema configuration.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  kafka:
+    consumer:
+      group-id: inventory-test
+      auto-offset-reset: earliest
+
+pos:
+  outbox:
+    # Outbox rows are read straight from the table; the relay is driven explicitly where needed.
+    enabled: false
+  inventory:
+    # The scheduled sweeps are invoked directly in tests so assertions do not wait on a clock.
+    expiry-scan-cron: "0 0 5 31 2 *"
+    reconciliation-cron: "0 0 5 31 2 *"
+    reservation-sweep: PT1H
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.pos: INFO

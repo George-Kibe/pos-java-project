@@ -30,6 +30,7 @@
     <module>api-gateway</module>
     <module>notification-service</module>
     <module>catalog-service</module>
+    <module>inventory-service</module>
   </modules>
 
   <properties>

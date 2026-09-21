@@ -49,4 +49,21 @@ class ErrorsTest {
     void anErrorWithoutDetailsHasAnEmptyMap() {
         assertThat(new Errors.ConflictException("p.conflict", "x").details()).isEmpty();
     }
+
+    @Test
+    void aMultiwordResourceNameBecomesAUriSafeCode() {
+        // "Stock item" once became the code "stock item", which URI.create then refused inside the
+        // exception handler - turning a deliberate 404 into an unhandled 500 with no body.
+        assertThat(Errors.NotFoundException.of("Stock item", "abc").code())
+                .isEqualTo("stock_item.not_found");
+        assertThat(Errors.NotFoundException.of("  Scale Item  ", 1).code())
+                .isEqualTo("scale_item.not_found");
+        assertThat(Errors.NotFoundException.of("Product", 1).code()).isEqualTo("product.not_found");
+    }
+
+    @Test
+    void theMessageKeepsTheNameAHumanWouldRead() {
+        assertThat(Errors.NotFoundException.of("Stock take", "ST-1").getMessage())
+                .isEqualTo("Stock take ST-1 not found");
+    }
 }

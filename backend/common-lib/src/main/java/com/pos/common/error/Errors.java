@@ -1,5 +1,6 @@
 package com.pos.common.error;
 
+import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
@@ -17,8 +18,7 @@ public final class Errors {
 
         public static NotFoundException of(String resource, Object id) {
             return new NotFoundException(
-                    resource.toLowerCase() + ".not_found",
-                    "%s %s not found".formatted(resource, id));
+                    slug(resource) + ".not_found", "%s %s not found".formatted(resource, id));
         }
     }
 
@@ -73,5 +73,19 @@ public final class Errors {
         public TooManyRequestsException(String code, String message) {
             super(HttpStatus.TOO_MANY_REQUESTS, code, message);
         }
+    }
+
+    /**
+     * Turns a human resource name into a code segment: {@code "Stock item"} becomes {@code
+     * stock_item}.
+     *
+     * <p>A code is a machine-readable identifier that clients branch on and that is interpolated
+     * into the problem {@code type} URI. Passing the display name through unchanged put a space in
+     * that URI, and {@code URI.create} refused it - so an ordinary 404 died inside the exception
+     * handler and reached the client as an unhandled 500.
+     */
+    static String slug(String resource) {
+        String slug = resource.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
+        return slug.replaceAll("^_|_$", "");
     }
 }

@@ -136,10 +136,30 @@ public class GlobalExceptionHandler {
 
     private static ProblemDetail problem(HttpStatus status, String code, String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
-        problem.setType(URI.create(TYPE_PREFIX + code));
+        problem.setType(typeUri(code));
         problem.setTitle(status.getReasonPhrase());
         problem.setProperty("code", code);
         problem.setProperty("correlationId", CorrelationId.get());
         return problem;
+    }
+
+    /**
+     * The problem type URI for a code, never throwing.
+     *
+     * <p>{@code URI.create} rejects a code containing a space or any other character illegal in a
+     * path, and an exception thrown here is far worse than a vague type: the resolver abandons the
+     * handler and the original exception escapes the dispatcher, so a deliberate 404 reaches the
+     * client as an unhandled 500 with no body. Codes are slugged at source; this is the backstop
+     * for the one that is not.
+     */
+    private static URI typeUri(String code) {
+        try {
+            return URI.create(TYPE_PREFIX + code);
+        } catch (IllegalArgumentException ex) {
+            log.warn(
+                    "Error code '{}' is not URI-safe; falling back to the generic problem type",
+                    code);
+            return URI.create(TYPE_PREFIX + "unspecified");
+        }
     }
 }
