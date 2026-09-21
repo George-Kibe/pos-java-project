@@ -29,6 +29,8 @@ public final class Topics {
     // --- purchasing -----------------------------------------------------------
     public static final String PURCHASING_PO_APPROVED = "pos.purchasing.po-approved.v1";
     public static final String PURCHASING_GOODS_RECEIVED = "pos.purchasing.goods-received.v1";
+    public static final String PURCHASING_SUPPLIER_COST_CHANGED =
+            "pos.purchasing.supplier-cost-changed.v1";
 
     // --- payments -------------------------------------------------------------
     public static final String PAYMENTS_PAYMENT_REQUESTED = "pos.payments.payment-requested.v1";
