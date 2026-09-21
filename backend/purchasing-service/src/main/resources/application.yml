@@ -1,0 +1,102 @@
+spring:
+  application:
+    name: purchasing-service
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:pos}
+    username: ${PURCHASING_DB_USER:purchasing_user}
+    password: ${PURCHASING_DB_PASSWORD}
+    hikari:
+      # hibernate.default_schema covers JPA only; the outbox and idempotency ledger use plain JDBC.
+      schema: ${DB_SCHEMA:purchasing}
+      maximum-pool-size: 12
+      minimum-idle: 2
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: purchasing
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    schemas: purchasing
+    default-schema: purchasing
+    locations: classpath:db/migration,classpath:db/migration/shared
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:purchasing-service}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 20
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    listener:
+      ack-mode: record
+      # Matches the topic partition count, so each partition has a thread without idle consumers.
+      concurrency: 3
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${SERVER_PORT:8084}
+  error:
+    whitelabel:
+      enabled: false
+
+pos:
+  security:
+    public-paths:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+
+  purchasing:
+    # A reorder suggestion is only useful if it arrives before the shelf empties, so the
+    # lead time is added to the cover period rather than assumed away.
+    default-cover-days: ${REORDER_COVER_DAYS:14}
+    # Three-way match tolerance. Both apply and the more generous wins; see MatchTolerance.
+    match-tolerance-amount: ${MATCH_TOLERANCE_AMOUNT:50.00}
+    match-tolerance-percentage: ${MATCH_TOLERANCE_PERCENTAGE:0.02}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.pos: INFO

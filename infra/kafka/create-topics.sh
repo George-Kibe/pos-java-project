@@ -24,6 +24,7 @@ pos.catalog.product-changed.v1|-1|compact
 pos.catalog.price-changed.v1|${RETENTION_SALES}|delete
 pos.purchasing.po-approved.v1|${RETENTION_DEFAULT}|delete
 pos.purchasing.goods-received.v1|${RETENTION_SALES}|delete
+pos.purchasing.supplier-cost-changed.v1|${RETENTION_DEFAULT}|delete
 pos.payments.payment-requested.v1|${RETENTION_DEFAULT}|delete
 pos.payments.payment-authorized.v1|${RETENTION_SALES}|delete
 pos.payments.payment-failed.v1|${RETENTION_DEFAULT}|delete

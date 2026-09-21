@@ -72,7 +72,7 @@ spring:
             - id: inventory-service
               uri: ${INVENTORY_SERVICE_URI:http://localhost:8083}
               predicates:
-                - Path=/api/v1/stock/**,/api/v1/batches/**,/api/v1/stock-takes/**,/api/v1/transfers/**
+                - Path=/api/v1/stock/**,/api/v1/stock-takes/**,/api/v1/transfers/**,/api/v1/adjustments/**,/api/v1/reservations/**
               filters:
                 - name: CircuitBreaker
                   args:
@@ -82,7 +82,7 @@ spring:
             - id: purchasing-service
               uri: ${PURCHASING_SERVICE_URI:http://localhost:8084}
               predicates:
-                - Path=/api/v1/suppliers/**,/api/v1/purchase-orders/**,/api/v1/goods-received/**
+                - Path=/api/v1/suppliers/**,/api/v1/purchase-orders/**,/api/v1/goods-receipts/**,/api/v1/supplier-invoices/**,/api/v1/supplier-returns/**,/api/v1/reorder-suggestions/**
               filters:
                 - name: CircuitBreaker
                   args:

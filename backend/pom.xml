@@ -31,6 +31,7 @@
     <module>notification-service</module>
     <module>catalog-service</module>
     <module>inventory-service</module>
+    <module>purchasing-service</module>
   </modules>
 
   <properties>

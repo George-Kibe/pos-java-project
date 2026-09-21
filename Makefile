@@ -14,7 +14,8 @@ INFRA_SERVICES := postgres kafka redis mailpit
 .DEFAULT_GOAL := help
 .PHONY: help env doctor infra-up infra-down infra-restart infra-logs topics ps logs \
         up down images service-logs \
-        build fmt test it verify psql redis-cli kafka-topics clean nuke check-env
+        build fmt test it verify psql redis-cli kafka-topics kafka-topics-sync clean nuke \
+		check-env
 
 ## ---------------------------------------------------------------------------
 ## Help
@@ -156,6 +157,13 @@ redis-cli: check-env ## Open a redis-cli shell
 
 kafka-topics: check-env ## List Kafka topics
 	@$(DC) exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list | sort
+
+kafka-topics-sync: check-env ## Create any topics missing from the running broker
+	@# kafka-init is a one-shot that already ran, so a topic added to the catalogue after the
+	@# broker was first started does not exist yet. The script leaves existing topics untouched,
+	@# so this is safe to run at any time - and has to be run when the catalogue grows, or the
+	@# first event on the new topic sits in the outbox retrying against a topic that is not there.
+	@$(DC) run --rm --no-deps kafka-init
 
 ## ---------------------------------------------------------------------------
 ## Cleanup
