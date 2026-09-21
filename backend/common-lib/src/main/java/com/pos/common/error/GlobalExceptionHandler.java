@@ -1,8 +1,10 @@
 package com.pos.common.error;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -21,6 +23,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.pos.common.correlation.CorrelationId;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
  * Turns every exception into one RFC 7807 {@code application/problem+json} shape, so a client
@@ -95,12 +100,76 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    /**
+     * A body the parser could not turn into the request type.
+     *
+     * <p>The parser's own message is logged but never returned: it echoes the submitted value,
+     * which may be a password or a card number. What is returned is the field path and, for an
+     * enum, the values that would have been accepted - the field names and the accepted set are
+     * published API, not the caller's data.
+     *
+     * <p>Worth the effort because the bare "could not be parsed" is the least actionable error the
+     * platform can send. An offline till retrying a queued sale gets one chance to be told which
+     * field is wrong.
+     */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ProblemDetail handleUnreadableBody(HttpMessageNotReadableException ex) {
-        // The parser message can echo the submitted body, so it is logged but not returned.
         log.warn("Unreadable request body: {}", ex.getMessage());
-        return problem(
-                HttpStatus.BAD_REQUEST, "request.malformed", "Request body could not be parsed");
+
+        String detail = "Request body could not be parsed";
+        String field = null;
+
+        if (ex.getCause() instanceof MismatchedInputException cause) {
+            field = fieldPath(cause);
+            Class<?> target = cause.getTargetType();
+
+            if (target != null && target.isEnum()) {
+                String accepted =
+                        Arrays.stream(target.getEnumConstants())
+                                .map(Object::toString)
+                                .collect(Collectors.joining(", "));
+                // The type is always named and the field only when Jackson recorded a path, so
+                // the message stays actionable either way rather than degrading to the bare
+                // "could not be parsed".
+                detail =
+                        field == null
+                                ? "A %s value must be one of: %s"
+                                        .formatted(target.getSimpleName(), accepted)
+                                : "Field '%s' (%s) must be one of: %s"
+                                        .formatted(field, target.getSimpleName(), accepted);
+            } else if (field != null) {
+                detail = "Field '%s' is missing or has the wrong type".formatted(field);
+            }
+        }
+
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "request.malformed", detail);
+        if (field != null) {
+            problem.setProperty("errors", List.of(Map.of("field", field, "message", detail)));
+        }
+        return problem;
+    }
+
+    /**
+     * The dotted path to the field the parser choked on, {@code lines[0].reasonCode} style.
+     *
+     * <p>Returns null when Jackson recorded no path, which does happen: a record is built through a
+     * creator, and depending on what else is in the body the failure can surface while the creator
+     * is invoked rather than while a property is bound, leaving nothing to prepend. Do not rely on
+     * the path being there - callers handle null and fall back to naming the type.
+     */
+    private static String fieldPath(MismatchedInputException ex) {
+        StringBuilder path = new StringBuilder();
+        for (JacksonException.Reference reference : ex.getPath()) {
+            if (reference.getPropertyName() != null) {
+                if (!path.isEmpty()) {
+                    path.append('.');
+                }
+                path.append(reference.getPropertyName());
+            } else if (reference.getIndex() >= 0) {
+                path.append('[').append(reference.getIndex()).append(']');
+            }
+        }
+        return path.isEmpty() ? null : path.toString();
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)

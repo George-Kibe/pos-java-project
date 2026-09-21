@@ -201,4 +201,71 @@ class ErrorContractTest {
         mockMvc.perform(get("/api/v1/public/ping").header(CorrelationId.HEADER, "x".repeat(200)))
                 .andExpect(header().string(CorrelationId.HEADER, not(is("x".repeat(200)))));
     }
+
+    // --- an unparseable body --------------------------------------------------
+
+    @Test
+    @DisplayName("an invalid enum names the field and the values that would have worked")
+    void anInvalidEnumIsActionable() throws Exception {
+        mockMvc.perform(
+                        post("/api/v1/probe/parse")
+                                .with(cashier())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"FOUND\",\"count\":1,\"lines\":[]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code", is("request.malformed")))
+                .andExpect(jsonPath("$.detail", containsString("'reason'")))
+                .andExpect(jsonPath("$.detail", containsString("DAMAGE, EXPIRY, OTHER")))
+                // The type is named too, so the message still says what kind of value was wanted
+                // in the cases where Jackson records no property path.
+                .andExpect(jsonPath("$.detail", containsString("ProbeReason")))
+                .andExpect(jsonPath("$.errors", hasSize(1)))
+                .andExpect(jsonPath("$.errors[0].field", is("reason")))
+                // The rejected value is never echoed: the next field like this holds a password.
+                .andExpect(jsonPath("$.detail", not(containsString("FOUND"))));
+    }
+
+    @Test
+    @DisplayName("a bad field inside a list is located by index")
+    void aNestedFieldIsLocatedByIndex() throws Exception {
+        mockMvc.perform(
+                        post("/api/v1/probe/parse")
+                                .with(cashier())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"reason\":\"DAMAGE\",\"count\":1,"
+                                                + "\"lines\":[{\"reason\":\"DAMAGE\",\"quantity\":1},"
+                                                + "{\"reason\":\"NOPE\",\"quantity\":2}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field", is("lines[1].reason")))
+                .andExpect(jsonPath("$.detail", containsString("lines[1].reason")));
+    }
+
+    @Test
+    void aWrongTypeNamesItsFieldWithoutEchoingTheValue() throws Exception {
+        mockMvc.perform(
+                        post("/api/v1/probe/parse")
+                                .with(cashier())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reason\":\"DAMAGE\",\"count\":\"seventeen\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code", is("request.malformed")))
+                .andExpect(jsonPath("$.errors[0].field", is("count")))
+                .andExpect(jsonPath("$.detail", not(containsString("seventeen"))));
+    }
+
+    @Test
+    @DisplayName("a body that is not JSON at all still gets the standard shape")
+    void aBodyThatIsNotJsonIsStillAProblemResponse() throws Exception {
+        mockMvc.perform(
+                        post("/api/v1/probe/parse")
+                                .with(cashier())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("not json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code", is("request.malformed")))
+                .andExpect(jsonPath("$.correlationId", notNullValue()));
+    }
 }

@@ -1,5 +1,6 @@
 package com.pos.common.testapp;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -102,6 +103,22 @@ public class TestApplication {
                 @NotBlank(message = "must not be blank") @Email(message = "must be a valid email")
                         String email,
                 @NotBlank(message = "must not be blank") String password) {}
+
+        /** Shaped like a real request: an enum and a nested list, which is where parsing fails. */
+        @PostMapping("/probe/parse")
+        Map<String, String> parse(@RequestBody ParseProbeRequest request) {
+            return Map.of("reason", request.reason().name());
+        }
+
+        enum ProbeReason {
+            DAMAGE,
+            EXPIRY,
+            OTHER
+        }
+
+        record ParseProbeRequest(ProbeReason reason, Integer count, List<ParseProbeLine> lines) {}
+
+        record ParseProbeLine(ProbeReason reason, Integer quantity) {}
     }
 
     /** Convenience for building a Jwt in tests. */
