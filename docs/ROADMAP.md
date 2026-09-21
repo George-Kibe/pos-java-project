@@ -371,49 +371,173 @@ service prices one line at a time. `PriceResolver` skips them explicitly rather 
 
 ---
 
-## Phase 7 — inventory-service
+## Phase 7 — inventory-service ✅
 
 **Goal:** stock is accurate, batch-aware and auditable.
 
-- `stock_items` (product × branch), `stock_batches` (lot, expiry, qty, unit cost),
-  `stock_movements` (append-only ledger), `stock_adjustments`, `stock_transfers`, `stock_takes`,
-  `stock_take_lines`
-- Every quantity change writes a movement row with type, reason, actor and reference — the ledger is
-  the source of truth; `stock_items.qty` is a derived cache that must reconcile
-- **FEFO** deduction across multiple batches, including partial consumption of a batch by one line
-- Reservations with expiry (for open carts), released on cancel or timeout
-- Adjustments with mandatory reason codes; damage and expiry write-offs
-- Inter-branch transfers with in-transit state
-- Stock takes: snapshot, count entry, variance report, approval, posting
-- Consumes `sales.sale-completed` (deduct), `sales.return-processed` (restock),
-  `purchasing.goods-received` (receive)
-- Emits `inventory.stock-deducted`, `.low-stock`, `.batch-expiring`, `.negative-stock-detected`
-- Scheduled near-expiry scan
+Delivered:
+- 10 tables: `stock_items` (product × branch, with the derived on-hand cache), `stock_batches`
+  (lot, expiry, quantity, unit cost), `stock_movements` (append-only ledger), `stock_adjustments`
+  and their lines, `stock_transfers` and their lines, `stock_takes` and their lines,
+  `stock_reservations`
+- **The ledger is the source of truth.** Every quantity change writes a movement row carrying type,
+  reason, actor and reference, and the same call applies it to the cached quantity - one method, so
+  the two cannot drift apart by someone forgetting the second half. `/api/v1/stock/reconciliation`
+  answers "do these numbers add up" on demand instead of leaving it to a nightly log
+- **`FefoAllocator`**: oldest expiry first, then receipt order, then batch number, nulls last;
+  splits one sale line across as many batches as it takes. Pure - no Spring, no JPA, no clock
+- **A shortfall is recorded, not refused.** By the time inventory hears about a sale the customer
+  has left with the goods, so an uncovered quantity becomes a batch-less movement, the on-hand
+  figure goes negative, and `negative-stock-detected` is emitted. Refusing it would lose the fact
+  that stock left the shop
+- Returns honour the till's resaleable flag: good stock goes back to a batch, damaged stock is
+  recorded in and then written off, so a return is never invisible to the shrinkage report
+- Reservations for open carts with expiry and a sweep; adjustments with mandatory reason codes;
+  inter-branch transfers with an in-transit state; stock takes from count sheet to posted variances
+- Consumes `sales.sale-completed`, `sales.return-processed`, `purchasing.goods-received` and
+  `catalog.product-changed`, each idempotent; emits `inventory.stock-deducted`, `.low-stock`,
+  `.batch-expiring`, `.negative-stock-detected` and `.adjustment-posted` through the outbox
+- Scheduled near-expiry scan and ledger reconciliation sweep
 
-**Done when:** a sale event deducts FEFO across two batches correctly, a redelivered event changes
-nothing, the movement ledger sums exactly to the on-hand cache, and a stock take posts variances as
-adjustments.
+**Verified — 324 tests in the build, 56 here, plus an end-to-end run through the gateway against
+the built image:**
+
+| Check | Result |
+|---|---|
+| FEFO order | ✅ earliest expiry first, then receipt order, then batch number |
+| A batch with no expiry | ✅ sorts last, never ahead of dated stock |
+| One line across several batches | ✅ partial consumption, remainders left intact |
+| A line larger than all stock | ✅ shortfall reported, not an exception |
+| Shortfall handling | ✅ batch-less movement, on-hand goes negative, event emitted |
+| Ledger sums to the cached quantity | ✅ after every operation tested |
+| Reconciliation endpoint | ✅ empty, and reachable on demand |
+| Redelivered sale event | ✅ deducts once; the second delivery is a no-op |
+| Redelivered GRN and return events | ✅ same |
+| Return of resaleable goods | ✅ back to a batch and sellable again |
+| Return of damaged goods | ✅ in, then written off - both halves in the ledger |
+| Reservation | ✅ holds against available without moving on-hand; released on cancel |
+| Stock take | ✅ opens, counts, reports variance, posts as adjustments |
+| Transfer | ✅ draft → in transit → received, stock lands at the destination |
+| Adjustment | ✅ signed delta, reason code, actor recorded, event on the topic |
+| Branch scoping | ✅ a manager at one branch is refused another's stock |
+| Permissions | ✅ `inventory:view` cannot adjust; unauthenticated is 401 |
+| Migrations against the real image | ✅ applied clean, 13 tables |
+| Outbox relay in the container | ✅ `adjustment-posted` consumed off Kafka with the right envelope |
+| Coverage gate | ✅ 88.8% |
+
+**Bugs found by the build rather than by a person:** a 404 whose resource name contained a space
+(`"Stock item"`) produced the error code `stock item.not_found`, which `URI.create` then refused
+*inside* the exception handler - so the resolver abandoned it and a deliberate 404 escaped the
+dispatcher as an unhandled 500 with no body. Shipped in catalog since Phase 6 on the "Scale item"
+path. Error codes are now slugged at source and the type URI never throws. The gateway was also
+missing routes for `/api/v1/adjustments` and `/api/v1/reservations` - the same trap as Phase 6, and
+the reason the route table is now checked with a token rather than by reading it.
+
+**Improved while verifying:** an invalid enum answered "Request body could not be parsed" and named
+nothing. It now names the field and the accepted values - never the submitted value, which may be a
+password - and an offline till retrying a queued sale gets one chance to be told what is wrong.
+
+**Deferred with reason:** stock valuation reports (moving average, FIFO cost layers) wait for
+reporting-service, which owns read models. Batch-level costing is captured on every movement, so
+nothing needed for it is being lost in the meantime.
 
 ---
 
-## Phase 8 — purchasing-service
+## Phase 8 — purchasing-service ✅
 
 **Goal:** stock enters the system the way it does in a real shop, with real costs.
 
-- `suppliers`, `supplier_products`, `purchase_orders`, `purchase_order_lines`, `goods_received_notes`
-  (GRN), `grn_lines`, `supplier_invoices`, `supplier_returns`
-- PO lifecycle: draft → submitted → approved (permission-gated, threshold-aware) → sent → partially
-  received → received → closed/cancelled
-- GRN capture: received quantity, batch number, expiry, unit cost, discrepancy against the PO
-- Landed cost allocation (freight, duty) across GRN lines
-- Supplier invoice matching (three-way: PO ↔ GRN ↔ invoice) with tolerance rules
-- Returns to supplier
-- Emits `purchasing.po-approved`, `purchasing.goods-received`, `purchasing.supplier-cost-changed`
-- Reorder suggestions from `inventory.low-stock` plus sales velocity
+Delivered:
+- 11 tables: `suppliers`, `supplier_products` (agreed and last-delivered cost side by side),
+  `purchase_orders` and their lines, `goods_received_notes` and `grn_lines`, `supplier_invoices`,
+  `supplier_returns` and their lines, `reorder_suggestions`
+- **A purchase order is a state machine, not a document.** Every transition goes through one method,
+  so the illegal ones cannot be reached by a new endpoint: an approved order can never return to
+  DRAFT, because an order editable after approval is an order whose total can be raised after
+  someone signed for it. `approved_total` freezes the authorised figure
+- **`LandedCostAllocator`**: freight and duty spread across a delivery by value or by quantity, with
+  the rounding remainder given to the largest line so the parts sum to the charge *exactly*. Naive
+  proportional arithmetic loses fractions of a cent on almost every real split and leaves an
+  unexplained residual in the accounts. Pure - no Spring, no JPA, no clock
+- **The landed cost is what inventory values stock at**, not the invoice price. A consignment
+  carrying freight sells at a loss if every item is priced off the supplier's unit price, and the
+  loss is invisible because each line looks profitable
+- **`ThreeWayMatcher`**: quantity against the *receipt*, price against the *order*, and receipt
+  against order for goods nobody authorised. Per product, not on totals - a supplier can bill the
+  right grand total while charging for goods that never arrived. Tolerance is an absolute floor or
+  a percentage, whichever is more generous, but quantity and not-received findings are never
+  tolerated: those are not matters of degree
+- Rejected goods are recorded and excluded - they never become sellable stock, and they carry none
+  of the freight
+- Returns to supplier priced at the landed cost the goods came in at, not today's price
+- Reorder suggestions from `inventory.low-stock`, sized to the preferred supplier's minimum order
+  quantity, and a dismissal is honoured for a cooling-off period so the list stays worth reading
+- Emits `purchasing.po-approved`, `purchasing.goods-received` and
+  `purchasing.supplier-cost-changed` through the outbox; consumes `inventory.low-stock` and
+  `catalog.product-changed`, both idempotent
 
-**Done when:** approving and receiving a PO creates batches in `inventory-service` with the right
-expiry and unit cost, a partial receipt leaves the PO correctly partially received, and three-way
-matching flags an over-billed invoice.
+**Verified — 424 tests in the build, 100 here, plus an end-to-end run through the gateway against
+the built images:**
+
+| Check | Result |
+|---|---|
+| Order lifecycle draft → submitted → approved → sent | ✅ with actor and time recorded at each step |
+| `approved_total` frozen at approval | ✅ |
+| An approved order cannot be edited or returned to draft | ✅ refused by the state machine |
+| A submitted order can be sent back to the buyer | ✅ the only backwards step there is |
+| Every illegal transition | ✅ enumerated exhaustively, not by example |
+| A supplier on hold cannot take new orders | ✅ |
+| Freight by value / by quantity | ✅ genuinely different answers, both correct |
+| Allocated charges sum to the charge | ✅ across 1–13 lines splitting 1000.01 |
+| Three lines splitting 100 | ✅ 33.3334 + 33.3333 + 33.3333, remainder deterministic |
+| A delivery of free samples | ✅ falls back to quantity rather than refusing |
+| Landed unit cost reaches the batch | ✅ 95.00 + freight = 103.3333 on the real image |
+| Partial receipt | ✅ 60 of 100 leaves PARTIALLY_RECEIVED, 40 outstanding |
+| Second receipt completes it | ✅ RECEIVED |
+| Rejected quantities | ✅ excluded from stock and from the freight weighting |
+| A delivery with everything rejected | ✅ refused, not posted as nothing |
+| A receipt posted twice | ✅ 409 |
+| A delivery with no purchase order | ✅ accepted and recorded |
+| An order already delivered against cannot be cancelled | ✅ close it instead |
+| Over-billed invoice | ✅ EXCEPTION, variance 500.00, PRICE_VARIANCE named with its cost |
+| Billed for more than arrived | ✅ EXCEPTION |
+| Right total, wrong goods | ✅ EXCEPTION — a totals-only check would have passed it |
+| Small price drift | ✅ WITHIN_TOLERANCE, still reported |
+| Absolute floor vs percentage | ✅ the more generous wins, both directions tested |
+| A quantity variance worth 10 cents | ✅ still an exception |
+| Accepting an exception | ✅ requires a reason, and keeps it |
+| An invoice with nothing to match against | ✅ stays PENDING rather than claiming a match |
+| Return lifecycle draft → sent → credited | ✅ priced at landed cost |
+| Cost change on delivery and on renegotiation | ✅ emitted once, not on every save |
+| One preferred supplier per product | ✅ enforced by a partial unique index |
+| Low-stock event → suggestion | ✅ priced from the supplier's price list |
+| Redelivered low-stock event | ✅ no second suggestion |
+| A dismissed suggestion | ✅ not re-proposed by the next event |
+| Minimum order quantity | ✅ a 24-case product is never suggested as 6 |
+| Branch scoping and per-permission authorization | ✅ approve is separate from create |
+| Migrations against the real image | ✅ applied clean, 13 tables |
+| Cross-service: purchasing → Kafka → inventory | ✅ batch created with the right expiry and landed cost |
+| Coverage gate | ✅ 90.5% |
+
+**Bugs found by the build rather than by a person:** `@EntityGraph` defaults to `FETCH`, which
+demotes every attribute it does not name to lazy - including a collection declared `EAGER` - so
+adding a graph to fetch the supplier silently broke the order's lines; `LOAD` adds to the declared
+fetch plan instead of replacing it. Replacing a draft order's lines violated the unique
+`(order, line_number)` index, because Hibernate orders inserts before the deletes that orphan
+removal queues. And the first delivery through the built image never reached inventory: the new
+`supplier-cost-changed` topic had been added to the topic script, which only runs on an empty Kafka
+volume, so the row sat in the outbox retrying against a topic that did not exist. `make
+kafka-topics-sync` now exists for exactly that.
+
+**Improved while verifying:** an invalid enum now names the accepted values *and* the type even when
+Jackson records no property path, which it does not always do.
+
+**Deferred with reason:** reorder suggestions use stock level, lead time and minimum order quantity,
+but not **sales velocity** - that needs sales history, which arrives with `sales-service` in Phase 9.
+The suggestion is sized to cover the reorder quantity inventory asks for meanwhile, and the hook to
+refine it is one service call away. Landed-cost **valuation reporting** (moving average across
+deliveries) belongs to `reporting-service`, which owns read models; every movement already carries
+the cost it needs.
 
 ---
 

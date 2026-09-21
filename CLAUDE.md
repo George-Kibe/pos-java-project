@@ -298,6 +298,38 @@ transaction load its own copy.
 - **`TestRestTemplate` is opt-in in Boot 4** via `@AutoConfigureTestRestTemplate`, needs
   `spring-boot-resttestclient`, and its auto-configuration additionally needs
   `spring-boot-restclient`. PATCH also needs `httpclient5` on the test classpath.
+- **`@EntityGraph` defaults to `FETCH`, which makes every attribute it does not name lazy** -
+  including a collection declared `EAGER` on the entity. Adding a graph to eagerly fetch a
+  to-one association therefore breaks the collections that used to load. Use
+  `@EntityGraph(type = EntityGraphType.LOAD, ...)`, which adds to the declared fetch plan instead
+  of replacing it.
+- **A lazy association mapped in a controller is a 500, not a second query.** `open-in-view` is
+  off, so the session is gone by the time a DTO maps `order.getSupplier().getName()`. Fetch what
+  the response needs with the aggregate.
+- **Orphan removal flushes its deletes after the inserts.** Clearing a child collection and adding
+  replacements in one go violates a unique constraint on the child's ordinal, because the new row 1
+  is inserted while the old row 1 is still there. Flush the clear (`saveAndFlush`) before adding.
+- **A new Kafka topic does not exist in an already-running environment.** `kafka-init` is a
+  one-shot that ran when the volume was created, so adding a topic to
+  `infra/kafka/create-topics.sh` does nothing for a broker that is already up - and auto-creation
+  is off on purpose. The first event on the new topic then sits in the outbox retrying while the
+  broker answers `UNKNOWN_TOPIC_OR_PARTITION`. Run `make kafka-topics-sync`, which is idempotent.
+- **Do not read the outbox mid-pass and conclude the relay is broken.** A pass claims a batch and
+  commits once at the end, so a row already sent still reads `PENDING` from another connection
+  until the pass commits - and a row whose topic is missing holds the batch for the full
+  `pos.outbox.send-timeout` first. Sample twice before diagnosing.
+
+- **An exception thrown inside an `@ExceptionHandler` is nearly silent.** The resolver logs one
+  WARN, abandons the handler and rethrows the *original* exception, which then escapes the
+  dispatcher - so a deliberate 404 reaches the client as an unhandled 500 with no body, and the log
+  line blames the 404. The cause here was an error code interpolated into the problem `type` URI:
+  `NotFoundException.of("Stock item", id)` produced `stock item.not_found` and `URI.create`
+  rejected the space. `Errors.slug()` now slugs the resource name and `typeUri()` never throws.
+  Anything built inside an error handler needs the same treatment.
+- **Check the gateway route table with a token, not by reading it.** An unauthenticated request is
+  rejected before routing, so every path - routed or not - answers 401 and proves nothing. Only an
+  authenticated request distinguishes a live route from a missing one.
+
 - **`@PreAuthorize` denials bypass the security filter chain.** They are thrown inside the
   application, so `AccessDeniedHandler` never sees them and a catch-all `@ExceptionHandler` turns
   every 403 into a 500. `SecurityExceptionHandler` in common-lib handles this - do not remove it.
@@ -326,5 +358,13 @@ transaction load its own copy.
   do not add tax on top of an inclusive price.
 - Weight-embedded scale barcodes encode price or weight in the digits — parse by configured prefix
   rule, never assume a single format.
+- The price on a purchase order is not what the goods cost. Freight and duty arrive with the
+  delivery, so the **landed** cost is computed at receipt and it is that figure - not the invoice
+  price - that inventory values stock at. An allocation must sum to the charge exactly; the
+  remainder goes to the largest line.
+- Three-way matching compares **per product**, never on totals: quantity against the receipt, price
+  against the order. A supplier can bill the correct grand total while charging for goods that never
+  arrived. A tolerance absorbs price drift only - a quantity or never-received finding is an
+  exception at any size.
 - Refunds are not negative sales: they reference the original sale, respect a returns policy window,
   and restock to a batch only when the goods are resaleable.

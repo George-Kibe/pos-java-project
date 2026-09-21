@@ -96,7 +96,8 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.catalog.product-changed.v1` | catalog | inventory, reporting, sales | productId, sku, name, taxClassId, sellByWeight, active |
 | `pos.catalog.price-changed.v1` | catalog | sales, reporting | productId, branchId, price, effectiveFrom |
 | `pos.purchasing.po-approved.v1` | purchasing | notification, reporting | poId, supplierId, total, approvedBy |
-| `pos.purchasing.goods-received.v1` | purchasing | inventory, reporting | grnId, branchId, lines[{productId, qty, batchNo, expiry, unitCost}] |
+| `pos.purchasing.goods-received.v1` | purchasing | inventory, reporting | grnId, branchId, lines[{productId, qty, batchNo, expiry, unitCost — **landed**}] |
+| `pos.purchasing.supplier-cost-changed.v1` | purchasing | catalog, reporting | supplierId, productId, previousUnitCost, newUnitCost, sourceType |
 | `pos.payments.payment-requested.v1` | sales | payment | saleId, branchId, amount, tenders[] |
 | `pos.payments.payment-authorized.v1` | payment | sales, reporting | saleId, paymentId, method, amount, reference |
 | `pos.payments.payment-failed.v1` | payment | sales, notification | saleId, reason, code |
