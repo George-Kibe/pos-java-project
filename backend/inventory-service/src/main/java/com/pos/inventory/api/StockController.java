@@ -1,15 +1,18 @@
 package com.pos.inventory.api;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +25,7 @@ import com.pos.inventory.api.dto.InventoryDtos;
 import com.pos.inventory.service.InventorySweepService;
 import com.pos.inventory.service.StockQueryService;
 import com.pos.inventory.service.StockService;
+import com.pos.inventory.service.StockValuationService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +41,7 @@ public class StockController {
     private final StockQueryService query;
     private final StockService stock;
     private final InventorySweepService sweeps;
+    private final StockValuationService valuations;
     private final BranchAccessGuard branchAccess;
 
     @GetMapping
@@ -120,5 +125,17 @@ public class StockController {
         return sweeps.reconcileLedger().stream()
                 .map(InventoryDtos.ReconciliationResponse::from)
                 .toList();
+    }
+
+    @PostMapping("/valuations")
+    @PreAuthorize("hasAuthority('inventory:adjust')")
+    @Operation(
+            summary =
+                    "Value a branch's stock now and announce it; reporting picks the snapshot up"
+                            + " as it does the nightly one")
+    public ResponseEntity<Map<String, UUID>> valueNow(@RequestParam UUID branchId) {
+        branchAccess.requireAccess(branchId);
+        return ResponseEntity.accepted()
+                .body(Map.of("snapshotId", valuations.valueBranch(branchId)));
     }
 }

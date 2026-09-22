@@ -83,6 +83,9 @@ pos:
     expiry-scan-cron: ${EXPIRY_SCAN_CRON:0 0 6 * * *}
     reservation-sweep: ${RESERVATION_SWEEP:PT5M}
     reconciliation-cron: ${RECONCILIATION_CRON:0 30 2 * * *}
+    # Each branch's stock at cost, announced nightly for reporting.
+    valuation-cron: ${VALUATION_CRON:0 15 3 * * *}
+    valuation-page-size: ${VALUATION_PAGE_SIZE:500}
 
 management:
   endpoints:

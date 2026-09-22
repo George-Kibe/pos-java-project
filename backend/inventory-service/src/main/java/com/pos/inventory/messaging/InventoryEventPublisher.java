@@ -16,6 +16,7 @@ import com.pos.events.inventory.BatchExpiringPayload;
 import com.pos.events.inventory.LowStockPayload;
 import com.pos.events.inventory.NegativeStockDetectedPayload;
 import com.pos.events.inventory.StockDeductedPayload;
+import com.pos.events.inventory.StockValuedPayload;
 import com.pos.inventory.domain.StockBatch;
 import com.pos.inventory.domain.StockItem;
 import com.pos.messaging.outbox.OutboxRecorder;
@@ -95,6 +96,22 @@ public class InventoryEventPublisher {
                                         attempted,
                                         triggeredBy,
                                         referenceId))
+                        .build());
+    }
+
+    /**
+     * One page of a branch's stock valuation, keyed by branch so a snapshot's pages stay in order.
+     */
+    public void stockValued(StockValuedPayload page) {
+        outbox.record(
+                Topics.INVENTORY_STOCK_VALUED,
+                "Branch",
+                page.branchId(),
+                EventEnvelope.<StockValuedPayload>builder()
+                        .topic(Topics.INVENTORY_STOCK_VALUED)
+                        .correlationId(CorrelationId.get())
+                        .branchId(page.branchId())
+                        .payload(page)
                         .build());
     }
 

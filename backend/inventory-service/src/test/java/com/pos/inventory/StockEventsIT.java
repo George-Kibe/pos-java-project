@@ -12,9 +12,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.pos.events.EventEnvelope;
+import com.pos.events.EventJson;
 import com.pos.events.Topics;
+import com.pos.events.inventory.StockValuedPayload;
 import com.pos.events.purchasing.GoodsReceivedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
 import com.pos.events.sales.SaleCancelledPayload;
@@ -22,11 +25,13 @@ import com.pos.events.sales.SaleCompletedPayload;
 import com.pos.inventory.domain.StockBatch;
 import com.pos.inventory.domain.StockItem;
 import com.pos.inventory.service.ReservationService;
+import com.pos.inventory.service.StockValuationService;
 
 /** Stock following what happens elsewhere: deliveries in, sales out, returns back. */
 class StockEventsIT extends InventoryTestBase {
 
     @Autowired private ReservationService reservations;
+    @Autowired private StockValuationService valuations;
 
     private static final UUID BRANCH = UUID.randomUUID();
 
@@ -260,6 +265,104 @@ class StockEventsIT extends InventoryTestBase {
         assertThat(onHand(product, BRANCH)).isEqualByComparingTo("10");
     }
 
+    @Test
+    @DisplayName("a branch's stock is valued batch by batch at the cost it landed at")
+    void aValuationPricesEveryBatchAtItsLandedCost() {
+        UUID sugar = UUID.randomUUID();
+        UUID flour = UUID.randomUUID();
+        receive(sugar, "VAL-SUGAR", "10", "S1", "2027-01-01", "95.00");
+        receive(sugar, "VAL-SUGAR", "5", "S2", "2027-02-01", "100.00");
+        receive(flour, "VAL-FLOUR", "3", "F1", "2027-01-01", "50.00");
+        eventually(
+                Duration.ofSeconds(30),
+                "the deliveries",
+                () ->
+                        onHand(sugar, BRANCH) != null
+                                && onHand(sugar, BRANCH).compareTo(new BigDecimal("15")) == 0
+                                && onHand(flour, BRANCH) != null);
+        UUID saleId = UUID.randomUUID();
+        publish(
+                Topics.SALES_SALE_COMPLETED,
+                saleCompleted(saleId, sugar, "VAL-SUGAR", "12"),
+                saleId);
+        eventually(
+                Duration.ofSeconds(30),
+                "the sale",
+                () -> onHand(sugar, BRANCH).compareTo(new BigDecimal("3")) == 0);
+
+        UUID snapshot = valuations.valueBranch(BRANCH);
+
+        List<StockValuedPayload> pages = valuationPages(snapshot);
+        assertThat(pages)
+                .singleElement()
+                .satisfies(
+                        page -> {
+                            assertThat(page.pageCount()).isEqualTo(1);
+                            // FEFO took the older batch first: 3 left, all from the 100.00 batch.
+                            assertThat(line(page, sugar).quantityOnHand())
+                                    .isEqualByComparingTo("3");
+                            assertThat(line(page, sugar).valueAtCost())
+                                    .isEqualByComparingTo("300.00");
+                            assertThat(line(page, flour).valueAtCost())
+                                    .isEqualByComparingTo("150.00");
+                        });
+    }
+
+    @Test
+    @DisplayName("a large snapshot is split into pages that share one id and one instant")
+    void aLargeSnapshotIsPaged() {
+        for (int i = 0; i < 3; i++) {
+            receive(UUID.randomUUID(), "PAGE-" + i, "1", "P" + i, "2027-01-01", "10.00");
+        }
+        eventually(
+                Duration.ofSeconds(30),
+                "the deliveries",
+                () ->
+                        jdbc.sql(
+                                                "SELECT count(*) FROM inventory.stock_items WHERE branch_id = :b AND sku LIKE 'PAGE-%'")
+                                        .param("b", BRANCH)
+                                        .query(Long.class)
+                                        .single()
+                                == 3);
+        ReflectionTestUtils.setField(valuations, "pageSize", 2);
+        try {
+            UUID snapshot = valuations.valueBranch(BRANCH);
+
+            List<StockValuedPayload> pages = valuationPages(snapshot);
+            assertThat(pages).isNotEmpty();
+            assertThat(pages)
+                    .allSatisfy(page -> assertThat(page.pageCount()).isEqualTo(pages.size()));
+            assertThat(pages)
+                    .extracting(StockValuedPayload::valuedAt)
+                    .containsOnly(pages.getFirst().valuedAt());
+            assertThat(pages.stream().mapToInt(page -> page.lines().size()).sum())
+                    .isGreaterThanOrEqualTo(3);
+        } finally {
+            ReflectionTestUtils.setField(valuations, "pageSize", 500);
+        }
+    }
+
+    private List<StockValuedPayload> valuationPages(UUID snapshotId) {
+        return jdbc
+                .sql(
+                        "SELECT payload FROM inventory.outbox WHERE topic = :topic ORDER BY created_at")
+                .param("topic", Topics.INVENTORY_STOCK_VALUED)
+                .query(String.class)
+                .list()
+                .stream()
+                .map(json -> EventJson.readEnvelope(json, StockValuedPayload.class).payload())
+                .filter(page -> page.snapshotId().equals(snapshotId))
+                .sorted(java.util.Comparator.comparingInt(StockValuedPayload::page))
+                .toList();
+    }
+
+    private static StockValuedPayload.ValuedLine line(StockValuedPayload page, UUID product) {
+        return page.lines().stream()
+                .filter(line -> line.productId().equals(product))
+                .findFirst()
+                .orElseThrow();
+    }
+
     // --- shortfalls and returns -------------------------------------------------
 
     @Test
@@ -453,7 +556,8 @@ class StockEventsIT extends InventoryTestBase {
                                 BigDecimal.ZERO,
                                 new BigDecimal("100.00"),
                                 "KES",
-                                cartId))
+                                cartId,
+                                List.of()))
                 .build();
     }
 
@@ -480,6 +584,7 @@ class StockEventsIT extends InventoryTestBase {
                                                 resaleable ? "CHANGED_MIND" : "DAMAGED")),
                                 new BigDecimal("100.00"),
                                 "KES",
+                                null,
                                 null))
                 .build();
     }
