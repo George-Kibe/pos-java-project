@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.pos.events.payments.PaymentMethod;
+
 /**
  * Goods came back.
  *
@@ -20,7 +22,8 @@ public record ReturnProcessedPayload(
         Instant processedAt,
         List<ReturnLine> lines,
         BigDecimal refundTotal,
-        String currency) {
+        String currency,
+        PaymentMethod refundMethod) {
 
     public record ReturnLine(
             UUID productId,

@@ -20,9 +20,11 @@ import com.pos.events.inventory.StockDeductedPayload;
 import com.pos.events.payments.PaymentAuthorizedPayload;
 import com.pos.events.payments.PaymentFailedPayload;
 import com.pos.events.payments.PaymentMethod;
+import com.pos.events.payments.PaymentRefundedPayload;
 import com.pos.events.payments.PaymentRequestedPayload;
 import com.pos.events.purchasing.GoodsReceivedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
+import com.pos.events.sales.SaleCancelledPayload;
 import com.pos.events.sales.SaleCompletedPayload;
 import com.pos.events.sales.SaleVoidedPayload;
 import com.pos.events.sales.ShiftClosedPayload;
@@ -118,10 +120,12 @@ class PayloadContractTest {
                                             "B-1",
                                             "DAMAGED")),
                             new BigDecimal("180.0000"),
-                            "KES");
+                            "KES",
+                            PaymentMethod.MPESA);
 
             String json = EventJson.write(payload);
             assertThat(json)
+                    .contains("\"refundMethod\":\"MPESA\"")
                     .contains("\"returnId\"")
                     .contains("\"originalSaleId\"")
                     .contains("\"resaleable\"")
@@ -157,6 +161,28 @@ class PayloadContractTest {
                     .contains("\"voidedAt\"");
 
             assertThat(EventJson.read(json, SaleVoidedPayload.class)).isEqualTo(payload);
+        }
+
+        @Test
+        void aCancellationNamesTheCartWhoseHoldsToRelease() {
+            SaleCancelledPayload payload =
+                    new SaleCancelledPayload(
+                            ID,
+                            ID,
+                            ID,
+                            ID,
+                            ID,
+                            "Payment failed: CANCELLED_BY_USER",
+                            Instant.parse("2026-01-02T03:04:05Z"));
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"saleId\"")
+                    .contains("\"cartId\"")
+                    .contains("\"reason\"")
+                    .contains("\"cancelledAt\"");
+
+            assertThat(EventJson.read(json, SaleCancelledPayload.class)).isEqualTo(payload);
         }
 
         @Test
@@ -251,6 +277,31 @@ class PayloadContractTest {
             PaymentAuthorizedPayload back = EventJson.read(json, PaymentAuthorizedPayload.class);
             assertThat(back).isEqualTo(payload);
             assertThat(back.amountAuthorized()).isEqualTo(new BigDecimal("180.0000"));
+        }
+
+        @Test
+        void aRefundCarriesTheProviderReferenceItWasConfirmedBy() {
+            PaymentRefundedPayload payload =
+                    new PaymentRefundedPayload(
+                            ID,
+                            ID,
+                            ID,
+                            ID,
+                            ID,
+                            PaymentMethod.MPESA,
+                            new BigDecimal("180.0000"),
+                            "KES",
+                            "QKR12XYZ9",
+                            Instant.parse("2026-01-02T03:04:05Z"));
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"refundId\"")
+                    .contains("\"returnId\"")
+                    .contains("\"providerReference\":\"QKR12XYZ9\"")
+                    .contains("\"refundedAt\"");
+
+            assertThat(EventJson.read(json, PaymentRefundedPayload.class)).isEqualTo(payload);
         }
 
         @Test
