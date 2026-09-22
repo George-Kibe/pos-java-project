@@ -35,6 +35,17 @@ public class GatewayRateLimitProperties {
     private Bucket anonymous = new Bucket(60, Duration.ofMinutes(1));
 
     /**
+     * Payment provider callbacks, keyed by client IP. A provider calls from a handful of addresses
+     * on behalf of every customer at once, so the anonymous limit would throttle a busy shortcode -
+     * and a callback refused with 429 is a payment the lane has to wait on the status query for.
+     */
+    private Bucket providerCallbacks = new Bucket(1200, Duration.ofMinutes(1));
+
+    /** Where providers call back. Explicit, like {@link #authPaths}. */
+    private List<String> providerCallbackPaths =
+            new ArrayList<>(List.of("/api/v1/payments/mpesa/callbacks/**"));
+
+    /**
      * The credential endpoints. Kept explicit rather than pattern-matched on {@code /auth/}: a path
      * added here should be a decision, not a side effect of a naming choice.
      */

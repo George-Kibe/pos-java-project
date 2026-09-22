@@ -89,6 +89,7 @@ public abstract class GatewayTestBase {
                 () -> DOWNSTREAM.baseUrl() + "/.well-known/jwks.json");
         registry.add("pos.gateway.jwt.issuer", () -> ISSUER);
         registry.add("AUTH_SERVICE_URI", DOWNSTREAM::baseUrl);
+        registry.add("PAYMENT_SERVICE_URI", DOWNSTREAM::baseUrl);
         // Deliberately nothing listening here, so the circuit breaker path is exercised.
         registry.add("CATALOG_SERVICE_URI", () -> "http://localhost:1");
     }

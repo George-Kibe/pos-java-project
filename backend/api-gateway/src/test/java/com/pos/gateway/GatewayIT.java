@@ -230,6 +230,26 @@ class GatewayIT extends GatewayTestBase {
     }
 
     @Test
+    @DisplayName("an M-Pesa callback passes without a token and has a provider-sized allowance")
+    void providerCallbacksAreRoutedWithoutATokenAndTheirOwnLimit() {
+        DOWNSTREAM.stubFor(
+                WireMock.post(WireMock.urlPathMatching("/api/v1/payments/mpesa/callbacks/stk/.*"))
+                        .willReturn(
+                                WireMock.aResponse()
+                                        .withStatus(200)
+                                        .withHeader("Content-Type", "application/json")
+                                        .withBody("{\"ResultCode\":0}")));
+
+        ResponseEntity<String> response =
+                post("/api/v1/payments/mpesa/callbacks/stk/some-token", "{}", null);
+
+        // Daraja cannot present a token; the service authenticates the path segment instead.
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        // Not the anonymous 60 a minute: one provider carries every customer's payment.
+        assertThat(response.getHeaders().getFirst("X-RateLimit-Limit")).isEqualTo("1200");
+    }
+
+    @Test
     @DisplayName("authenticated traffic gets a far larger allowance than a credential endpoint")
     void authenticatedTrafficIsNotThrottledLikeLogin() {
         DOWNSTREAM.stubFor(

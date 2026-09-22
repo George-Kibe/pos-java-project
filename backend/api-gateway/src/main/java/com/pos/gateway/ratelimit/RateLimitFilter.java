@@ -77,6 +77,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (isCredentialEndpoint(path)) {
             bucket = properties.getAuth();
             key = "pos:rl:auth:" + clientIp(request);
+        } else if (isProviderCallback(path)) {
+            bucket = properties.getProviderCallbacks();
+            key = "pos:rl:callback:" + clientIp(request);
         } else if (userId != null) {
             bucket = properties.getAuthenticated();
             key = "pos:rl:user:" + userId;
@@ -118,6 +121,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // usually retry immediately, making the overload worse.
         response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds));
         response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
+
+    private boolean isProviderCallback(String path) {
+        return properties.getProviderCallbackPaths().stream()
+                .anyMatch(pattern -> MATCHER.match(pattern, path));
     }
 
     private boolean isCredentialEndpoint(String path) {

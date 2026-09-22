@@ -214,6 +214,8 @@ pos:
       - /api/v1/auth/logout
       - /api/v1/auth/forgot-password
       - /api/v1/auth/reset-password
+      # Daraja cannot present a token; payment-service authenticates these by a secret path segment.
+      - /api/v1/payments/mpesa/callbacks/**
       - /.well-known/jwks.json
       - /v3/api-docs/**
       - /swagger-ui/**
@@ -236,6 +238,10 @@ pos:
         window: PT1M
       anonymous:
         capacity: 60
+        window: PT1M
+      # One provider, a few IPs, every customer's payment: sized for a busy shortcode.
+      provider-callbacks:
+        capacity: 1200
         window: PT1M
 
 springdoc:
