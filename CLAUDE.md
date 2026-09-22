@@ -123,6 +123,9 @@ Rules:
 
 - Every endpoint carries an explicit `@PreAuthorize` on a **permission** (`sale:void`), never on a
   role name. Deny by default — an endpoint without an authorization check does not get merged.
+  The one exception is a **provider callback** (Daraja cannot present a token): it is
+  `permitAll()`, listed as a public path in both the service and the gateway, and authenticated
+  by a secret path token checked in constant time before the body is read (`CallbackGuard`).
 - Every endpoint that touches branch-scoped data verifies the caller is assigned to that branch.
   Use the shared `BranchAccessGuard`; do not reimplement it. **Check before the write, not after**:
   controllers are not transactional, so a check on the object just created answers 403 with the
@@ -148,7 +151,9 @@ Rules:
 - Collections are paginated (`page`, `size`, `sort`), max page size 100, wrapped in the shared
   `PageResponse<T>`.
 - Every mutating endpoint that a cashier terminal can call accepts an `Idempotency-Key` header and
-  honours it — offline terminals retry.
+  honours it — offline terminals retry. The filter lives in messaging-lib: set
+  `pos.idempotency.enabled: true` and create the `idempotency_records` table in the service's own
+  migration (a shared migration added after services are past V1 would fail their validation).
 - Annotate with springdoc; the gateway aggregates the specs.
 
 ## Frontend
@@ -355,6 +360,11 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   the business error it is inside the fallback, and list it under the breaker's
   `ignoreExceptions`.
 
+- **Adding an optional web dependency to a library turns its `@SpringBootTest`s into web
+  contexts**, which then load every web handler on the classpath - common-lib's among them, which
+  need security. messaging-lib's tests broke this way when the idempotency filter moved in. A
+  library's non-web tests set `spring.main.web-application-type: none`.
+
 ## Testing traps
 
 - **Tests that share a broker must select their own message**, not "the first record on the
@@ -362,6 +372,9 @@ rollback-only, so the commit fails anyway and takes the batch with it.
 - **Tests that share a database must not share a table when one of them has a live scheduler.**
   A relay running in one Spring context will happily publish rows another test is asserting stay
   `PENDING`. Give such a context its own schema.
+- **A raw-JDBC test that creates a table in `public` breaks every Flyway test after it** on the
+  same container: "Found non-empty schema(s) public but no schema history table". Give such a test
+  its own schema (`CREATE SCHEMA ...; setCurrentSchema(...)`).
 - **Asynchronous retries continue after an assertion passes.** A second test truncating tables
   while the first message is still being retried produces rows belonging to neither. Follow one
   message to its end in one test.
@@ -389,10 +402,25 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   exception at any size.
 - Refunds are not negative sales: they reference the original sale, respect a returns policy window,
   and restock to a batch only when the goods are resaleable.
-- A basket's stock holds end with the sale event, not an HTTP call. Inventory consumes the holds
-  for `sale-completed.cartId` in the same transaction as the FEFO deduction. Sales cannot release
-  them itself on completion: an M-Pesa sale completes inside a Kafka listener with no caller token
-  to forward. Left unconsumed, every sold unit stays "held" until expiry and availability on a
-  best-seller is permanently understated.
+- **Anything a Kafka listener or a scheduler triggers has no caller token to forward.** Work that
+  needs to happen in another service from those paths goes by event, never by a call that would
+  borrow the user's token. A basket's stock holds are the example that bit twice: inventory
+  consumes them on `sale-completed.cartId` (with the FEFO deduction) and releases them on
+  `sale-cancelled.cartId`. Both sales paths - an M-Pesa authorisation, a payment failure - run in
+  a listener; a skipped call left the goods unsellable until the hold expired.
+- M-Pesa takes whole shillings. The push is the amount rounded `HALF_UP` (`MpesaAmount`); paying
+  exactly that settles the four-decimal amount in full, and the difference is recorded as rounding
+  on the payment. Reporting 1052 as "part paid" against 1052.40 leaves a sale waiting for forty
+  cents nobody can send.
+- **Daraja's `404.001.03 Invalid Access Token` means two different things.** For a cached token
+  it is an early expiry (Daraja does not use 401), and the client refreshes and retries once. For a
+  token fetched moments ago it means the Daraja *app* is not subscribed to that API product -
+  diagnose by calling Account Balance with the same token: accepted there, refused on STK Push, is
+  a missing M-Pesa Express subscription in the portal, not a code or `.env` problem.
+- `.env` values cannot carry an inline comment on an otherwise empty value: `KEY= # note` is an
+  empty `KEY`. Put the note on its own line.
+- An STK Push that timed out is **never resent** - "no answer" includes "the prompt reached the
+  phone". A payment that arrives after the intent was declared failed is recorded as a late payment
+  and announced, never dropped: the customer paid.
 - A cash sale's grand total carries four decimals; the change handed back is rounded to cents
   (`HALF_UP`) and that is the only rounding the drawer sees. The payments keep the 4dp figure.

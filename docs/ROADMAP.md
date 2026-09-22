@@ -602,7 +602,7 @@ through the gateway against the built images:**
 | The basket's hold consumed with the deduction | ✅ reserved 2 → 4 → 2 on the real images |
 | Payment authorised asynchronously | ✅ AWAITING_PAYMENT → PAID on the event, receipt numbered then |
 | A redelivered authorisation | ✅ paid once, numbered once, announced once |
-| A failed payment | ✅ sale CANCELLED, stock released, nothing announced as sold |
+| A failed payment | ✅ sale CANCELLED, nothing announced as sold. *Stock release was not in fact working - the holds waited for their 30-minute expiry. Found and fixed in Phase 10 (`sale-cancelled`).* |
 | A late authorisation for a cancelled sale | ✅ not applied |
 | Timeout sweep | ✅ compensates exactly like a failure |
 | Split cash + M-Pesa | ✅ waits for the M-Pesa half; only the cash half reaches the drawer |
@@ -650,27 +650,122 @@ here cash and card settle at the till and M-Pesa is exercised through its events
 
 ---
 
-## Phase 10 — payment-service
+## Phase 10 — payment-service 🟡 built; sandbox run pending
 
 **Goal:** money is taken, matched and reconciled.
 
-- `payment_intents`, `payments`, `payment_events`, `refunds`, `mpesa_transactions`,
-  `reconciliation_runs`
-- `PaymentProvider` port with three adapters:
-  - **Cash** — tendered amount, change due, denomination breakdown for the drawer
-  - **M-Pesa** — Daraja OAuth token caching, STK Push initiate, callback endpoint,
-    transaction-status query for the cases where the callback never arrives
-  - **Card terminal** — manual capture of reference and approval code; no card data stored
-- Split payments across methods on one sale
-- Refunds per method, respecting M-Pesa's reversal constraints
-- Consumes `payments.payment-requested`, emits `payment-authorized` / `-failed` / `-refunded`
-- Daily reconciliation: M-Pesa statement against recorded payments, variance report
-- Callback handling that is **idempotent on `CheckoutRequestID`**, tolerant of out-of-order and
-  duplicate deliveries, and signature/IP validated
+**Status:** built and verified against a local fake of Daraja and across the running services.
+Not ✅ until the one check that needs Safaricom is done: the Daraja sandbox credentials are not
+in `.env` yet (Phase 0's unchecked item), so no real STK Push has been sent. Fill in the
+`MPESA_*` values, add the callback token (`openssl rand -hex 24`) and a tunnel, then run a push
+end to end.
+
+Delivered:
+- 8 tables: `payment_intents`, `payments`, `payment_events`, `mpesa_transactions`, `refunds`,
+  `reconciliation_runs`, `reconciliation_items`, `idempotency_records`, plus the shared outbox
+- **Intents keyed by sales' own `paymentIntentId`**, so a redelivered `payment-requested` finds the
+  row it created. The Kafka listener only records; a dispatcher calls the provider after that
+  commit, outside any transaction, claiming with `SKIP LOCKED`. A rollback or a redelivery
+  therefore can never prompt a customer's phone twice
+- `PaymentProvider` port: **Cash** (authorises at once; sales normally settles cash at the till
+  itself - no network between a customer and their change), **Card terminal** (waits for the
+  cashier to key in the approval code; no card data accepted - an approval code is letters,
+  digits and dashes only), **M-Pesa** (STK Push). Voucher and account fail fast with
+  `METHOD_NOT_SUPPORTED` rather than leaving a lane waiting
+- **Daraja client**: OAuth token cached until a minute before expiry, STK Push, STK Query
+  (including its quirk: "still processing" is an HTTP 500 with code `500.001.1001`), Reversal.
+  Refusals and outages are told apart; a push that timed out is never resent
+- **Whole-shilling rounding** (`MpesaAmount`): the push is the amount rounded `HALF_UP`; paying
+  exactly that settles the four-decimal sale amount, and the difference is kept on the payment
+- **Callbacks**: authenticated by a secret path token compared in constant time (Daraja cannot
+  sign or authenticate a callback), optional IP allowlist read from the trusted proxy's
+  X-Forwarded-For entry, idempotent on `CheckoutRequestID`. A callback that beats its push's own
+  response is parked and applied when the push is recorded; one for a push nobody made is kept
+  for reconciliation. Settling the transaction and the intent is one transaction
+- **Status sweep**: unanswered pushes are queried; past the give-up point the intent fails as
+  `TIMEOUT` so the lane moves on, while the transaction stays open - money that still arrives is
+  recorded as a **late** payment and announced, never dropped
+- **Refunds** from `return-processed` (which now carries `refundMethod`): a full M-Pesa payment is
+  reversed; a partial one, one whose receipt is not yet known, or one with reversals unconfigured
+  is raised as `REQUIRES_ACTION` with the reason; card refunds are captured like card payments. A
+  person settling a refund by hand records how, and who. Amounts are reserved against the payment
+  at planning, so two returns cannot refund more than was paid
+- **Reconciliation** of the day's M-Pesa statement export (Daraja has no statement API): receipt
+  by receipt, never on totals; a payment recovered by query without a receipt is paired on an
+  unambiguous amount and its receipt filled in
+- The **Idempotency-Key filter moved to messaging-lib** (`pos.idempotency.enabled`), shared by
+  sales and payment; the table stays in each service's own migration
+- **Gateway**: callbacks are a public path with their own rate-limit bucket - one provider carries
+  every customer's payment from a handful of IPs, and the anonymous 60/min would throttle a busy
+  shortcode
+- The log masker now covers `SecurityCredential` and the callback token in a logged URL
 
 **Done when:** a sandbox STK Push completes end to end through a tunnel, a duplicated callback is a
 no-op, a never-delivered callback is recovered by the status query job, cash change is exact to the
 cent, and a split cash + M-Pesa payment settles the sale exactly once.
+
+**Verified — 639 tests in the build, 104 here (65 unit, 39 integration), plus an end-to-end
+run through the gateway against the built images:**
+
+| Check | Result |
+|---|---|
+| Sandbox STK Push through a tunnel | ⏳ credentials in; OAuth works. Blocked: the Daraja app is not subscribed to M-Pesa Express (see below), and there is no callback URL or tunnel yet |
+| Push: amount, MSISDN, callback URL, password | ✅ 1052.5377 pushed as 1053 to 254712345678, password = base64(shortcode+passkey+timestamp) |
+| Callback authorises to the cent asked for | ✅ 1052.5377 authorised, 0.4623 rounding recorded, receipt kept |
+| A duplicated callback | ✅ one payment, one `payment-authorized` |
+| A callback before its push is recorded | ✅ parked, then applied when the push lands |
+| A never-delivered callback | ✅ recovered by the status query |
+| Past the give-up point, then the customer pays | ✅ TIMEOUT released the lane; the money is a late payment, announced |
+| The sweep stops asking | ✅ after its last attempt; only a callback can settle it then |
+| A redelivered request | ✅ one push |
+| Daraja refuses / is down / a bad number | ✅ PROVIDER_REJECTED / PROVIDER_UNAVAILABLE / never pushed |
+| Token cache | ✅ one token for many pushes |
+| A token Daraja stops honouring early (404.001.03) | ✅ replaced once, the push still goes out |
+| An app without M-Pesa Express | ✅ tender fails as PROVIDER_REJECTED, naming the subscription as the likely cause |
+| A forged callback | ✅ 404, nothing changed |
+| Correlation and causation through a callback | ✅ the authorisation traces to the request |
+| Card capture, retried with and without its key | ✅ one payment |
+| A card number keyed in as an approval code | ✅ refused |
+| Split card + M-Pesa | ✅ each tender settled on its own |
+| Full M-Pesa refund | ✅ reversal of 1053 against the receipt; completed on Daraja's result, announced once |
+| Partial M-Pesa refund | ✅ REQUIRES_ACTION, settled by a supervisor with how and who recorded |
+| Two returns against one sale | ✅ never more than was paid |
+| Reconciliation | ✅ matched, mismatched, recovered-by-amount, statement-only, recorded-only |
+| Card sale through the gateway, real images | ✅ AWAITING_CAPTURE → captured → sale PAID → stock 16 → 15 |
+| M-Pesa sale with M-Pesa unconfigured, real images | ✅ fails fast, sale CANCELLED, **hold released** (reserved 2 → 1) |
+| Z-report with a card sale | ✅ card takings apart from the drawer; variance 0 |
+| Cash change exact to the cent | ✅ sales, Phase 9 (47.46) |
+| Coverage gate | ✅ 91.0% |
+
+**Bugs found by the build rather than by a person:**
+- **A cancelled sale kept its stock held for half an hour.** Phase 9 recorded this as working; it
+  was not. A payment failure cancels the sale from a Kafka listener, which has no caller token, so
+  the release call to inventory was skipped. Sales now emits `sale-cancelled` with the cart, and
+  inventory releases on it - the same path however the sale was cancelled.
+- **Moving the idempotency filter broke messaging-lib's own tests**: adding the servlet stack
+  turned their contexts into web contexts, which pulled in common-lib's web handlers and their
+  security. Library tests now run with `web-application-type: none`.
+- **The token cache listened for the wrong error.** Found against the real sandbox: Daraja
+  answers an expired or revoked token with HTTP 404 and `404.001.03`, not 401, so a cached token
+  that went bad early would have failed every M-Pesa sale until its expiry. The client now drops
+  it and retries once - safe, since a request refused at the token check was never processed.
+- **A raw-JDBC test table in `public` failed every Flyway test after it** ("non-empty schema but
+  no history table"). The filter test has its own schema.
+
+**Sandbox findings (22 Sep 2026), with the credentials now in `.env`:** OAuth succeeds, and the
+token is accepted by Account Balance - but STK Push, STK Query, Transaction Status and Reversal
+all answer `404.001.03 Invalid Access Token`, exactly as they answer a made-up token. The token is
+genuine; the Daraja **app is not subscribed to the M-Pesa Express (and Reversal) API products**.
+That is a Daraja portal setting, not code: add the products to the app, or create a sandbox app
+with them and use its key and secret. Separately, `MPESA_CALLBACK_URL` holds only an inline
+comment (so it is empty) and `MPESA_CALLBACK_TOKEN` is absent, so the service still reports M-Pesa
+unconfigured; both need a tunnel address and a generated token.
+
+**Deferred with reason:** M-Pesa **B2C** (paying a partial refund to the customer's phone) needs a
+B2C shortcode and credentials of its own; until then a partial M-Pesa refund is settled by a
+person and recorded. **Sales does not yet consume `payment-refunded`** - the return is already
+complete at the till; reporting is the consumer that needs it. Daily reconciliation is triggered by
+uploading the statement, because Daraja cannot provide one.
 
 ---
 

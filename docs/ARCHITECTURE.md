@@ -98,13 +98,14 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.purchasing.po-approved.v1` | purchasing | notification, reporting | poId, supplierId, total, approvedBy |
 | `pos.purchasing.goods-received.v1` | purchasing | inventory, reporting | grnId, branchId, lines[{productId, qty, batchNo, expiry, unitCost — **landed**}] |
 | `pos.purchasing.supplier-cost-changed.v1` | purchasing | catalog, reporting | supplierId, productId, previousUnitCost, newUnitCost, sourceType |
-| `pos.payments.payment-requested.v1` | sales | payment | saleId, branchId, amount, tenders[] |
-| `pos.payments.payment-authorized.v1` | payment | sales, reporting | saleId, paymentId, method, amount, reference |
-| `pos.payments.payment-failed.v1` | payment | sales, notification | saleId, reason, code |
-| `pos.payments.payment-refunded.v1` | payment | sales, reporting | refundId, saleId, amount, method |
+| `pos.payments.payment-requested.v1` | sales | payment | paymentIntentId (the dedupe key), saleId, branchId, method, amount, phoneNumber (M-Pesa only), terminalReference (card only) — one event per tender |
+| `pos.payments.payment-authorized.v1` | payment | sales, reporting | paymentIntentId, saleId, method, amountAuthorized (the intent amount when the whole-shilling M-Pesa charge was paid), providerReference, approvalCode |
+| `pos.payments.payment-failed.v1` | payment | sales, notification | paymentIntentId, saleId, method, reasonCode (e.g. CANCELLED_BY_USER, TIMEOUT, PROVIDER_UNAVAILABLE), providerMessage |
+| `pos.payments.payment-refunded.v1` | payment | reporting | refundId, paymentIntentId, saleId, returnId, method, amount, providerReference — emitted only once the provider (or a person) confirms it |
 | `pos.sales.sale-completed.v1` | sales | inventory, customer, reporting, notification | saleId, receiptNumber, branchId, registerId, shiftId, cashierId, customerId?, lines[] (as charged, with tax class), net/tax/grand totals, cartId? (the reservation reference inventory consumes) |
 | `pos.sales.sale-voided.v1` | sales | inventory, reporting | saleId, reason, actorId |
-| `pos.sales.return-processed.v1` | sales | inventory, customer, reporting | returnId, saleId, lines[{productId, qty, resaleable, batchNo?}] |
+| `pos.sales.sale-cancelled.v1` | sales | inventory | saleId, branchId, cartId? (whose stock holds inventory releases), reason |
+| `pos.sales.return-processed.v1` | sales | inventory, payment, customer, reporting | returnId, saleId, lines[{productId, qty, resaleable, batchNo?}], refundTotal, refundMethod (non-cash is refunded by payment) |
 | `pos.sales.shift-closed.v1` | sales | reporting, notification | shiftId, branchId, registerId, expected, declared, variance |
 | `pos.inventory.stock-deducted.v1` | inventory | reporting | saleId, branchId, lines[{productId, qty, batchAllocations[]}] |
 | `pos.inventory.low-stock.v1` | inventory | notification, purchasing | productId, branchId, onHand, reorderPoint |
@@ -192,16 +193,28 @@ cannot be accepted surfaces in the terminal UI for supervisor action.
 ### 3.4 M-Pesa payment
 
 ```
-payment-service ──STK Push──▶ Daraja ──prompt──▶ customer phone
-        │                                           │ enters PIN
-        │ ◀──── callback (may duplicate, reorder, or never arrive) ────┘
-        │ idempotent on CheckoutRequestID
+sales ──payment-requested──▶ payment-service: record the intent (the listener only records)
+                                    │
+                    dispatcher, after that commit, outside any transaction
+                                    │
+                             STK Push ──▶ Daraja ──prompt──▶ customer phone
+                                    │                          │ enters PIN
+        callback ◀── (may duplicate, beat the push's own response, or never arrive) ──┘
+        │ authenticated by a secret path token; idempotent on CheckoutRequestID
+        │ a callback for a push not yet recorded is parked, and applied when it is
         │
-        └─ scheduled job: for intents still PENDING past the timeout,
-           query the Daraja transaction-status API and settle from the truth
+        └─ status sweep: pushes with no answer are queried; the query is the authority
+           past the give-up point the intent fails as TIMEOUT so the lane moves on,
+           and money that still arrives is recorded as a late payment, never dropped
 ```
-The callback is a hint; the status query is the authority. Daily reconciliation compares recorded
-payments against the M-Pesa statement and reports variances.
+Daraja takes whole shillings, so the push is the amount rounded `HALF_UP`; paying exactly that
+charge settles the four-decimal sale amount, and the difference is kept as rounding on the payment.
+A push that timed out is never resent: it may have reached the phone.
+
+Refunds go back by the method they came in. A full M-Pesa payment is reversed through Daraja's
+Reversal API; part of one cannot be (M-Pesa reverses whole transactions), so it is raised for a
+person, who settles it another way and records how. Daraja has no statement API: the day's export
+from the M-Pesa organisation portal is uploaded and reconciled receipt by receipt.
 
 ---
 
