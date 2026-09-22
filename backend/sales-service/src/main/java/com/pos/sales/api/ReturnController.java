@@ -25,6 +25,7 @@ import com.pos.sales.api.dto.SalesDtos;
 import com.pos.sales.domain.SaleReturn;
 import com.pos.sales.service.CheckoutService;
 import com.pos.sales.service.SaleReturnService;
+import com.pos.sales.service.TillSessionService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +41,7 @@ public class ReturnController {
     private final SaleReturnService returns;
     private final CheckoutService sales;
     private final BranchAccessGuard branchAccess;
+    private final TillSessionService tillSessions;
 
     @GetMapping("/eligibility")
     @PreAuthorize("hasAuthority('sale:refund')")
@@ -58,6 +60,10 @@ public class ReturnController {
             @Valid @RequestBody SalesDtos.ReturnRequest request) {
 
         branchAccess.requireAccess(sales.require(request.saleId()).getBranchId());
+        if (request.tillSessionId() != null) {
+            // The drawer paying out must be one the caller may work.
+            branchAccess.requireAccess(tillSessions.require(request.tillSessionId()).getBranchId());
+        }
         boolean overriding =
                 request.policyOverrideReason() != null && !request.policyOverrideReason().isBlank();
 
@@ -77,7 +83,8 @@ public class ReturnController {
                                                         line.quantity(),
                                                         line.resaleable(),
                                                         line.conditionNote()))
-                                .toList());
+                                .toList(),
+                        request.tillSessionId());
 
         return ResponseEntity.created(URI.create("/api/v1/returns/" + processed.getId()))
                 .body(SalesDtos.ReturnResponse.from(processed));

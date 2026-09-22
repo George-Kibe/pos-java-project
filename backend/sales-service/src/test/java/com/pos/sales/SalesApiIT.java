@@ -364,6 +364,8 @@ class SalesApiIT extends SalesTestBase {
                                                                         saleId,
                                                                         "reason",
                                                                         "FAULTY",
+                                                                        "tillSessionId",
+                                                                        tillId,
                                                                         "lines",
                                                                         List.of(
                                                                                 Map.of(

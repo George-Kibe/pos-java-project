@@ -15,6 +15,7 @@ import com.pos.events.sales.SaleCompletedPayload;
 import com.pos.events.sales.SaleVoidedPayload;
 import com.pos.events.sales.ShiftClosedPayload;
 import com.pos.messaging.outbox.OutboxRecorder;
+import com.pos.sales.domain.PaymentStatus;
 import com.pos.sales.domain.Sale;
 import com.pos.sales.domain.SalePayment;
 import com.pos.sales.domain.SaleReturn;
@@ -120,7 +121,8 @@ public class SalesEventPublisher {
                                         sale.getTaxTotal(),
                                         sale.getGrandTotal(),
                                         sale.getCurrency(),
-                                        sale.getReservationReference()))
+                                        sale.getReservationReference(),
+                                        tenders(sale)))
                         .build());
     }
 
@@ -215,7 +217,10 @@ public class SalesEventPublisher {
                                         lines,
                                         saleReturn.getRefundTotal(),
                                         saleReturn.getCurrency(),
-                                        saleReturn.getRefundMethod()))
+                                        saleReturn.getRefundMethod(),
+                                        saleReturn.getTillSession() == null
+                                                ? null
+                                                : saleReturn.getTillSession().getId()))
                         .build());
     }
 
@@ -249,5 +254,21 @@ public class SalesEventPublisher {
                                         session.getSaleCount(),
                                         session.getCurrency()))
                         .build());
+    }
+
+    /**
+     * How the sale was paid, as the drawer keeps it: authorised tenders only, cash net of change.
+     * The same figures the shift's counters were moved by, so a report built from them reconciles.
+     */
+    private static List<SaleCompletedPayload.Tender> tenders(Sale sale) {
+        return sale.getPayments().stream()
+                .filter(payment -> payment.getStatus() == PaymentStatus.AUTHORIZED)
+                .map(
+                        payment ->
+                                // amount, not amountAuthorized: it is what the till's
+                                // counters were moved by (Sale.cashPortion).
+                                new SaleCompletedPayload.Tender(
+                                        payment.getMethod(), payment.getAmount()))
+                .toList();
     }
 }

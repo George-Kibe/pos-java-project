@@ -76,12 +76,6 @@ public class ZReportService {
         BigDecimal totalTakings =
                 takings.stream().map(MethodTakings::total).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal cashFromSales =
-                takings.stream()
-                        .filter(row -> "CASH".equals(row.method()))
-                        .map(MethodTakings::total)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-
         TillReconciliation reconciliation = session.reconcile(session.getCountedCash());
 
         List<CashMovementSummary> cashMovements =
@@ -96,8 +90,10 @@ public class ZReportService {
                         .toList();
 
         // The running counter on the session against what the sales actually say. A mismatch is a
-        // bug in this service, and a report that cannot show one would hide it.
-        boolean agree = session.getCashSales().compareTo(cashFromSales) == 0;
+        // bug in this service, and a report that cannot show one would hide it. Voided sales count
+        // on both sides: the counter keeps them, and their cash goes out again as a refund.
+        boolean agree =
+                session.getCashSales().compareTo(sales.cashTakenIncludingVoided(sessionId)) == 0;
 
         return new ZReport(
                 session.getId(),

@@ -324,6 +324,15 @@ public class CheckoutService {
             throw new Errors.BusinessRuleException(
                     "sale.void_reason_required", "A void needs a reason");
         }
+        if (sale.getTillSession() != null && !sale.getTillSession().getStatus().acceptsSales()) {
+            // A void puts the cash back through the shift that took it. Once that shift is being
+            // counted or closed, changing its takings would move a drawer nobody can recount: the
+            // customer has gone, and what is left is a return.
+            throw new Errors.ConflictException(
+                    "sale.shift_closed",
+                    "The shift that took this sale is %s; process a return instead"
+                            .formatted(sale.getTillSession().getStatus()));
+        }
 
         sale.setStatus(SaleStatus.VOIDED);
         sale.setVoidedAt(Instant.now());

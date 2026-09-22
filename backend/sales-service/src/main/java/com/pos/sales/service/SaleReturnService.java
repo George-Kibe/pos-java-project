@@ -23,6 +23,7 @@ import com.pos.sales.domain.SaleLine;
 import com.pos.sales.domain.SaleReturn;
 import com.pos.sales.domain.SaleReturnLine;
 import com.pos.sales.domain.SaleStatus;
+import com.pos.sales.domain.TillSession;
 import com.pos.sales.domain.policy.ReturnEligibility;
 import com.pos.sales.domain.policy.ReturnPolicy;
 import com.pos.sales.messaging.SalesEventPublisher;
@@ -47,6 +48,7 @@ public class SaleReturnService {
     private final SaleRepository sales;
     private final ServiceEndpointProperties properties;
     private final SalesEventPublisher events;
+    private final TillSessionService tillSessions;
 
     /** One line coming back. */
     public record ReturnLineRequest(
@@ -102,9 +104,12 @@ public class SaleReturnService {
             String notes,
             UUID policyOverrideBy,
             String policyOverrideReason,
-            List<ReturnLineRequest> requested) {
+            List<ReturnLineRequest> requested,
+            UUID tillSessionId) {
 
         Sale sale = requireReturnable(saleId);
+        PaymentMethod method = refundMethod == null ? PaymentMethod.CASH : refundMethod;
+        TillSession payingShift = payingShift(method, tillSessionId);
         if (requested == null || requested.isEmpty()) {
             throw new Errors.BusinessRuleException(
                     "return.no_lines", "A refund needs at least one line");
@@ -116,9 +121,11 @@ public class SaleReturnService {
         long days = ReturnPolicy.daysBetween(soldAt, now);
 
         SaleReturn saleReturn = new SaleReturn(nextReturnNumber(), sale, currentActor(), reason);
-        saleReturn.setTillSession(sale.getTillSession());
+        // The shift the refund is paid from - where the cash actually leaves a drawer today - not
+        // the shift that took the sale, which may have been counted and closed days ago.
+        saleReturn.setTillSession(payingShift);
         saleReturn.setNotes(notes);
-        saleReturn.setRefundMethod(refundMethod == null ? PaymentMethod.CASH : refundMethod);
+        saleReturn.setRefundMethod(method);
         saleReturn.setDaysSinceSale((int) days);
 
         boolean anyOutsideWindow = false;
@@ -195,6 +202,24 @@ public class SaleReturnService {
         SaleReturn saved = returns.save(saleReturn);
         events.returnProcessed(saved);
         return saved;
+    }
+
+    /**
+     * The open shift a refund is paid from.
+     *
+     * <p>Required for cash: the money leaves a drawer, and the shift that drawer belongs to is the
+     * one whose count must show it. Optional otherwise - a card or M-Pesa refund touches no drawer.
+     */
+    private TillSession payingShift(PaymentMethod method, UUID tillSessionId) {
+        if (tillSessionId == null) {
+            if (method == PaymentMethod.CASH) {
+                throw new Errors.BusinessRuleException(
+                        "return.shift_required",
+                        "A cash refund comes out of a drawer: name the open shift paying it");
+            }
+            return null;
+        }
+        return tillSessions.requireOpen(tillSessionId);
     }
 
     private Sale requireReturnable(UUID saleId) {

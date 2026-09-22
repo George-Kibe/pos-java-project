@@ -201,7 +201,8 @@ public class TillSessionService {
         }
     }
 
-    private TillSession requireOpen(UUID sessionId) {
+    /** A shift that can still take money in or out. */
+    public TillSession requireOpen(UUID sessionId) {
         TillSession session = require(sessionId);
         if (!session.getStatus().acceptsSales()) {
             throw new Errors.ConflictException(

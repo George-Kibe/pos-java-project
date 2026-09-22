@@ -66,6 +66,26 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
             nativeQuery = true)
     List<MethodTotal> takingsByMethod(@Param("sessionId") UUID sessionId);
 
+    /**
+     * Every shilling of cash a shift took, voided sales included - what the session's running
+     * {@code cashSales} counter holds. A void is paid back out as a cash refund rather than
+     * subtracted from sales, so comparing the counter with takings net of voids would call every
+     * shift with a void a drifting counter.
+     */
+    @Query(
+            value =
+                    """
+                    SELECT COALESCE(SUM(p.amount), 0)
+                    FROM sales s
+                             JOIN sale_payments p ON p.sale_id = s.id
+                    WHERE s.till_session_id = :sessionId
+                      AND s.status IN ('PAID', 'VOIDED')
+                      AND p.status = 'AUTHORIZED'
+                      AND p.method = 'CASH'
+                    """,
+            nativeQuery = true)
+    java.math.BigDecimal cashTakenIncludingVoided(@Param("sessionId") UUID sessionId);
+
     /** Projection for the Z-report. */
     interface MethodTotal {
         String getMethod();

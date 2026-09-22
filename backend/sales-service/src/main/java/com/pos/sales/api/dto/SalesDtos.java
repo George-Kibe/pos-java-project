@@ -441,7 +441,9 @@ public final class SalesDtos {
             @Size(max = 1000) String notes,
             /** Only needed outside the returns window; the approver is the caller. */
             @Size(max = 500) String policyOverrideReason,
-            @NotEmpty @Valid List<ReturnLineRequest> lines) {}
+            @NotEmpty @Valid List<ReturnLineRequest> lines,
+            /** The open shift paying the refund; required for cash. */
+            UUID tillSessionId) {}
 
     public record ReturnLineResponse(
             UUID id,

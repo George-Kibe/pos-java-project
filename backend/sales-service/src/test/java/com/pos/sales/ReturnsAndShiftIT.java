@@ -62,7 +62,8 @@ class ReturnsAndShiftIT extends SalesTestBase {
                         "Seal broken",
                         null,
                         null,
-                        List.of(new ReturnLineRequest(lineId, money("1"), false, "Leaking")));
+                        List.of(new ReturnLineRequest(lineId, money("1"), false, "Leaking")),
+                        shift());
 
         assertThat(processed.getStatus()).isEqualTo(ReturnStatus.COMPLETED);
         assertThat(processed.getReturnNumber()).matches("RT-\\d{4}-000001");
@@ -97,7 +98,8 @@ class ReturnsAndShiftIT extends SalesTestBase {
                 null,
                 null,
                 null,
-                List.of(new ReturnLineRequest(lineId, money("1.5"), true, null)));
+                List.of(new ReturnLineRequest(lineId, money("1.5"), true, null)),
+                shift());
 
         assertThatThrownBy(
                         () ->
@@ -110,7 +112,8 @@ class ReturnsAndShiftIT extends SalesTestBase {
                                         null,
                                         List.of(
                                                 new ReturnLineRequest(
-                                                        lineId, money("1"), true, null))))
+                                                        lineId, money("1"), true, null)),
+                                        shift()))
                 .isInstanceOf(Errors.BusinessRuleException.class);
         assertThat(outboxCount(Topics.SALES_RETURN_PROCESSED)).isEqualTo(1);
     }
@@ -138,7 +141,8 @@ class ReturnsAndShiftIT extends SalesTestBase {
                                         null,
                                         null,
                                         null,
-                                        lines))
+                                        lines,
+                                        shift()))
                 .isInstanceOf(Errors.BusinessRuleException.class)
                 .hasMessageContaining("outside");
 
@@ -150,7 +154,8 @@ class ReturnsAndShiftIT extends SalesTestBase {
                         null,
                         SUPERVISOR,
                         "Regular customer, receipt shown",
-                        lines);
+                        lines,
+                        shift());
 
         assertThat(approved.isOutsidePolicyWindow()).isTrue();
         assertThat(approved.getPolicyOverrideBy()).isEqualTo(SUPERVISOR);
@@ -166,6 +171,91 @@ class ReturnsAndShiftIT extends SalesTestBase {
 
         assertThatThrownBy(() -> returns.eligibility(pending.getId()))
                 .isInstanceOf(Errors.BusinessRuleException.class);
+    }
+
+    @Test
+    @DisplayName(
+            "a cash refund comes out of today's drawer, not the closed shift that took the sale")
+    void aLaterRefundIsPaidFromTheShiftThatPaysIt() {
+        TillSession monday = openTill();
+        Sale sale = paidSale(monday, SOAP, "2");
+        tills.close(monday.getId(), money("5232.00"), null);
+
+        TillSession tuesday = openTill();
+        actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
+        returns.process(
+                sale.getId(),
+                ReturnReason.CHANGED_MIND,
+                PaymentMethod.CASH,
+                null,
+                null,
+                null,
+                List.of(
+                        new ReturnLineRequest(
+                                sale.getLines().getFirst().getId(), money("1"), true, null)),
+                tuesday.getId());
+
+        // Monday was counted and closed; it must not move. Tuesday's drawer paid the refund.
+        assertThat(tills.require(monday.getId()).getCashRefunds()).isEqualByComparingTo("0");
+        assertThat(tills.require(tuesday.getId()).getCashRefunds()).isEqualByComparingTo("116.00");
+        assertThat(latestOutboxPayload(Topics.SALES_RETURN_PROCESSED))
+                .contains("\"tillSessionId\":\"" + tuesday.getId() + "\"");
+    }
+
+    @Test
+    void aCashRefundMustNameTheDrawerPayingIt() {
+        Sale sale = paidSale(openTill(), SOAP, "1");
+        actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
+
+        assertThatThrownBy(
+                        () ->
+                                returns.process(
+                                        sale.getId(),
+                                        ReturnReason.FAULTY,
+                                        PaymentMethod.CASH,
+                                        null,
+                                        null,
+                                        null,
+                                        List.of(
+                                                new ReturnLineRequest(
+                                                        sale.getLines().getFirst().getId(),
+                                                        money("1"),
+                                                        true,
+                                                        null)),
+                                        null))
+                .isInstanceOf(Errors.BusinessRuleException.class)
+                .hasMessageContaining("open shift");
+    }
+
+    @Test
+    @DisplayName("once the shift that took a sale is closed, the sale is returned, not voided")
+    void aSaleOnAClosedShiftCannotBeVoided() {
+        TillSession till = openTill();
+        Sale sale = paidSale(till, SOAP, "1");
+        tills.close(till.getId(), money("5116.00"), null);
+        actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
+
+        assertThatThrownBy(() -> checkout.voidSale(sale.getId(), "Too late", SUPERVISOR))
+                .isInstanceOf(Errors.ConflictException.class)
+                .hasMessageContaining("process a return");
+    }
+
+    @Test
+    @DisplayName("a completed sale says how it was paid, cash net of the change handed back")
+    void aCompletedSaleCarriesItsTenders() {
+        TillSession till = openTill();
+        Cart cart = carts.open(till.getId(), null, false);
+        cart = carts.addLine(cart.getId(), SOAP.id(), SOAP.sku(), null, money("1"), false, TOKEN);
+        Sale sale = checkout.checkout(cart.getId(), null, TOKEN);
+        checkout.tender(
+                sale.getId(),
+                List.of(
+                        new CheckoutService.Tender(
+                                PaymentMethod.CASH, money("200.00"), null, null)),
+                money("200.00"));
+
+        assertThat(latestOutboxPayload(Topics.SALES_SALE_COMPLETED))
+                .contains("\"payments\":[{\"method\":\"CASH\",\"amount\":116");
     }
 
     // --- the shift --------------------------------------------------------------
@@ -186,7 +276,8 @@ class ReturnsAndShiftIT extends SalesTestBase {
                 null,
                 List.of(
                         new ReturnLineRequest(
-                                sale.getLines().getFirst().getId(), money("1"), true, null)));
+                                sale.getLines().getFirst().getId(), money("1"), true, null)),
+                shift());
         tills.recordDrop(till.getId(), money("1000.00"), "Mid-shift drop", "SAFE-BAG-7");
         tills.addFloat(till.getId(), money("200.00"), "More coins");
 
@@ -219,6 +310,24 @@ class ReturnsAndShiftIT extends SalesTestBase {
                             assertThat(takings.total()).isEqualByComparingTo("348.00");
                         });
         assertThat(tills.movementsOf(till.getId())).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("a void is not a drifting counter: the Z-report still agrees with the till")
+    void aShiftWithAVoidStillAgreesWithItsCounters() {
+        TillSession till = openTill();
+        paidSale(till, SOAP, "2"); // 232.00 cash
+        Sale voided = paidSale(till, SOAP, "1"); // 116.00 cash, then given back
+        actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
+        checkout.voidSale(voided.getId(), "Rung up twice", SUPERVISOR);
+
+        ZReportService.ZReport report = zReports.forSession(till.getId());
+
+        assertThat(report.countersAgreeWithSales()).isTrue();
+        // The drawer took both and gave one back; the takings are what was kept.
+        assertThat(report.cashSales()).isEqualByComparingTo("348.00");
+        assertThat(report.cashRefunds()).isEqualByComparingTo("116.00");
+        assertThat(report.totalTakings()).isEqualByComparingTo("232.00");
     }
 
     @Test
@@ -264,6 +373,11 @@ class ReturnsAndShiftIT extends SalesTestBase {
     }
 
     // --- helpers ----------------------------------------------------------------
+
+    /** The open shift on this test's register: the drawer a refund is paid from. */
+    private UUID shift() {
+        return tills.requireOpenForRegister(REGISTER).getId();
+    }
 
     private TillSession openTill() {
         return tills.open(BRANCH, REGISTER, money("5000.00"));
