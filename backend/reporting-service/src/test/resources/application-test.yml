@@ -1,0 +1,17 @@
+# Test overlay merged onto the real application.yml by @ActiveProfiles("test").
+# Never name this application.yml in src/test/resources: it shadows the main file.
+spring:
+  kafka:
+    consumer:
+      group-id: reporting-test
+      auto-offset-reset: earliest
+
+pos:
+  reporting:
+    # Lag is measured on demand in the tests.
+    lag-interval: PT1H
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.pos: INFO

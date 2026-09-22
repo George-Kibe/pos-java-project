@@ -350,6 +350,45 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  reporting-service:
+    build:
+      context: ../../backend
+      dockerfile: ../infra/docker/service.Dockerfile
+      args:
+        MODULE: reporting-service
+    image: pos/reporting-service:dev
+    container_name: pos-reporting-service
+    restart: unless-stopped
+    networks: [pos]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8089
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-pos}
+      REPORTING_DB_USER: ${REPORTING_DB_USER:-reporting_user}
+      REPORTING_DB_PASSWORD: ${REPORTING_DB_PASSWORD:?required}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+      # How often consumer lag is measured against the broker for /reports/lag and the gauge.
+      REPORTING_LAG_INTERVAL: ${REPORTING_LAG_INTERVAL:-PT30S}
+    # No published port: reachable only through the gateway.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8089/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   api-gateway:
     build:
       context: ../../backend
@@ -378,6 +417,7 @@ services:
       SALES_SERVICE_URI: http://sales-service:8085
       PAYMENT_SERVICE_URI: http://payment-service:8086
       CUSTOMER_SERVICE_URI: http://customer-service:8087
+      REPORTING_SERVICE_URI: http://reporting-service:8089
       AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
       JWT_ISSUER: ${JWT_ISSUER:-http://auth-service:8081}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
