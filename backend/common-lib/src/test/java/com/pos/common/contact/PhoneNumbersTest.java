@@ -1,12 +1,10 @@
-package com.pos.payment.policy;
+package com.pos.common.contact;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-
-import com.pos.payment.domain.policy.PhoneNumbers;
 
 class PhoneNumbersTest {
 

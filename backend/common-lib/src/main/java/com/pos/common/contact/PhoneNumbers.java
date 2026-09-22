@@ -1,4 +1,4 @@
-package com.pos.payment.domain.policy;
+package com.pos.common.contact;
 
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -6,9 +6,10 @@ import java.util.regex.Pattern;
 /**
  * Kenyan mobile numbers, as a cashier types them and as Daraja wants them.
  *
- * <p>Daraja expects {@code 2547XXXXXXXX} or {@code 2541XXXXXXXX}. Cashiers type {@code 0712...},
- * {@code +254712...}, {@code 712...}, with spaces. Anything that is not one of those shapes is
- * refused here rather than sent, because a push to a mistyped number prompts a stranger.
+ * <p>One shape everywhere: {@code 2547XXXXXXXX} or {@code 2541XXXXXXXX}. Cashiers type {@code
+ * 0712...}, {@code +254712...}, {@code 712...}, with spaces, so the same number must not become two
+ * customers - or, on a payment, an STK prompt to a stranger. Anything that is not a Kenyan mobile
+ * number is refused rather than stored or sent.
  */
 public final class PhoneNumbers {
 

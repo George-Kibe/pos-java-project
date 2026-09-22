@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -191,6 +192,23 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ProblemDetail handleNoResource(NoResourceFoundException ex) {
         return problem(HttpStatus.NOT_FOUND, "route.not_found", "No endpoint for this path");
+    }
+
+    /**
+     * A unique or check constraint refused the write.
+     *
+     * <p>A 409 rather than a 500: the caller asked for something the data will not allow, which is
+     * their business to resolve. Services check the common cases themselves and say which field is
+     * at fault; this catches the race between that check and the insert. The constraint's name
+     * stays in the log - it names internals, and a caller cannot act on it.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Constraint violation: {}", ex.getMostSpecificCause().getMessage());
+        return problem(
+                HttpStatus.CONFLICT,
+                "request.conflict",
+                "That change conflicts with something already recorded");
     }
 
     @ExceptionHandler(Exception.class)
