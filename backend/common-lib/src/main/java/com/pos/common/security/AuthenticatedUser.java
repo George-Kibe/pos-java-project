@@ -42,6 +42,21 @@ public record AuthenticatedUser(
                                                 + " configuration."));
     }
 
+    /**
+     * The caller's verified token as an {@code Authorization} header value, for forwarding to a
+     * service this one calls on the caller's behalf.
+     *
+     * <p>Taken from the security context rather than re-read from the request, so what is forwarded
+     * is exactly what the resource server validated.
+     */
+    public static Optional<String> bearerToken() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof Jwt jwt)) {
+            return Optional.empty();
+        }
+        return Optional.of("Bearer " + jwt.getTokenValue());
+    }
+
     public static AuthenticatedUser from(Jwt jwt) {
         String id = jwt.getClaimAsString(JwtClaims.USER_ID);
         if (id == null) {

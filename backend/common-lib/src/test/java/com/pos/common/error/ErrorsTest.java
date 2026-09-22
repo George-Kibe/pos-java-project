@@ -17,6 +17,8 @@ class ErrorsTest {
                 .isEqualTo(HttpStatus.CONFLICT);
         assertThat(new Errors.ForbiddenException("p.forbidden", "x").status())
                 .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(new Errors.ServiceUnavailableException("p.down", "x").status())
+                .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(new Errors.UnauthorizedException("p.unauth", "x").status())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(new Errors.BadRequestException("p.bad", "x").status())

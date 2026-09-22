@@ -76,6 +76,24 @@ public final class Errors {
     }
 
     /**
+     * A service this one depends on could not be reached.
+     *
+     * <p>503 rather than 500, because the distinction matters to the caller: nothing was recorded
+     * and the request is worth retrying. A till that cannot confirm a price must say so and keep
+     * the basket, not fail the sale ambiguously.
+     */
+    public static class ServiceUnavailableException extends ApiException {
+        public ServiceUnavailableException(String code, String message) {
+            super(HttpStatus.SERVICE_UNAVAILABLE, code, message);
+        }
+
+        public ServiceUnavailableException(
+                String code, String message, Map<String, Object> details) {
+            super(HttpStatus.SERVICE_UNAVAILABLE, code, message, details);
+        }
+    }
+
+    /**
      * Turns a human resource name into a code segment: {@code "Stock item"} becomes {@code
      * stock_item}.
      *

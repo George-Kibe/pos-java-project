@@ -106,6 +106,20 @@ class AuthenticatedUserTest {
     }
 
     @Test
+    void theForwardedTokenIsTheOneThatWasVerified() {
+        assertThat(AuthenticatedUser.bearerToken()).isEmpty();
+
+        authenticateWith(token().claim(JwtClaims.USER_ID, USER.toString()).build());
+        assertThat(AuthenticatedUser.bearerToken()).contains("Bearer t");
+
+        // Anything but a JWT has no token to forward.
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken("someone", "creds", List.of()));
+        assertThat(AuthenticatedUser.bearerToken()).isEmpty();
+    }
+
+    @Test
     void aNonJwtAuthenticationIsNotTreatedAsAUser() {
         SecurityContextHolder.getContext()
                 .setAuthentication(
