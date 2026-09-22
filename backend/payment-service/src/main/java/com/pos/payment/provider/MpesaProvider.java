@@ -7,12 +7,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import com.pos.common.contact.PhoneNumbers;
 import com.pos.events.payments.PaymentMethod;
 import com.pos.payment.client.daraja.DarajaClient;
 import com.pos.payment.client.daraja.DarajaException;
 import com.pos.payment.client.daraja.DarajaProperties;
 import com.pos.payment.domain.policy.MpesaAmount;
-import com.pos.payment.domain.policy.PhoneNumbers;
 
 import lombok.RequiredArgsConstructor;
 

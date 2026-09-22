@@ -15,8 +15,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
+import com.pos.events.EventEnvelope;
 import com.pos.events.Topics;
 import com.pos.events.payments.PaymentMethod;
+import com.pos.events.payments.PaymentRequestedPayload;
 import com.pos.payment.domain.IntentStatus;
 import com.pos.payment.domain.PaymentIntent;
 
@@ -133,6 +135,22 @@ class PaymentApiIT extends PaymentTestBase {
         assertThat(voucher.getStatus()).isEqualTo(IntentStatus.FAILED);
         assertThat(voucher.getFailureCode()).isEqualTo("METHOD_NOT_SUPPORTED");
         assertThat(outboxCount(Topics.PAYMENTS_PAYMENT_FAILED)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a loyalty tender is left to customer-service, not failed here")
+    void aDelegatedTenderIsIgnored() {
+        EventEnvelope<PaymentRequestedPayload> request =
+                request(PaymentMethod.LOYALTY, "100.00", null, null);
+
+        publish(Topics.PAYMENTS_PAYMENT_REQUESTED, request, request.payload().saleId());
+        // Wait for a request that should leave no trace: give it time to be wrong.
+        EventEnvelope<PaymentRequestedPayload> next =
+                request(PaymentMethod.CASH, "100.00", null, null);
+        requestAndDispatch(next);
+
+        assertThat(exists(request.payload().paymentIntentId())).isFalse();
+        assertThat(outboxCount(Topics.PAYMENTS_PAYMENT_FAILED)).isZero();
     }
 
     @Test

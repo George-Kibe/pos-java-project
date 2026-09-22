@@ -1,5 +1,7 @@
 package com.pos.payment.messaging;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +13,7 @@ import com.pos.events.Topics;
 import com.pos.events.payments.PaymentRequestedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
 import com.pos.messaging.idempotency.IdempotentConsumer;
+import com.pos.payment.config.PaymentProperties;
 import com.pos.payment.service.PaymentIntentService;
 import com.pos.payment.service.RefundService;
 
@@ -27,12 +30,15 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PaymentRequestListener {
 
+    private static final Logger log = LoggerFactory.getLogger(PaymentRequestListener.class);
+
     private static final String REQUEST_CONSUMER = "payment.accept-payment-requested";
     private static final String RETURN_CONSUMER = "payment.plan-refund-on-return";
 
     private final IdempotentConsumer idempotentConsumer;
     private final PaymentIntentService intents;
     private final RefundService refunds;
+    private final PaymentProperties properties;
 
     @KafkaListener(
             topics = Topics.PAYMENTS_PAYMENT_REQUESTED,
@@ -43,6 +49,14 @@ public class PaymentRequestListener {
                 EventJson.readEnvelope(message, PaymentRequestedPayload.class);
         CorrelationId.set(event.correlationId());
 
+        if (properties.isDelegated(event.payload().method())) {
+            // Another service owns this tender and answers the request itself.
+            log.debug(
+                    "Payment request {} is a {} tender, settled elsewhere",
+                    event.payload().paymentIntentId(),
+                    event.payload().method());
+            return;
+        }
         idempotentConsumer.consumeOnce(event, REQUEST_CONSUMER, intents::accept);
     }
 

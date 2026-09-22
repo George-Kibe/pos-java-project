@@ -179,7 +179,8 @@ public abstract class PaymentTestBase {
                                 "KES",
                                 phone,
                                 terminalRef,
-                                Instant.now()))
+                                Instant.now(),
+                                null))
                 .build();
     }
 

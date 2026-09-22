@@ -82,6 +82,8 @@ pos:
       - /api/v1/payments/mpesa/callbacks/**
 
   payment:
+    # Tenders another service settles; requests for them are ignored here.
+    delegated-methods: ${PAYMENT_DELEGATED_METHODS:LOYALTY}
     dispatch-interval: ${PAYMENT_DISPATCH_INTERVAL:PT0.5S}
     status-sweep-interval: ${MPESA_STATUS_SWEEP_INTERVAL:PT15S}
     refund-dispatch-interval: ${REFUND_DISPATCH_INTERVAL:PT5S}

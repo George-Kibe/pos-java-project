@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.pos.common.contact.PhoneNumbers;
 import com.pos.common.error.Errors;
 import com.pos.events.EventEnvelope;
 import com.pos.events.payments.PaymentRequestedPayload;
@@ -21,7 +22,6 @@ import com.pos.payment.domain.PaymentEvent;
 import com.pos.payment.domain.PaymentIntent;
 import com.pos.payment.domain.policy.MpesaAmount;
 import com.pos.payment.domain.policy.MpesaResultCodes;
-import com.pos.payment.domain.policy.PhoneNumbers;
 import com.pos.payment.messaging.PaymentEventPublisher;
 import com.pos.payment.provider.PaymentProvider;
 import com.pos.payment.repository.PaymentEventRepository;
