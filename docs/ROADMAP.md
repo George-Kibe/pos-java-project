@@ -541,32 +541,112 @@ the cost it needs.
 
 ---
 
-## Phase 9 — sales-service
+## Phase 9 — sales-service ✅
 
 **Goal:** the till works — including with the network down.
 
-- `till_sessions` (shifts), `carts`, `cart_lines`, `sales`, `sale_lines`, `sale_payments`,
-  `returns`, `return_lines`, `receipts`, `price_overrides`, `outbox`
-- Shift lifecycle: open with float → sales → cash drops → close with declared count → variance
-- Cart operations: add by barcode/SKU/search, weighed line entry, quantity change, line void,
-  line discount and price override (permission-gated, reason required), suspend and recall,
-  customer attach
-- **Server-side totalling, always** — the client's totals are advisory and revalidated
-- Checkout saga: sale `PENDING` → request payment → on `payment-authorized` mark `PAID` and emit
-  `sale-completed`; on failure or timeout compensate and cancel
-- Returns and refunds: reference the original sale, policy window, partial returns, resaleable flag
-  driving restock, emits `return-processed`
-- Voids: supervisor-approved, audited, never destructive
-- Receipt generation: numbered per branch, gapless sequence, full tax breakdown per class
-- **Offline sync endpoint**: accepts a batch of terminal-created sales carrying client UUIDs and an
-  `Idempotency-Key`; deduplicates, revalidates prices and stock, and reports per-sale results
-  including price variances
-- Z-report data per shift
+Delivered:
+- 14 tables: `till_sessions`, `cash_movements`, `carts`, `cart_lines`, `sales`, `sale_lines`,
+  `sale_payments`, `price_overrides`, `returns`, `return_lines`, `receipts`, `receipt_sequences`,
+  `offline_sync_batches`, `idempotency_records`, plus the shared `outbox` / `processed_event`
+- **Shift lifecycle**: open with a float, cash drops and float top-ups as `cash_movements`,
+  `begin-close` freezes the expected figure *before* the count so a sale rung up mid-count cannot
+  show as a shortfall, close with a declared count and a signed variance. A variance never blocks
+  a close. A cashier closes their own shift; anyone else's needs `shift:close:any`
+- **Carts**: add by product, SKU or barcode, weighed lines kept separate rather than merged, quantity
+  change, line void kept on the record, price override (permission-gated, reason required, audited
+  in `price_overrides` with the value given away), suspend with a four-digit code and recall,
+  customer attach that reprices for members
+- **Server-side totalling, always.** Every line is priced by catalog's `PriceResolver`;
+  `SaleTotalsCalculator` sums tax per class and flags a disagreement with the client's figure
+  rather than trusting either side. Pure — no Spring, no JPA
+- **Checkout saga**: `PENDING` → tender. Cash and card settle at the till; M-Pesa emits
+  `payment-requested` and waits as `AWAITING_PAYMENT`. `payment-authorized` completes the sale,
+  `payment-failed` or the timeout sweep cancels it and releases the stock. A late authorisation
+  for a sale already given up on is not applied. Split tenders; change only ever in cash
+- **Receipts**: numbered per branch from a gapless sequence drawn inside the completing
+  transaction, so a cancelled sale leaves no hole. Full tax breakdown per class; reprints counted
+- **Returns**: reference the original sale, pro-rated from what was *charged* (a promotion is
+  honoured on the way back), partial returns tracked per line, a returns window with a recorded
+  supervisor override outside it, `resaleable` carried to inventory. Emits `return-processed`
+- **Voids**: `sale:void` only, the approver taken from the token, never an `UPDATE` that erases —
+  emits `sale-voided` and the drawer follows
+- **Offline sync**: a batch of terminal-created sales under an `Idempotency-Key`. Deduped on the
+  terminal's own `clientSaleId`, each sale in its own transaction so one bad sale cannot sink the
+  rest, repriced against catalog with the variance flagged, and the whole answer stored so a
+  replay returns it verbatim. A catalog outage refuses the batch (503) without recording it, so the
+  retry is processed properly
+- **Z-report** built from the recorded sales, not the running counters, and says whether the two
+  agree — the only way a drifting counter is ever noticed
+- `Idempotency-Key` honoured on every mutating endpoint via a replaying filter; catalog and
+  inventory behind circuit breakers, catalog failing closed (503, basket kept) and inventory
+  failing open (a lane that will not serve is worse than overselling the last unit)
+- Emits `sale-completed`, `sale-voided`, `return-processed`, `shift-closed` and
+  `payment-requested` through the outbox; consumes `payment-authorized` / `payment-failed`,
+  idempotently
 
 **Done when:** an end-to-end test rings up a mixed basket (standard-rated, zero-rated, weighed,
 promo-discounted), pays it, and sees stock deducted and a receipt whose tax breakdown matches the
 catalog's `PriceResolver` exactly; a replayed offline batch creates no duplicates; a payment failure
 leaves no stock reserved.
+
+**Verified — 520 tests in the build, 89 here (41 unit, 48 integration), plus an end-to-end run
+through the gateway against the built images:**
+
+| Check | Result |
+|---|---|
+| Mixed basket: standard-rated, zero-rated, weighed, promo-discounted | ✅ 1052.5377, tax 116.2121 |
+| Receipt tax breakdown matches catalog line by line | ✅ to the fourth decimal, and sums to the sale |
+| Cash change | ✅ 47.46 handed back; the drawer records the sale, not the notes |
+| Stock deducted, cross-service, on the real images | ✅ 20 → 18 → 16 via `sale-completed` |
+| The basket's hold consumed with the deduction | ✅ reserved 2 → 4 → 2 on the real images |
+| Payment authorised asynchronously | ✅ AWAITING_PAYMENT → PAID on the event, receipt numbered then |
+| A redelivered authorisation | ✅ paid once, numbered once, announced once |
+| A failed payment | ✅ sale CANCELLED, stock released, nothing announced as sold |
+| A late authorisation for a cancelled sale | ✅ not applied |
+| Timeout sweep | ✅ compensates exactly like a failure |
+| Split cash + M-Pesa | ✅ waits for the M-Pesa half; only the cash half reaches the drawer |
+| Receipt numbers | ✅ contiguous; cancelled sales leave no gap |
+| Offline batch | ✅ accepted, numbered, receipted, announced, and on the shift's counters |
+| A replayed offline batch | ✅ first answer returned, no duplicates |
+| The same sale in a new batch | ✅ DUPLICATE with the original receipt, no number consumed |
+| A stale terminal price | ✅ accepted at the server's figure, variance −6.00 flagged |
+| One unsellable sale in a batch | ✅ REJECTED, the other two land, no gap in numbering |
+| Catalog down during a sync | ✅ 503, nothing recorded, the retry succeeds |
+| Partial return | ✅ refund pro-rated from the promotional price, `resaleable=false` carried |
+| Returning more than was sold | ✅ refused |
+| Outside the returns window | ✅ refused without an approver; recorded with one |
+| Shift float → sales → refund → drop → top-up → count | ✅ expected 4432.00, variance −2.00, `shift-closed` emitted |
+| Z-report against the counters | ✅ agree, takings split by method |
+| One shift per register; a colleague's drawer | ✅ 409; 403 unless `shift:close:any` |
+| The whole lane over HTTP | ✅ every response mapped with open-in-view off |
+| Branch scoping, before anything is written | ✅ 403 leaves no till or cart behind |
+| A retried request with the same `Idempotency-Key` | ✅ replayed, byte for byte |
+| Gateway routes, with a real token | ✅ `/sales`, `/carts`, `/till-sessions`, `/returns` |
+| Outbox relay on the real image | ✅ every row PUBLISHED |
+| Coverage gate | ✅ 91.0% |
+
+**Bugs found by the build rather than by a person:**
+- **Offline sync refused every sale.** The per-sale `REQUIRES_NEW` method was called on `this`, so
+  no transaction existed; the receipt-number service (`MANDATORY`) threw and a catch-all reported
+  each sale as REJECTED. It had no test until this phase's verification wrote one.
+- **An unknown barcode read as "catalog is down"**, because the circuit breaker's fallback caught
+  the 404 too and counted it towards opening the breaker. In a sync, one delisted product made
+  the whole batch a 503 the terminal would retry forever.
+- **Holds outlived the sale.** Inventory had a `consume` for exactly this and nothing called it:
+  `sale-completed` did not say which cart the stock was held under. The payload now carries
+  `cartId` (additive; `.v1` unchanged) and inventory consumes the holds with the deduction.
+- **`GET /returns` answered 500** on every call: the list mapped each return's lazy original sale
+  after the session closed. The single-return lookup had the entity graph; the page did not.
+- **A 403 left the row behind.** Opening a cart and checking out checked branch access on the
+  object they had just committed. Both now check the parent first.
+- **The gateway routed `/api/v1/shifts/**`**, a path the service never had; till sessions would
+  have 404'd at the edge while the service was healthy.
+- **Change came back as 47.4623**, four decimals of shilling handed to a customer.
+
+**Deferred with reason:** loyalty redemption at the till waits for `customer-service` (Phase 11);
+the cart already attaches a customer and reprices for members. Payment providers are Phase 10 —
+here cash and card settle at the till and M-Pesa is exercised through its events.
 
 ---
 

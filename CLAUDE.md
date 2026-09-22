@@ -124,7 +124,11 @@ Rules:
 - Every endpoint carries an explicit `@PreAuthorize` on a **permission** (`sale:void`), never on a
   role name. Deny by default — an endpoint without an authorization check does not get merged.
 - Every endpoint that touches branch-scoped data verifies the caller is assigned to that branch.
-  Use the shared `BranchAccessGuard`; do not reimplement it.
+  Use the shared `BranchAccessGuard`; do not reimplement it. **Check before the write, not after**:
+  controllers are not transactional, so a check on the object just created answers 403 with the
+  row already committed. Guard on the parent (the shift, the cart) the request names.
+- Forward the caller's token to a downstream service with `AuthenticatedUser.bearerToken()` - the
+  token the resource server verified - rather than re-reading the `Authorization` header.
 - Services validate the JWT themselves via JWKS. The gateway is not the only line of defence.
 - Never log tokens, OTPs, passwords, M-Pesa credentials, or full customer phone numbers. The
   logging masker in `common-lib` covers the known fields — extend it when adding new sensitive ones.
@@ -136,7 +140,9 @@ Rules:
 
 - Base path `/api/v1/<resource>`, plural nouns, kebab-case multiword segments.
 - Standard verbs and codes: `200`, `201` + `Location`, `204`, `400`, `401`, `403`, `404`, `409`,
-  `422`, `429`, `500`.
+  `422`, `429`, `500`, `503`. Use `503` (`Errors.ServiceUnavailableException`) when a service this
+  one depends on could not be reached — the caller needs to know nothing was recorded and a retry
+  is worth making, which a `500` does not say.
 - Errors use RFC 7807 `application/problem+json` via the shared handler — one shape everywhere:
   `type`, `title`, `status`, `detail`, `instance`, `correlationId`, `errors[]`.
 - Collections are paginated (`page`, `size`, `sort`), max page size 100, wrapped in the shared
@@ -210,6 +216,14 @@ self-invocation does not go through the proxy). See `LoginAttemptService`, `OtpS
 bumps the row's version while the caller still holds the old one, and the caller's next flush dies
 with an optimistic-lock failure on a row it never meant to touch. Pass the id and let the inner
 transaction load its own copy.
+
+**A self-invoked `REQUIRES_NEW` is not a separate transaction - it is no transaction at all.** Phase
+9's offline sync called its per-sale `@Transactional(REQUIRES_NEW)` method on `this`, so nothing
+was transactional; the receipt-number service (`MANDATORY`) then threw on every sale, and a
+catch-all turned that into a per-sale `REJECTED`. The endpoint refused every sale it was sent and
+looked like it was working. Put the per-item transaction on another bean (`OfflineSaleWriter`) and
+catch the failure **outside** it: an exception caught inside a transaction has already marked it
+rollback-only, so the commit fails anyway and takes the batch with it.
 
 ## Stack traps already hit (do not rediscover these)
 
@@ -334,6 +348,13 @@ transaction load its own copy.
   application, so `AccessDeniedHandler` never sees them and a catch-all `@ExceptionHandler` turns
   every 403 into a 500. `SecurityExceptionHandler` in common-lib handles this - do not remove it.
 
+- **A circuit breaker's fallback sees every exception, 4xx included.** Catalog answering 404 for
+  an unknown barcode came out of the fallback as "catalog unavailable" (503), and counted towards
+  opening the breaker for every lane. An offline batch holding one delisted product became a
+  permanent 503 that the terminal would retry forever. Translate `HttpClientErrorException` into
+  the business error it is inside the fallback, and list it under the breaker's
+  `ignoreExceptions`.
+
 ## Testing traps
 
 - **Tests that share a broker must select their own message**, not "the first record on the
@@ -368,3 +389,10 @@ transaction load its own copy.
   exception at any size.
 - Refunds are not negative sales: they reference the original sale, respect a returns policy window,
   and restock to a batch only when the goods are resaleable.
+- A basket's stock holds end with the sale event, not an HTTP call. Inventory consumes the holds
+  for `sale-completed.cartId` in the same transaction as the FEFO deduction. Sales cannot release
+  them itself on completion: an M-Pesa sale completes inside a Kafka listener with no caller token
+  to forward. Left unconsumed, every sold unit stays "held" until expiry and availability on a
+  best-seller is permanently understated.
+- A cash sale's grand total carries four decimals; the change handed back is rounded to cents
+  (`HALF_UP`) and that is the only rounding the drawer sees. The payments keep the 4dp figure.

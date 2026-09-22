@@ -102,7 +102,7 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.payments.payment-authorized.v1` | payment | sales, reporting | saleId, paymentId, method, amount, reference |
 | `pos.payments.payment-failed.v1` | payment | sales, notification | saleId, reason, code |
 | `pos.payments.payment-refunded.v1` | payment | sales, reporting | refundId, saleId, amount, method |
-| `pos.sales.sale-completed.v1` | sales | inventory, customer, reporting, notification | saleId, branchId, cashierId, customerId?, lines[], totals, taxBreakdown[], payments[] |
+| `pos.sales.sale-completed.v1` | sales | inventory, customer, reporting, notification | saleId, receiptNumber, branchId, registerId, shiftId, cashierId, customerId?, lines[] (as charged, with tax class), net/tax/grand totals, cartId? (the reservation reference inventory consumes) |
 | `pos.sales.sale-voided.v1` | sales | inventory, reporting | saleId, reason, actorId |
 | `pos.sales.return-processed.v1` | sales | inventory, customer, reporting | returnId, saleId, lines[{productId, qty, resaleable, batchNo?}] |
 | `pos.sales.shift-closed.v1` | sales | reporting, notification | shiftId, branchId, registerId, expected, declared, variance |

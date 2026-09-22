@@ -4,11 +4,12 @@ A production-grade Point of Sale platform for multi-branch supermarket retail, b
 Spring Boot microservices behind an API gateway, with a Next.js cashier + back-office frontend,
 Kafka for event-driven communication, and PostgreSQL for persistence.
 
-> **Status:** phases 0-8 of 16 complete - infrastructure, shared libraries, `auth-service`,
-> `api-gateway`, `notification-service`, `catalog-service`, `inventory-service` and
-> `purchasing-service` are built, tested and running under Docker Compose, with stock flowing from
-> a purchase order through a goods receipt into batches at its landed cost. 424 tests in the build.
-> Next up is `sales-service`; the frontend starts at phase 13. Code is built phase by phase per
+> **Status:** phases 0-9 of 16 complete - infrastructure, shared libraries, `auth-service`,
+> `api-gateway`, `notification-service`, `catalog-service`, `inventory-service`,
+> `purchasing-service` and `sales-service` are built, tested and running under Docker Compose: stock
+> arrives through a purchase order at its landed cost and leaves through a till whose totals, tax
+> and receipts are the server's, online or synced from offline. 520 tests in the build.
+> Next up is `payment-service`; the frontend starts at phase 13. Code is built phase by phase per
 > [docs/ROADMAP.md](docs/ROADMAP.md), which records what each phase delivered and how it was
 > verified.
 
