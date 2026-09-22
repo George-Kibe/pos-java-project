@@ -15,12 +15,12 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 | 4 | api-gateway | Single ingress, JWT enforcement, rate limits | ✅ done |
 | 5 | notification-service | Real OTP email; registration loop closes | ✅ done |
 | 6 | catalog-service | Products, barcodes, tax engine, pricing, promos | ✅ done |
-| 7 | inventory-service | Stock, batches/expiry, FEFO, movements | 4–5 d |
-| 8 | purchasing-service | Suppliers, PO, GRN, costing | 3–4 d |
-| 9 | sales-service | Shifts, checkout saga, receipts, returns, offline sync | 5–7 d |
-| 10 | payment-service | Cash, M-Pesa STK, card terminal, refunds | 4–5 d |
-| 11 | customer-service | Customers, loyalty, member pricing | 2–3 d |
-| 12 | reporting-service | CQRS projections, Z-report, dashboards | 3–4 d |
+| 7 | inventory-service | Stock, batches/expiry, FEFO, movements | ✅ done |
+| 8 | purchasing-service | Suppliers, PO, GRN, costing | ✅ done |
+| 9 | sales-service | Shifts, checkout saga, receipts, returns, offline sync | ✅ done |
+| 10 | payment-service | Cash, M-Pesa STK, card terminal, refunds | 🟡 built; M-Pesa sandbox run pending |
+| 11 | customer-service | Customers, loyalty, member pricing | ✅ done |
+| 12 | reporting-service | CQRS projections, Z-report, dashboards | ✅ done |
 | 13 | Frontend: foundation & auth | Next.js app, BFF auth, shell, RBAC routing | 3–4 d |
 | 14 | Frontend: cashier lane | Checkout, scanner, printer, offline | 5–7 d |
 | 15 | Frontend: back office | Catalog, stock, purchasing, users, reports | 5–7 d |
@@ -861,22 +861,99 @@ occasional goodwill gesture meanwhile.
 
 ---
 
-## Phase 12 — reporting-service
+## Phase 12 — reporting-service ✅
 
 **Goal:** the numbers the business actually runs on, without touching other services' schemas.
 
-- Read models projected from events only: `sales_daily`, `sales_by_product`, `sales_by_cashier`,
-  `sales_by_branch`, `payment_mix`, `stock_valuation`, `margin_by_category`, `shift_summary`
-- Z-report / X-report per shift and per branch
-- Dashboard endpoints: today's revenue, basket count, average basket, top movers, dead stock,
-  near-expiry value, gross margin
-- Date-range, branch and category filters everywhere
-- CSV and PDF export
-- Projection rebuild capability — replay topics from the beginning into a fresh read model
-- Consumer-lag monitoring, since these reads are eventually consistent
+Delivered:
+- 14 tables, all projected from events: an append-only `event_log`, the fact tables
+  (`report_sales`, `report_sale_lines`, `report_sale_tenders`, `report_sale_costs`,
+  `report_sale_voids`, `report_returns`, `report_return_lines`, `report_shifts`,
+  `report_stock_valuations`, `report_expiring_batches`, `report_products`) and `rebuild_runs`
+- **Facts, not running totals.** Each event writes only its own rows, and every figure is
+  aggregated when it is asked for. Events arrive in any order and a projection cannot depend on
+  which came first - which is also what makes a rebuild reproduce the same numbers exactly
+- Sales by day, branch, cashier and product; margin by category; payment mix; returns net of
+  sales, with resaleable goods putting their cost back. Voided sales are out of everything
+- **Z-report per shift and per branch-day, X-report for a shift still open.** reporting mirrors
+  the till's own arithmetic and compares every figure with the `shift-closed` event - cash sales,
+  cash refunds, non-cash sales, sale count, expected cash - and lists each one that disagrees
+- Stock valuation, its trend, dead stock and near-expiry value, from **inventory's own snapshots**:
+  inventory publishes `stock-valued` nightly and on demand (`POST /api/v1/stock/valuations`), paged,
+  and a snapshot counts only once every page has arrived
+- A dashboard per branch and day: gross and net sales, baskets, average basket, refunds, gross
+  margin, top movers, dead stock, near-expiry value, stock value
+- Date range, branch and category filters, business days in Nairobi time, a year at most
+- CSV (UTF-8 with a BOM, so Excel reads it) and PDF for every report, from the same queries as the
+  screen; a Z-report exports on its own
+- **Rebuild from the local event log**: every event consumed is stored verbatim before it is
+  projected, and doubles as the idempotency record. A rebuild takes an exclusive advisory lock
+  (ingestion waits), truncates the facts and replays the log in arrival order
+- Consumer lag measured against the broker, exposed at `/api/v1/reports/lag` and as a gauge
+- Branch managers see their own branches (`report:view:branch`) and must name one; head office
+  (`report:view`) sees all; exports need `export:data`
+- **Uncosted stock is reported as uncosted.** Goods sold ahead of their delivery come out of no
+  batch, and a sale whose deduction has not arrived has no cost yet. Both are shown as an uncosted
+  quantity beside the margin, never as costing nothing
+
+**Deviations, agreed before building:** the roadmap said "replay topics from the beginning"; topic
+retention is days and the books are years, so a rebuild replays reporting's own event log
+(ADR-011). And rather than rebuild inventory's ledger from deductions, reporting stores the
+valuations inventory publishes.
+
+**Changed in other services:** `sale-completed` now carries `payments[]` and `return-processed`
+the paying `tillSessionId` (both additive); inventory publishes `stock-valued`.
 
 **Done when:** a projection rebuilt from an empty database reproduces exactly the same numbers as the
 incrementally built one, and a Z-report reconciles against `sales-service` shift totals to the cent.
+
+**Verified — 741 tests in the build, 32 here (14 unit, 18 integration), plus an end-to-end run
+through the gateway against the built images:**
+
+| Check | Result |
+|---|---|
+| A rebuild reproduces the incremental numbers | ✅ every report compared field by field in the test; byte-identical over the gateway after replaying 43 events |
+| A Z-report reconciles with the till to the cent | ✅ in the test, and live: expected 1232, counted 1230, variance −2, no differences |
+| A sale reporting never received | ✅ the Z-report names cash sales, non-cash sales and sale count as disagreeing |
+| Events in any order | ✅ the fixture day is published scrambled |
+| A redelivered event | ✅ logged and projected once |
+| Half a stock snapshot | ✅ ignored until the last page arrives |
+| Uncosted stock | ✅ 2 of 3 units flagged, cost only for the one a batch covered |
+| A void and a cash return in one shift | ✅ both Z-reports agree, reporting's and sales' own |
+| Stock valuation on demand | ✅ through the gateway, reported seconds later |
+| CSV and PDF for every report | ✅ all nine, plus the Z-report |
+| A branch manager | ✅ sees their branch, must name it, refused another |
+| Exports | ✅ refused without `export:data`, or in an unknown format |
+| Rebuild and lag endpoints | ✅ rebuild needs head-office rights; lag measured against the broker |
+| Coverage gate | ✅ 95% |
+
+**Bugs found by running it rather than by a person:**
+- **Inventory froze on the live stack**: consumers, HTTP and health all stopped, with no error and
+  no CPU. Kafka listener containers were running on virtual threads, and on Java 21 the consumer
+  coordinator's `synchronized` code pins them. In a rebalance, fifteen listeners on eight CPUs
+  pinned every carrier, and the thread holding the log appender's lock was never scheduled to
+  release it. Latent in every consuming service since virtual threads were switched on; inventory's
+  listener count tipped it. Listeners now get platform threads (common-lib), with a regression test
+  shown to fail without the fix.
+- **Sales' own Z-report called every shift with a void a drifting counter** (a Phase 9 bug). The
+  running counter keeps a voided sale and pays its cash back out as a refund; the check compared it
+  with takings net of voids.
+- **A cash refund was booked on the original sale's shift**, which may have closed, and **a void
+  could change a closed shift**. Refunds are now paid from the open shift that names itself, and a
+  sale on a closed shift is returned, not voided.
+- **Retries hid their cause.** Every consumer logged "listener threw exception" and nothing else;
+  they now name the root cause's class (not its message, which can carry a phone number).
+- **A full disk looked like a Docker fault**: the host's root filesystem filled with build cache and
+  Docker stopped answering mid-verification.
+
+**Known limitation:** sales completed before `payments[]` existed carry no tender breakdown, so
+their shifts cannot reconcile and their totals are counted as non-cash. On this dev stack, two
+earlier shifts show it; every shift since reconciles.
+
+**Deferred with reason:** scheduled report delivery (email a Z-report at close) belongs with
+notification's templates and the frontend's report screens (Phases 13-15). Loyalty and purchasing
+figures are consumed by nothing yet: their events are catalogued, and a projection is added when a
+report needs one, not before.
 
 ---
 

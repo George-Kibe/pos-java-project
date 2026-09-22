@@ -4,17 +4,17 @@ A production-grade Point of Sale platform for multi-branch supermarket retail, b
 Spring Boot microservices behind an API gateway, with a Next.js cashier + back-office frontend,
 Kafka for event-driven communication, and PostgreSQL for persistence.
 
-> **Status:** phases 0-9 and 11 of 16 complete - infrastructure, shared libraries, `auth-service`,
-> `api-gateway`, `notification-service`, `catalog-service`, `inventory-service`,
-> `purchasing-service`, `sales-service` and `customer-service` are built, tested and running under
-> Docker Compose: stock arrives at its landed cost, leaves through a till whose totals and receipts
-> are the server's, and members earn, spend and lose points on a ledger that balances.
-> Phase 10's `payment-service` is built and running - card and cash settle end to end, M-Pesa is
-> verified against a fake of Daraja - and waits only on a real sandbox STK Push, which needs a
-> Daraja app subscribed to M-Pesa Express. 700 tests in the build. The frontend starts at
-> phase 13. Code is built phase by phase per
-> [docs/ROADMAP.md](docs/ROADMAP.md), which records what each phase delivered and how it was
-> verified.
+> **Status:** phases 0-9, 11 and 12 of 16 complete - infrastructure, shared libraries,
+> `auth-service`, `api-gateway`, `notification-service`, `catalog-service`, `inventory-service`,
+> `purchasing-service`, `sales-service`, `customer-service` and `reporting-service` are built,
+> tested and running under Docker Compose: stock arrives at its landed cost, leaves through a till
+> whose totals and receipts are the server's, members earn, spend and lose points on a ledger that
+> balances, and the reports - rebuilt from their own event log - reconcile with the till to the
+> cent. Phase 10's `payment-service` is built and running - card and cash settle end to end, M-Pesa
+> is verified against a fake of Daraja - and waits only on a real sandbox STK Push, which needs a
+> Daraja app subscribed to M-Pesa Express. 741 tests in the build. The frontend starts at phase 13.
+> Code is built phase by phase per [docs/ROADMAP.md](docs/ROADMAP.md), which records what each
+> phase delivered and how it was verified.
 
 ---
 

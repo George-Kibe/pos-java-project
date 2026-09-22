@@ -81,6 +81,20 @@ is deliberately clean so that is additive work, not a refactor.
 token. Defence in depth.
 **Cost:** a small per-request validation cost and a JWKS cache in each service.
 
+### ADR-011 — Reporting rebuilds from its own event log, not from topic replay
+**Decision:** reporting-service writes every event it consumes, verbatim, to an append-only
+`event_log` before projecting it. A rebuild truncates the fact tables and replays that log in the
+order it was received. Stock is valued by inventory, which publishes paged `stock-valued` snapshots;
+reporting never recomputes on-hand from deductions.
+**Why:** topic retention is days, the books are years. A rebuild that depends on Kafka still holding
+last March's sales works in a demo and fails the first time anyone needs it. The same row is the
+consumer's idempotency record, so there is one table to trust, not two. Valuing stock from
+deductions alone would miss receipts, adjustments, transfers and write-offs - inventory already
+knows the answer.
+**Cost:** the log grows with the business and is the one reporting table that must be backed up.
+Fact tables are order-independent (each event writes only its own rows; figures are aggregated at
+read time), so a replay in receipt order reproduces the incremental result exactly.
+
 ---
 
 ## 2. Event catalogue
@@ -102,16 +116,17 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.payments.payment-authorized.v1` | payment, customer (loyalty) | sales, reporting | paymentIntentId, saleId, method, amountAuthorized (the intent amount when the whole-shilling M-Pesa charge was paid), providerReference, approvalCode |
 | `pos.payments.payment-failed.v1` | payment, customer (loyalty) | sales, notification | paymentIntentId, saleId, method, reasonCode (e.g. CANCELLED_BY_USER, TIMEOUT, PROVIDER_UNAVAILABLE), providerMessage |
 | `pos.payments.payment-refunded.v1` | payment | reporting | refundId, paymentIntentId, saleId, returnId, method, amount, providerReference — emitted only once the provider (or a person) confirms it |
-| `pos.sales.sale-completed.v1` | sales | inventory, customer, reporting, notification | saleId, receiptNumber, branchId, registerId, shiftId, cashierId, customerId?, lines[] (as charged, with tax class), net/tax/grand totals, cartId? (the reservation reference inventory consumes) |
+| `pos.sales.sale-completed.v1` | sales | inventory, customer, reporting, notification | saleId, receiptNumber, branchId, registerId, shiftId, cashierId, customerId?, lines[] (as charged, with tax class), net/tax/grand totals, payments[{method, amount}] (authorised tenders, cash before change), cartId? (the reservation reference inventory consumes) |
 | `pos.sales.sale-voided.v1` | sales | inventory, customer, reporting | saleId, reason, actorId |
 | `pos.sales.sale-cancelled.v1` | sales | inventory, customer | saleId, branchId, cartId? (whose stock holds inventory releases), reason |
-| `pos.sales.return-processed.v1` | sales | inventory, payment, customer, reporting | returnId, saleId, lines[{productId, qty, resaleable, batchNo?}], refundTotal, refundMethod (non-cash is refunded by payment) |
+| `pos.sales.return-processed.v1` | sales | inventory, payment, customer, reporting | returnId, saleId, lines[{productId, qty, resaleable, batchNo?}], refundTotal, refundMethod (non-cash is refunded by payment), tillSessionId (the open shift that paid it; required for cash) |
 | `pos.sales.shift-closed.v1` | sales | reporting, notification | shiftId, branchId, registerId, expected, declared, variance |
 | `pos.customers.loyalty-accrued.v1` | customer | reporting, notification | customerId, saleId, points, balanceAfter, eligibleSpend, tierCode, expiresAt |
 | `pos.customers.tier-changed.v1` | customer | reporting, notification | customerId, previousTierCode, tierCode, rollingSpend, upgrade (it falls as well as rises) |
 | `pos.inventory.stock-deducted.v1` | inventory | reporting | saleId, branchId, lines[{productId, qty, batchAllocations[]}] |
 | `pos.inventory.low-stock.v1` | inventory | notification, purchasing | productId, branchId, onHand, reorderPoint |
-| `pos.inventory.batch-expiring.v1` | inventory | notification | batchId, productId, branchId, expiry, qty, value |
+| `pos.inventory.batch-expiring.v1` | inventory | notification, reporting | batchId, productId, branchId, expiry, qty, value |
+| `pos.inventory.stock-valued.v1` | inventory | reporting | snapshotId, branchId, valuedAt, page, pageCount, lines[{productId, sku, quantityOnHand, valueAtCost, currency}] — nightly and on demand; a snapshot counts only once every page has arrived |
 | `pos.inventory.negative-stock-detected.v1` | inventory | notification, reporting | productId, branchId, onHand, triggeredBy |
 | `pos.inventory.adjustment-posted.v1` | inventory | reporting | adjustmentId, branchId, lines[], reason, actorId |
 | `pos.customers.loyalty-accrued.v1` | customer | notification, reporting | customerId, saleId, points, balance |
@@ -247,7 +262,7 @@ from the M-Pesa organisation portal is uploaded and reconciled receipt by receip
 | `payment` | payment-service | sales learns outcomes via events only |
 | `customer` | customer-service | sales attaches `customerId`; loyalty resolved via events/API |
 | `notification` | notification-service | — |
-| `reporting` | reporting-service | Read-only projections; rebuildable from topic replay |
+| `reporting` | reporting-service | Read-only projections; rebuildable from its own append-only `event_log` (ADR-011) |
 
 Grants are per-role and per-schema, so a cross-schema query fails at the database, not at review
 time.
@@ -279,5 +294,6 @@ time.
 | loki | 3100 |
 
 Topic defaults: 3 partitions, replication 1 in dev and 3 in production, 7-day retention for
-transactional events, 30 days for `sales.*` (reporting rebuild window), compaction for
+transactional events, 30 days for `sales.*` and `stock-valued` (a consumer outage window - reporting
+rebuilds from its own log, not from the topics), compaction for
 `catalog.product-changed`.

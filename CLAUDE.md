@@ -384,6 +384,23 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   database needs `ALTER EXTENSION ... SET SCHEMA` by hand, like any other init-script change.
   Default operator classes (catalog's `btree_gist`) are found without this; a named one is not.
 
+- **Kafka listeners must not run on virtual threads (Java 21).** `spring.threads.virtual.enabled`
+  puts listener containers on virtual threads, and the consumer coordinator works - and logs -
+  inside `synchronized` methods. In a rebalance every listener blocks there on the log appender's
+  lock and pins a carrier; with more listener threads than CPUs, all carriers are pinned and the
+  lock holder is never scheduled. Inventory (15 listeners, 8 CPUs) froze outright: consumers,
+  HTTP and health checks, near-zero CPU, no error. `KafkaListenerThreadsAutoConfiguration` in
+  common-lib gives listeners platform threads; do not remove it. To diagnose a silent hang, a
+  plain thread dump hides virtual threads - use `jcmd <pid> Thread.dump_to_file`, which the
+  runtime image lacks, so install a JDK into the running container temporarily.
+- **A full host disk looks like a Docker bug.** Docker Desktop keeps its VM disk on `/`, and every
+  image rebuild leaves build cache behind; at 100% the daemon stops answering and Testcontainers
+  reports "Could not find a valid Docker environment". Check `df -h /` first, and
+  `docker builder prune` now and then.
+- **ArchUnit's `layeredArchitecture()` fails on an empty layer.** A service with no `repository`
+  package (reporting writes with `JdbcClient` from its services) must leave that layer out of its
+  rules, not create an empty package to satisfy it.
+
 ## Testing traps
 
 - **Tests that share a broker must select their own message**, not "the first record on the
@@ -449,5 +466,16 @@ rollback-only, so the commit fails anyway and takes the batch with it.
 - An STK Push that timed out is **never resent** - "no answer" includes "the prompt reached the
   phone". A payment that arrives after the intent was declared failed is recorded as a late payment
   and announced, never dropped: the customer paid.
+- **A cash refund is paid from the drawer that is open now**, not the one the sale went through -
+  that shift may have closed yesterday, and booking the refund there changes a till already
+  counted. A return names the paying `tillSessionId` (required for CASH), and a void is refused
+  once the sale's shift has closed: after close it is a return.
+- **reporting-service mirrors the till's arithmetic** (`ShiftArithmetic`) so a Z-report can be
+  reconciled against `shift-closed` figure by figure. Change how sales-service computes expected
+  cash and the mirror must change in the same commit, or every Z-report starts disagreeing.
+- **Reporting projections must stay order-independent.** Each event writes only its own rows and
+  every figure is aggregated at read time, which is what lets a rebuild from `event_log` reproduce
+  the incremental numbers exactly. A projection that updates a running total from another event's
+  row breaks that the first time events arrive out of order.
 - A cash sale's grand total carries four decimals; the change handed back is rounded to cents
   (`HALF_UP`) and that is the only rounding the drawer sees. The payments keep the 4dp figure.
