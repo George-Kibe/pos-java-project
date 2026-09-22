@@ -12,6 +12,11 @@ import java.util.UUID;
  * models) and notification (email the receipt). Carries the priced lines as they were charged - not
  * references to look up - because a consumer reading this a week later must see what the customer
  * actually paid, not what the product costs today.
+ *
+ * @param cartId the cart stock was held under while the basket was open (inventory reservation
+ *     reference type {@code Cart}). Inventory consumes those holds when it deducts, so they stop
+ *     counting against availability. Null for a sale with no holds, such as one synced from an
+ *     offline terminal, and on events published before the field existed.
  */
 public record SaleCompletedPayload(
         UUID saleId,
@@ -26,7 +31,8 @@ public record SaleCompletedPayload(
         BigDecimal netTotal,
         BigDecimal taxTotal,
         BigDecimal grandTotal,
-        String currency) {
+        String currency,
+        UUID cartId) {
 
     /**
      * One line as charged.

@@ -17,9 +17,15 @@ import com.pos.events.inventory.BatchExpiringPayload;
 import com.pos.events.inventory.LowStockPayload;
 import com.pos.events.inventory.NegativeStockDetectedPayload;
 import com.pos.events.inventory.StockDeductedPayload;
+import com.pos.events.payments.PaymentAuthorizedPayload;
+import com.pos.events.payments.PaymentFailedPayload;
+import com.pos.events.payments.PaymentMethod;
+import com.pos.events.payments.PaymentRequestedPayload;
 import com.pos.events.purchasing.GoodsReceivedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
 import com.pos.events.sales.SaleCompletedPayload;
+import com.pos.events.sales.SaleVoidedPayload;
+import com.pos.events.sales.ShiftClosedPayload;
 
 /**
  * The published shape of every payload.
@@ -67,11 +73,13 @@ class PayloadContractTest {
                             new BigDecimal("155.1724"),
                             new BigDecimal("24.8276"),
                             new BigDecimal("180.0000"),
-                            "KES");
+                            "KES",
+                            ID);
 
             String json = EventJson.write(payload);
             assertThat(json)
                     .contains("\"saleId\"")
+                    .contains("\"cartId\"")
                     .contains("\"receiptNumber\"")
                     .contains("\"registerId\"")
                     .contains("\"shiftId\"")
@@ -123,6 +131,149 @@ class PayloadContractTest {
             assertThat(back).isEqualTo(payload);
             // Inventory restocks on this flag alone; defaulting it to true resells broken goods.
             assertThat(back.lines().getFirst().resaleable()).isFalse();
+        }
+
+        @Test
+        void aVoidNamesTheSupervisorWhoApprovedIt() {
+            SaleVoidedPayload payload =
+                    new SaleVoidedPayload(
+                            ID,
+                            "R-000123",
+                            ID,
+                            ID,
+                            ID,
+                            ID,
+                            "WRONG_ITEM",
+                            "Customer changed their mind",
+                            new BigDecimal("180.0000"),
+                            "KES",
+                            Instant.parse("2026-01-02T03:04:05Z"));
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"saleId\"")
+                    .contains("\"approvedBy\"")
+                    .contains("\"reasonCode\"")
+                    .contains("\"voidedAt\"");
+
+            assertThat(EventJson.read(json, SaleVoidedPayload.class)).isEqualTo(payload);
+        }
+
+        @Test
+        void aClosedShiftCarriesItsVarianceWithTheSignIntact() {
+            ShiftClosedPayload payload =
+                    new ShiftClosedPayload(
+                            ID,
+                            ID,
+                            ID,
+                            ID,
+                            ID,
+                            Instant.parse("2026-01-02T03:04:05Z"),
+                            Instant.parse("2026-01-02T11:04:05Z"),
+                            new BigDecimal("5000.0000"),
+                            new BigDecimal("12000.0000"),
+                            new BigDecimal("300.0000"),
+                            new BigDecimal("10000.0000"),
+                            new BigDecimal("6700.0000"),
+                            new BigDecimal("6650.0000"),
+                            new BigDecimal("-50.0000"),
+                            new BigDecimal("8000.0000"),
+                            42,
+                            "KES");
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"tillSessionId\"")
+                    .contains("\"expectedCash\"")
+                    .contains("\"countedCash\"")
+                    .contains("\"variance\"")
+                    .contains("\"saleCount\":42");
+
+            ShiftClosedPayload back = EventJson.read(json, ShiftClosedPayload.class);
+            assertThat(back).isEqualTo(payload);
+            assertThat(back.variance()).isEqualTo(new BigDecimal("-50.0000"));
+            assertThat(back.isShort()).isTrue();
+        }
+    }
+
+    @Nested
+    class Payments {
+
+        @Test
+        void aPaymentRequestCarriesTheMethodAsItsName() {
+            PaymentRequestedPayload payload =
+                    new PaymentRequestedPayload(
+                            ID,
+                            ID,
+                            "R-000123",
+                            ID,
+                            ID,
+                            ID,
+                            PaymentMethod.MPESA,
+                            new BigDecimal("180.0000"),
+                            "KES",
+                            "254700000000",
+                            null,
+                            Instant.parse("2026-01-02T03:04:05Z"));
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"paymentIntentId\"")
+                    .contains("\"saleId\"")
+                    .contains("\"method\":\"MPESA\"")
+                    .contains("\"phoneNumber\"")
+                    .contains("\"requestedAt\"");
+
+            assertThat(EventJson.read(json, PaymentRequestedPayload.class)).isEqualTo(payload);
+        }
+
+        @Test
+        void anAuthorisationCarriesTheReferenceADisputeIsSettledWith() {
+            PaymentAuthorizedPayload payload =
+                    new PaymentAuthorizedPayload(
+                            ID,
+                            ID,
+                            ID,
+                            PaymentMethod.CARD,
+                            new BigDecimal("180.0000"),
+                            "KES",
+                            "TERM-7-000812",
+                            "A1B2C3",
+                            Instant.parse("2026-01-02T03:04:05Z"));
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"amountAuthorized\"")
+                    .contains("\"providerReference\"")
+                    .contains("\"approvalCode\"")
+                    .contains("\"authorizedAt\"");
+
+            PaymentAuthorizedPayload back = EventJson.read(json, PaymentAuthorizedPayload.class);
+            assertThat(back).isEqualTo(payload);
+            assertThat(back.amountAuthorized()).isEqualTo(new BigDecimal("180.0000"));
+        }
+
+        @Test
+        void aFailureCarriesAStableReasonCode() {
+            PaymentFailedPayload payload =
+                    new PaymentFailedPayload(
+                            ID,
+                            ID,
+                            ID,
+                            PaymentMethod.MPESA,
+                            new BigDecimal("180.0000"),
+                            "KES",
+                            "INSUFFICIENT_FUNDS",
+                            "The balance is insufficient for the transaction.",
+                            Instant.parse("2026-01-02T03:04:05Z"));
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"reasonCode\":\"INSUFFICIENT_FUNDS\"")
+                    .contains("\"providerMessage\"")
+                    .contains("\"failedAt\"");
+
+            assertThat(EventJson.read(json, PaymentFailedPayload.class)).isEqualTo(payload);
         }
     }
 
