@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.pos.events.EventEnvelope;
 import com.pos.events.Topics;
@@ -19,9 +20,12 @@ import com.pos.events.sales.ReturnProcessedPayload;
 import com.pos.events.sales.SaleCompletedPayload;
 import com.pos.inventory.domain.StockBatch;
 import com.pos.inventory.domain.StockItem;
+import com.pos.inventory.service.ReservationService;
 
 /** Stock following what happens elsewhere: deliveries in, sales out, returns back. */
 class StockEventsIT extends InventoryTestBase {
+
+    @Autowired private ReservationService reservations;
 
     private static final UUID BRANCH = UUID.randomUUID();
 
@@ -193,6 +197,32 @@ class StockEventsIT extends InventoryTestBase {
         assertThat(movementCount(product, BRANCH)).isEqualTo(movementsAfterFirst);
     }
 
+    @Test
+    @DisplayName("a completed sale consumes the holds its basket placed")
+    void aCompletedSaleConsumesItsCartsHolds() {
+        UUID product = UUID.randomUUID();
+        receive(product, "RICE-1KG", "10", "B1", "2027-01-01", "150.00");
+        eventually(Duration.ofSeconds(30), "the delivery", () -> onHand(product, BRANCH) != null);
+
+        UUID cartId = UUID.randomUUID();
+        reservations.reserve(product, BRANCH, new BigDecimal("3"), "Cart", cartId);
+        assertThat(reserved(product)).isEqualByComparingTo("3");
+
+        UUID saleId = UUID.randomUUID();
+        publish(
+                Topics.SALES_SALE_COMPLETED,
+                saleCompleted(saleId, product, "RICE-1KG", "3", cartId),
+                saleId);
+
+        eventually(
+                Duration.ofSeconds(30),
+                "the sale to be deducted",
+                () -> onHand(product, BRANCH).compareTo(new BigDecimal("7")) == 0);
+        // Left held, the three already sold would keep reducing availability until the hold
+        // expired - on a best-seller, permanently, since a new basket holds more every minute.
+        assertThat(reserved(product)).isEqualByComparingTo("0");
+    }
+
     // --- shortfalls and returns -------------------------------------------------
 
     @Test
@@ -338,8 +368,25 @@ class StockEventsIT extends InventoryTestBase {
                 .build();
     }
 
+    private BigDecimal reserved(UUID product) {
+        return jdbc.sql(
+                        """
+                        SELECT quantity_reserved FROM inventory.stock_items
+                        WHERE product_id = :product AND branch_id = :branch
+                        """)
+                .param("product", product)
+                .param("branch", BRANCH)
+                .query(BigDecimal.class)
+                .single();
+    }
+
     private static EventEnvelope<SaleCompletedPayload> saleCompleted(
             UUID saleId, UUID product, String sku, String quantity) {
+        return saleCompleted(saleId, product, sku, quantity, null);
+    }
+
+    private static EventEnvelope<SaleCompletedPayload> saleCompleted(
+            UUID saleId, UUID product, String sku, String quantity, UUID cartId) {
         return EventEnvelope.<SaleCompletedPayload>builder()
                 .topic(Topics.SALES_SALE_COMPLETED)
                 .correlationId("sale-correlation")
@@ -368,7 +415,8 @@ class StockEventsIT extends InventoryTestBase {
                                 new BigDecimal("100.00"),
                                 BigDecimal.ZERO,
                                 new BigDecimal("100.00"),
-                                "KES"))
+                                "KES",
+                                cartId))
                 .build();
     }
 

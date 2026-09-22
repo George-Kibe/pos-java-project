@@ -16,6 +16,7 @@ import com.pos.events.catalog.ProductChangedPayload;
 import com.pos.events.purchasing.GoodsReceivedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
 import com.pos.events.sales.SaleCompletedPayload;
+import com.pos.inventory.service.ReservationService;
 import com.pos.inventory.service.StockService;
 import com.pos.messaging.idempotency.IdempotentConsumer;
 
@@ -37,12 +38,17 @@ public class InventoryEventListener {
     private static final Logger log = LoggerFactory.getLogger(InventoryEventListener.class);
 
     private static final String SALE_CONSUMER = "inventory.deduct-on-sale";
+
+    /** The reference type sales places its holds under. */
+    private static final String CART_RESERVATION = "Cart";
+
     private static final String RETURN_CONSUMER = "inventory.restock-on-return";
     private static final String RECEIPT_CONSUMER = "inventory.receive-on-goods-received";
     private static final String PRODUCT_CONSUMER = "inventory.cache-product-details";
 
     private final IdempotentConsumer idempotentConsumer;
     private final StockService stock;
+    private final ReservationService reservations;
 
     @KafkaListener(
             topics = Topics.SALES_SALE_COMPLETED,
@@ -69,6 +75,12 @@ public class InventoryEventListener {
                                                             line.batchNumber()))
                                     .toList();
                     stock.deductForSale(sale.saleId(), sale.branchId(), lines);
+                    if (sale.cartId() != null) {
+                        // Same transaction as the deduction: the goods have left, so the hold
+                        // that kept them for this basket must stop reducing availability now,
+                        // not when it expires half an hour later.
+                        reservations.consume(CART_RESERVATION, sale.cartId());
+                    }
                 });
     }
 
