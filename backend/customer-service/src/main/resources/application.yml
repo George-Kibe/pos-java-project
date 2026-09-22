@@ -1,0 +1,110 @@
+spring:
+  application:
+    name: customer-service
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:pos}
+    username: ${CUSTOMER_DB_USER:customer_user}
+    password: ${CUSTOMER_DB_PASSWORD}
+    hikari:
+      # hibernate.default_schema covers JPA only; the outbox and idempotency ledger use plain JDBC.
+      schema: ${DB_SCHEMA:customer}
+      maximum-pool-size: 12
+      minimum-idle: 2
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: customer
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    schemas: customer
+    default-schema: customer
+    locations: classpath:db/migration,classpath:db/migration/shared
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:customer-service}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 20
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    listener:
+      ack-mode: record
+      # Matches the topic partition count, so each partition has a thread without idle consumers.
+      concurrency: 3
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${SERVER_PORT:8087}
+  error:
+    whitelabel:
+      enabled: false
+
+pos:
+  idempotency:
+    enabled: true
+  security:
+    public-paths:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+
+  loyalty:
+    # The scheme's economics. A shop changes these without a deployment; changing them does not
+    # rewrite what members already earned.
+    spend-per-point: ${LOYALTY_SPEND_PER_POINT:100}
+    point-value: ${LOYALTY_POINT_VALUE:1}
+    points-expire-after-months: ${LOYALTY_EXPIRY_MONTHS:12}
+    tier-window-months: ${LOYALTY_TIER_WINDOW_MONTHS:12}
+    # Earn on what the customer paid. Set false to earn on the net of tax instead.
+    accrue-on-grand-total: ${LOYALTY_ACCRUE_ON_GRAND_TOTAL:true}
+    # How stale a tier may be before the nightly review looks at it again.
+    tier-evaluation-interval: ${LOYALTY_TIER_EVALUATION_INTERVAL:P1D}
+    expiry-cron: ${LOYALTY_EXPIRY_CRON:0 30 2 * * *}
+    tier-cron: ${LOYALTY_TIER_CRON:0 45 2 * * *}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.pos: INFO

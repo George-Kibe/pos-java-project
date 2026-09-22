@@ -58,6 +58,16 @@ for svc in $SERVICES; do
 		-- Explicitly deny the shared public schema.
 		REVOKE ALL ON SCHEMA public FROM "${user}";
 	SQL
+
+    # Extensions a single service needs go in that service's own schema, not in public: a role's
+    # search_path is its schema alone, and an operator class it cannot see is an operator class it
+    # cannot use. Installed here as the superuser, because a per-service role cannot create one.
+    if [ "$svc" = "customer" ]; then
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$DB" <<-SQL
+			-- Fuzzy name search for the customer lookup at the lane.
+			CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA "customer";
+		SQL
+    fi
 done
 
 echo "Schema bootstrap complete: ${SERVICES}"

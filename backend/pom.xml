@@ -34,6 +34,7 @@
     <module>purchasing-service</module>
     <module>sales-service</module>
     <module>payment-service</module>
+    <module>customer-service</module>
   </modules>
 
   <properties>
