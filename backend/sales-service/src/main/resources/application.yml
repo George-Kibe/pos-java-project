@@ -1,0 +1,139 @@
+spring:
+  application:
+    name: sales-service
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:pos}
+    username: ${SALES_DB_USER:sales_user}
+    password: ${SALES_DB_PASSWORD}
+    hikari:
+      # hibernate.default_schema covers JPA only; the outbox and idempotency ledger use plain JDBC.
+      schema: ${DB_SCHEMA:sales}
+      maximum-pool-size: 12
+      minimum-idle: 2
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: sales
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    schemas: sales
+    default-schema: sales
+    locations: classpath:db/migration,classpath:db/migration/shared
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:sales-service}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 20
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    listener:
+      ack-mode: record
+      # Matches the topic partition count, so each partition has a thread without idle consumers.
+      concurrency: 3
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${SERVER_PORT:8085}
+  error:
+    whitelabel:
+      enabled: false
+
+pos:
+  security:
+    public-paths:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+
+  sales:
+    # Where the services the till depends on live.
+    catalog-uri: ${CATALOG_SERVICE_URI:http://localhost:8082}
+    inventory-uri: ${INVENTORY_SERVICE_URI:http://localhost:8083}
+    # Short, because a customer is standing at the lane: a dependency that is merely slow has to
+    # be treated as absent quickly enough for the circuit breaker to be useful.
+    pricing-timeout: ${PRICING_TIMEOUT:PT3S}
+    reservation-timeout: ${RESERVATION_TIMEOUT:PT2S}
+    # How long a sale waits for a payment answer before the saga compensates. A customer who walks
+    # away from an M-Pesa prompt must not leave a lane held open.
+    payment-timeout: ${PAYMENT_TIMEOUT:PT2M}
+    payment-sweep-cron: ${PAYMENT_SWEEP_CRON:0 */1 * * * *}
+    return-window-days: ${RETURN_WINDOW_DAYS:30}
+    receipt-prefix: ${RECEIPT_PREFIX:R}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 20
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        # A 4xx is the dependency answering, not failing. Counting it would let a few unknown
+        # barcodes open the breaker and take pricing away from every lane.
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+    instances:
+      catalog-pricing:
+        baseConfig: default
+      inventory-reservations:
+        baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        # Above the client read timeouts, so the HTTP timeout is what fails first and the reason
+        # reaches the log rather than a bare TimeoutException from the limiter.
+        timeoutDuration: 5s
+    instances:
+      catalog-pricing:
+        baseConfig: default
+      inventory-reservations:
+        baseConfig: default
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.pos: INFO

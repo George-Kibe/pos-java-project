@@ -32,6 +32,7 @@
     <module>catalog-service</module>
     <module>inventory-service</module>
     <module>purchasing-service</module>
+    <module>sales-service</module>
   </modules>
 
   <properties>

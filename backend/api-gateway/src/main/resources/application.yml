@@ -92,7 +92,7 @@ spring:
             - id: sales-service
               uri: ${SALES_SERVICE_URI:http://localhost:8085}
               predicates:
-                - Path=/api/v1/sales/**,/api/v1/carts/**,/api/v1/shifts/**,/api/v1/returns/**
+                - Path=/api/v1/sales/**,/api/v1/carts/**,/api/v1/till-sessions/**,/api/v1/returns/**
               filters:
                 - name: CircuitBreaker
                   args:
