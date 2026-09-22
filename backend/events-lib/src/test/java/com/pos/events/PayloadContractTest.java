@@ -19,6 +19,7 @@ import com.pos.events.inventory.BatchExpiringPayload;
 import com.pos.events.inventory.LowStockPayload;
 import com.pos.events.inventory.NegativeStockDetectedPayload;
 import com.pos.events.inventory.StockDeductedPayload;
+import com.pos.events.inventory.StockValuedPayload;
 import com.pos.events.payments.PaymentAuthorizedPayload;
 import com.pos.events.payments.PaymentFailedPayload;
 import com.pos.events.payments.PaymentMethod;
@@ -78,7 +79,11 @@ class PayloadContractTest {
                             new BigDecimal("24.8276"),
                             new BigDecimal("180.0000"),
                             "KES",
-                            ID);
+                            ID,
+                            java.util.List.of(
+                                    new SaleCompletedPayload.Tender(
+                                            com.pos.events.payments.PaymentMethod.CASH,
+                                            new BigDecimal("180.0000"))));
 
             String json = EventJson.write(payload);
             assertThat(json)
@@ -123,7 +128,8 @@ class PayloadContractTest {
                                             "DAMAGED")),
                             new BigDecimal("180.0000"),
                             "KES",
-                            PaymentMethod.MPESA);
+                            PaymentMethod.MPESA,
+                            ID);
 
             String json = EventJson.write(payload);
             assertThat(json)
@@ -495,6 +501,37 @@ class PayloadContractTest {
             assertThat(back).isEqualTo(payload);
             // The sign is the whole meaning; an absolute value would post a write-off as a receipt.
             assertThat(back.lines().getFirst().quantityDelta()).isNegative();
+        }
+
+        @Test
+        void aValuationPageSaysWhichSnapshotItBelongsToAndHowManyThereAre() {
+            StockValuedPayload payload =
+                    new StockValuedPayload(
+                            ID,
+                            ID,
+                            Instant.parse("2026-01-02T03:04:05Z"),
+                            2,
+                            3,
+                            List.of(
+                                    new StockValuedPayload.ValuedLine(
+                                            ID,
+                                            "SKU-1",
+                                            new BigDecimal("-2.000"),
+                                            new BigDecimal("0.0000"),
+                                            "KES")));
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"snapshotId\"")
+                    .contains("\"page\":2")
+                    .contains("\"pageCount\":3")
+                    .contains("\"quantityOnHand\"")
+                    .contains("\"valueAtCost\"");
+
+            StockValuedPayload back = EventJson.read(json, StockValuedPayload.class);
+            assertThat(back).isEqualTo(payload);
+            // Oversold stock is reported, with no value: there is no batch behind it to cost.
+            assertThat(back.lines().getFirst().quantityOnHand()).isNegative();
         }
 
         @Test

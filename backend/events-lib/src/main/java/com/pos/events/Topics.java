@@ -48,6 +48,7 @@ public final class Topics {
     // --- inventory ------------------------------------------------------------
     public static final String INVENTORY_STOCK_DEDUCTED = "pos.inventory.stock-deducted.v1";
     public static final String INVENTORY_LOW_STOCK = "pos.inventory.low-stock.v1";
+    public static final String INVENTORY_STOCK_VALUED = "pos.inventory.stock-valued.v1";
     public static final String INVENTORY_BATCH_EXPIRING = "pos.inventory.batch-expiring.v1";
     public static final String INVENTORY_NEGATIVE_STOCK_DETECTED =
             "pos.inventory.negative-stock-detected.v1";

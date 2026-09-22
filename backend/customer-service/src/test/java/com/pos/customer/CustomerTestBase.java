@@ -153,7 +153,8 @@ public abstract class CustomerTestBase {
                                 grand.multiply(new BigDecimal("0.137931")),
                                 grand,
                                 "KES",
-                                null))
+                                null,
+                                java.util.List.of()))
                 .build();
     }
 

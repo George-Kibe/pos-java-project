@@ -255,7 +255,8 @@ class LoyaltyFlowIT extends CustomerTestBase {
                                 List.of(),
                                 new BigDecimal(refund),
                                 "KES",
-                                com.pos.events.payments.PaymentMethod.CASH))
+                                com.pos.events.payments.PaymentMethod.CASH,
+                                null))
                 .build();
     }
 

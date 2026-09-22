@@ -36,6 +36,7 @@ pos.sales.return-processed.v1|${RETENTION_SALES}|delete
 pos.sales.shift-closed.v1|${RETENTION_SALES}|delete
 pos.inventory.stock-deducted.v1|${RETENTION_SALES}|delete
 pos.inventory.low-stock.v1|${RETENTION_DEFAULT}|delete
+pos.inventory.stock-valued.v1|${RETENTION_SALES}|delete
 pos.inventory.batch-expiring.v1|${RETENTION_DEFAULT}|delete
 pos.inventory.negative-stock-detected.v1|${RETENTION_DEFAULT}|delete
 pos.inventory.adjustment-posted.v1|${RETENTION_SALES}|delete

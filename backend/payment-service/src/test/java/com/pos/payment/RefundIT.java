@@ -277,7 +277,8 @@ class RefundIT extends PaymentTestBase {
                                 List.of(),
                                 new BigDecimal(amount),
                                 "KES",
-                                method))
+                                method,
+                                null))
                 .build();
     }
 

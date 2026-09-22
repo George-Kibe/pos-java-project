@@ -17,6 +17,10 @@ import java.util.UUID;
  *     reference type {@code Cart}). Inventory consumes those holds when it deducts, so they stop
  *     counting against availability. Null for a sale with no holds, such as one synced from an
  *     offline terminal, and on events published before the field existed.
+ * @param payments how it was paid, as the drawer keeps it: cash is what stayed in the drawer after
+ *     change, not the notes handed over. Cash never leaves sales as an event of its own, so this is
+ *     the only place a report can learn the split. Empty on events published before the field
+ *     existed.
  */
 public record SaleCompletedPayload(
         UUID saleId,
@@ -32,7 +36,11 @@ public record SaleCompletedPayload(
         BigDecimal taxTotal,
         BigDecimal grandTotal,
         String currency,
-        UUID cartId) {
+        UUID cartId,
+        List<Tender> payments) {
+
+    /** One tender as settled. */
+    public record Tender(com.pos.events.payments.PaymentMethod method, BigDecimal amount) {}
 
     /**
      * One line as charged.

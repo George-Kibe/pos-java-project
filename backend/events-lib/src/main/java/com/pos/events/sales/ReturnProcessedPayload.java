@@ -23,7 +23,8 @@ public record ReturnProcessedPayload(
         List<ReturnLine> lines,
         BigDecimal refundTotal,
         String currency,
-        PaymentMethod refundMethod) {
+        PaymentMethod refundMethod,
+        UUID tillSessionId) {
 
     public record ReturnLine(
             UUID productId,
