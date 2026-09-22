@@ -258,7 +258,7 @@ class CheckoutFlowIT extends SalesTestBase {
         TillSession till = openTill();
         payCash(pendingSale(till));
         Sale abandoned = pendingSale(till);
-        checkout.cancel(abandoned.getId(), "Customer left", TOKEN);
+        checkout.cancel(abandoned.getId(), "Customer left");
         Sale next = payCash(pendingSale(till));
 
         assertThat(abandoned.getReceiptNumber()).isNull();
@@ -363,9 +363,11 @@ class CheckoutFlowIT extends SalesTestBase {
         assertThat(cancelled.getCancellationReason()).contains("CANCELLED_BY_USER");
         assertThat(cancelled.getReceiptNumber()).isNull();
         assertThat(outboxCount(Topics.SALES_SALE_COMPLETED)).isZero();
-        // The listener has no caller token to forward, so the release is left to inventory's
-        // expiry sweep; the stock was only ever soft-held, never deducted.
-        assertThat(outboxCount(Topics.SALES_SALE_COMPLETED)).isZero();
+        // No caller token here, so the release goes by event rather than by a call inventory would
+        // refuse - and the basket's stock is sellable again as soon as inventory sees it.
+        assertThat(latestOutboxPayload(Topics.SALES_SALE_CANCELLED))
+                .contains("\"cartId\":\"" + cancelled.getReservationReference() + "\"")
+                .contains("CANCELLED_BY_USER");
     }
 
     @Test
@@ -374,10 +376,13 @@ class CheckoutFlowIT extends SalesTestBase {
         Sale sale = pendingSale(openTill());
         assertThat(INVENTORY.reservations()).isGreaterThan(0);
 
-        checkout.cancel(sale.getId(), "Customer walked away", TOKEN);
+        checkout.cancel(sale.getId(), "Customer walked away");
 
-        assertThat(INVENTORY.releasesFor(sale.getReservationReference())).isEqualTo(1);
         assertThat(checkout.require(sale.getId()).getStatus()).isEqualTo(SaleStatus.CANCELLED);
+        // Inventory releases the holds on the event: the same path whoever cancelled.
+        assertThat(outboxCount(Topics.SALES_SALE_CANCELLED)).isEqualTo(1);
+        assertThat(latestOutboxPayload(Topics.SALES_SALE_CANCELLED))
+                .contains("\"cartId\":\"" + sale.getReservationReference() + "\"");
     }
 
     @Test
@@ -385,7 +390,7 @@ class CheckoutFlowIT extends SalesTestBase {
     void aLateAuthorisationIsNotApplied() {
         Sale sale = awaitingMpesa(pendingSale(openTill()));
         UUID intent = sale.getPayments().getFirst().getPaymentIntentId();
-        checkout.cancel(sale.getId(), "Timed out", TOKEN);
+        checkout.cancel(sale.getId(), "Timed out");
 
         publish(Topics.PAYMENTS_PAYMENT_AUTHORIZED, authorized(sale, intent), sale.getId());
 

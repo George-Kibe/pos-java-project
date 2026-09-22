@@ -47,7 +47,7 @@ public class PaymentTimeoutSweeper {
             // Null token: there is no caller to borrow credentials from on a scheduled thread,
             // and InventoryClient skips the release rather than guaranteeing a 401. Inventory
             // expires the reservation on its own sweep.
-            checkout.cancel(sale.getId(), "Payment timed out", null);
+            checkout.cancel(sale.getId(), "Payment timed out");
         }
         if (!stale.isEmpty()) {
             log.info("Compensated {} sales that timed out waiting for payment", stale.size());

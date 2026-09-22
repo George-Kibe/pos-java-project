@@ -17,6 +17,7 @@ import com.pos.events.EventEnvelope;
 import com.pos.events.Topics;
 import com.pos.events.purchasing.GoodsReceivedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
+import com.pos.events.sales.SaleCancelledPayload;
 import com.pos.events.sales.SaleCompletedPayload;
 import com.pos.inventory.domain.StockBatch;
 import com.pos.inventory.domain.StockItem;
@@ -221,6 +222,42 @@ class StockEventsIT extends InventoryTestBase {
         // Left held, the three already sold would keep reducing availability until the hold
         // expired - on a best-seller, permanently, since a new basket holds more every minute.
         assertThat(reserved(product)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("a cancelled sale's basket holds go back to sale at once")
+    void aCancelledSaleReleasesItsCartsHolds() {
+        UUID product = UUID.randomUUID();
+        receive(product, "OIL-1L", "10", "B1", "2027-01-01", "300.00");
+        eventually(Duration.ofSeconds(30), "the delivery", () -> onHand(product, BRANCH) != null);
+
+        UUID cartId = UUID.randomUUID();
+        reservations.reserve(product, BRANCH, new BigDecimal("4"), "Cart", cartId);
+        assertThat(reserved(product)).isEqualByComparingTo("4");
+
+        UUID saleId = UUID.randomUUID();
+        EventEnvelope<SaleCancelledPayload> cancelled =
+                EventEnvelope.<SaleCancelledPayload>builder()
+                        .topic(Topics.SALES_SALE_CANCELLED)
+                        .branchId(BRANCH)
+                        .payload(
+                                new SaleCancelledPayload(
+                                        saleId,
+                                        BRANCH,
+                                        UUID.randomUUID(),
+                                        UUID.randomUUID(),
+                                        cartId,
+                                        "Payment failed: CANCELLED_BY_USER",
+                                        Instant.now()))
+                        .build();
+        publish(Topics.SALES_SALE_CANCELLED, cancelled, saleId);
+
+        eventually(
+                Duration.ofSeconds(30),
+                "the holds to be released",
+                () -> reserved(product).signum() == 0);
+        // Nothing was sold: released, not deducted.
+        assertThat(onHand(product, BRANCH)).isEqualByComparingTo("10");
     }
 
     // --- shortfalls and returns -------------------------------------------------
@@ -442,7 +479,8 @@ class StockEventsIT extends InventoryTestBase {
                                                 null,
                                                 resaleable ? "CHANGED_MIND" : "DAMAGED")),
                                 new BigDecimal("100.00"),
-                                "KES"))
+                                "KES",
+                                null))
                 .build();
     }
 }

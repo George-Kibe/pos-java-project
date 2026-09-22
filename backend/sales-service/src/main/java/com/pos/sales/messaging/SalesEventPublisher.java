@@ -10,6 +10,7 @@ import com.pos.events.EventEnvelope;
 import com.pos.events.Topics;
 import com.pos.events.payments.PaymentRequestedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
+import com.pos.events.sales.SaleCancelledPayload;
 import com.pos.events.sales.SaleCompletedPayload;
 import com.pos.events.sales.SaleVoidedPayload;
 import com.pos.events.sales.ShiftClosedPayload;
@@ -122,6 +123,32 @@ public class SalesEventPublisher {
                         .build());
     }
 
+    /**
+     * A sale given up on before payment. Inventory releases the basket's holds on it - the one
+     * release path that works when the cancellation comes from a payment event with no caller.
+     */
+    public void saleCancelled(Sale sale) {
+        outbox.record(
+                Topics.SALES_SALE_CANCELLED,
+                "Sale",
+                sale.getId(),
+                EventEnvelope.<SaleCancelledPayload>builder()
+                        .topic(Topics.SALES_SALE_CANCELLED)
+                        .correlationId(CorrelationId.get())
+                        .branchId(sale.getBranchId())
+                        .actorId(sale.getCashierId())
+                        .payload(
+                                new SaleCancelledPayload(
+                                        sale.getId(),
+                                        sale.getBranchId(),
+                                        sale.getRegisterId(),
+                                        sale.getCashierId(),
+                                        sale.getReservationReference(),
+                                        sale.getCancellationReason(),
+                                        sale.getCancelledAt()))
+                        .build());
+    }
+
     public void saleVoided(Sale sale) {
         outbox.record(
                 Topics.SALES_SALE_VOIDED,
@@ -186,7 +213,8 @@ public class SalesEventPublisher {
                                         saleReturn.getCompletedAt(),
                                         lines,
                                         saleReturn.getRefundTotal(),
-                                        saleReturn.getCurrency()))
+                                        saleReturn.getCurrency(),
+                                        saleReturn.getRefundMethod()))
                         .build());
     }
 

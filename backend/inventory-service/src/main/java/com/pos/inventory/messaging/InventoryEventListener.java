@@ -15,6 +15,7 @@ import com.pos.events.Topics;
 import com.pos.events.catalog.ProductChangedPayload;
 import com.pos.events.purchasing.GoodsReceivedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
+import com.pos.events.sales.SaleCancelledPayload;
 import com.pos.events.sales.SaleCompletedPayload;
 import com.pos.inventory.service.ReservationService;
 import com.pos.inventory.service.StockService;
@@ -42,6 +43,7 @@ public class InventoryEventListener {
     /** The reference type sales places its holds under. */
     private static final String CART_RESERVATION = "Cart";
 
+    private static final String CANCEL_CONSUMER = "inventory.release-on-sale-cancelled";
     private static final String RETURN_CONSUMER = "inventory.restock-on-return";
     private static final String RECEIPT_CONSUMER = "inventory.receive-on-goods-received";
     private static final String PRODUCT_CONSUMER = "inventory.cache-product-details";
@@ -80,6 +82,29 @@ public class InventoryEventListener {
                         // that kept them for this basket must stop reducing availability now,
                         // not when it expires half an hour later.
                         reservations.consume(CART_RESERVATION, sale.cartId());
+                    }
+                });
+    }
+
+    /**
+     * A sale given up on before payment: its basket's holds go back to sale now, not when they
+     * would have expired. Releasing holds already gone is a no-op, so a redelivery is harmless.
+     */
+    @KafkaListener(
+            topics = Topics.SALES_SALE_CANCELLED,
+            groupId = "${spring.kafka.consumer.group-id}")
+    @Transactional
+    public void onSaleCancelled(String message) {
+        EventEnvelope<SaleCancelledPayload> event =
+                EventJson.readEnvelope(message, SaleCancelledPayload.class);
+        CorrelationId.set(event.correlationId());
+
+        idempotentConsumer.consumeOnce(
+                event,
+                CANCEL_CONSUMER,
+                envelope -> {
+                    if (envelope.payload().cartId() != null) {
+                        reservations.release(CART_RESERVATION, envelope.payload().cartId());
                     }
                 });
     }

@@ -277,11 +277,11 @@ public class CheckoutService {
     /**
      * Compensation: the payment did not happen.
      *
-     * <p>Releases the stock held for the basket and cancels the sale. Nothing is published as sold,
-     * so no consumer ever sees a sale that was not paid for.
+     * <p>Cancels the sale and announces it, so inventory releases the stock the basket held.
+     * Nothing is published as sold, so no consumer ever sees a sale that was not paid for.
      */
     @Transactional
-    public Sale cancel(UUID saleId, String reason, String authorization) {
+    public Sale cancel(UUID saleId, String reason) {
         Sale sale = require(saleId);
 
         if (sale.getStatus() == SaleStatus.PAID) {
@@ -299,10 +299,11 @@ public class CheckoutService {
                 .filter(payment -> payment.getStatus() == PaymentStatus.PENDING)
                 .forEach(payment -> payment.fail("SALE_CANCELLED", reason));
 
-        if (sale.getReservationReference() != null) {
-            inventory.release(sale.getReservationReference(), authorization);
-        }
-        return sales.save(sale);
+        // Released by inventory on the event, in this transaction's outbox. A direct call would
+        // need the caller's token, and a cancellation from a payment event has no caller.
+        Sale cancelled = sales.save(sale);
+        events.saleCancelled(cancelled);
+        return cancelled;
     }
 
     /**

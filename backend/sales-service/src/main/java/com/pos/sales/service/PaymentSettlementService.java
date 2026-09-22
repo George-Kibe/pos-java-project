@@ -133,6 +133,6 @@ public class PaymentSettlementService {
         }
 
         // Compensation: no money, so no sale. Nothing was ever published as sold.
-        checkout.cancel(sale.getId(), "Payment failed: " + failed.reasonCode(), null);
+        checkout.cancel(sale.getId(), "Payment failed: " + failed.reasonCode());
     }
 }
