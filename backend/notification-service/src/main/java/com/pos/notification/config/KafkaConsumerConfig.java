@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -50,11 +51,16 @@ public class KafkaConsumerConfig {
         handler.setRetryListeners(
                 (record, exception, attempt) ->
                         log.warn(
-                                "Delivery attempt {} failed for {} offset {}: {}",
+                                "Delivery attempt {} failed for {} offset {}: {} (root cause {})",
                                 attempt,
                                 record.topic(),
                                 record.offset(),
-                                exception.getMessage()));
+                                exception.getMessage(),
+                                // The class, not the message: a cause's message can carry the
+                                // recipient's address or phone number.
+                                NestedExceptionUtils.getMostSpecificCause(exception)
+                                        .getClass()
+                                        .getName()));
         return handler;
     }
 }

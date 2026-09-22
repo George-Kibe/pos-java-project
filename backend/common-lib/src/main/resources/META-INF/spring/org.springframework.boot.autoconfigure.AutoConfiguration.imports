@@ -1,3 +1,4 @@
 com.pos.common.CommonWebAutoConfiguration
 com.pos.common.PosResourceServerAutoConfiguration
 com.pos.common.PosJpaAuditingAutoConfiguration
+com.pos.common.kafka.KafkaListenerThreadsAutoConfiguration
