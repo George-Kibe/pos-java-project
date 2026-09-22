@@ -1,1 +1,2 @@
 com.pos.messaging.MessagingAutoConfiguration
+com.pos.messaging.IdempotencyAutoConfiguration

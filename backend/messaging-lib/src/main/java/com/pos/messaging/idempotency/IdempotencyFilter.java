@@ -1,4 +1,4 @@
-package com.pos.sales.config;
+package com.pos.messaging.idempotency;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -8,9 +8,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ReadListener;
@@ -29,7 +29,6 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import com.pos.common.correlation.CorrelationId;
 import com.pos.common.id.UuidV7;
-import com.pos.common.security.AuthenticatedUser;
 
 /**
  * Honours {@code Idempotency-Key} on every mutating request.
@@ -56,8 +55,13 @@ import com.pos.common.security.AuthenticatedUser;
  * crash between two statements, and the alternative - holding the business transaction open across
  * the response write - is worse.
  *
- * <p>Local to sales-service, the only service a terminal calls directly so far. It moves to
- * common-lib, with a shared migration, when a second service needs it.
+ * <p>Shared by every service a terminal calls, and switched on with {@code
+ * pos.idempotency.enabled=true}. Each such service creates the {@code idempotency_records} table in
+ * its own migration: a shared migration added after services are past V1 would fail their Flyway
+ * validation as a skipped version.
+ *
+ * <p>Keys are scoped to {@link HttpServletRequest#getUserPrincipal()}, which Spring Security fills
+ * with the verified token's subject, so this needs no security dependency of its own.
  */
 public class IdempotencyFilter extends OncePerRequestFilter {
 
@@ -71,9 +75,15 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     private static final int MAX_KEY_LENGTH = 120;
 
     private final JdbcClient jdbc;
+    private final List<String> excludedPaths;
 
-    public IdempotencyFilter(JdbcClient jdbc) {
+    /**
+     * @param excludedPaths path prefixes that keep their own idempotency, such as a batch endpoint
+     *     that stores a per-item answer under the same key
+     */
+    public IdempotencyFilter(JdbcClient jdbc, List<String> excludedPaths) {
         this.jdbc = jdbc;
+        this.excludedPaths = List.copyOf(excludedPaths);
     }
 
     @Override
@@ -81,8 +91,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         return !MUTATING.contains(request.getMethod())
                 || request.getHeader(HEADER) == null
                 || !request.getRequestURI().startsWith("/api/v1/")
-                // The sync endpoint stores a per-sale answer of its own under the same key.
-                || request.getRequestURI().startsWith("/api/v1/sales/sync");
+                || excludedPaths.stream().anyMatch(request.getRequestURI()::startsWith);
     }
 
     @Override
@@ -101,7 +110,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         }
 
         byte[] body = request.getInputStream().readAllBytes();
-        String principal = principal();
+        String principal = principal(request);
         String hash = hash(request.getMethod(), request.getRequestURI(), body);
 
         if (!claim(key, principal, hash)) {
@@ -282,11 +291,10 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
     // --- helpers --------------------------------------------------------------------------
 
-    private static String principal() {
-        return AuthenticatedUser.current()
-                .map(AuthenticatedUser::userId)
-                .map(UUID::toString)
-                .orElse("anonymous");
+    private static String principal(HttpServletRequest request) {
+        return request.getUserPrincipal() == null
+                ? "anonymous"
+                : request.getUserPrincipal().getName();
     }
 
     private static String hash(String method, String uri, byte[] body) {

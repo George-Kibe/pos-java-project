@@ -67,6 +67,11 @@ server:
       enabled: false
 
 pos:
+  idempotency:
+    enabled: true
+    # The sync endpoint stores a per-sale answer of its own under the same key.
+    excluded-paths:
+      - /api/v1/sales/sync
   security:
     public-paths:
       - /actuator/health

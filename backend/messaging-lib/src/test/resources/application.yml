@@ -1,4 +1,8 @@
 spring:
+  main:
+    # The library tests exercise outbox and consumers, not web; the filter IT drives MockMvc
+    # standalone. A servlet context would pull in common-lib's web handlers and their security.
+    web-application-type: none
   flyway:
     # Only the shared infrastructure migration; a real service would list its own first.
     locations: classpath:db/migration/shared

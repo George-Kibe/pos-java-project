@@ -22,8 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.pos.common.security.AuthenticatedUser;
 import com.pos.common.security.BranchAccessGuard;
 import com.pos.common.web.PageResponse;
+import com.pos.messaging.idempotency.IdempotencyFilter;
 import com.pos.sales.api.dto.SalesDtos;
-import com.pos.sales.config.IdempotencyFilter;
 import com.pos.sales.domain.Sale;
 import com.pos.sales.service.CartService;
 import com.pos.sales.service.CheckoutService;
@@ -91,7 +91,7 @@ public class SaleController {
     public SalesDtos.SaleResponse cancel(
             @PathVariable UUID id, @Valid @RequestBody SalesDtos.ReasonRequest request) {
         branchAccess.requireAccess(checkout.require(id).getBranchId());
-        return SalesDtos.SaleResponse.from(checkout.cancel(id, request.reason(), bearerToken()));
+        return SalesDtos.SaleResponse.from(checkout.cancel(id, request.reason()));
     }
 
     @PostMapping("/{id}/void")
