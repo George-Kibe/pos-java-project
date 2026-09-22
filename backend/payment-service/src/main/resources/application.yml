@@ -1,0 +1,130 @@
+spring:
+  application:
+    name: payment-service
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:pos}
+    username: ${PAYMENT_DB_USER:payment_user}
+    password: ${PAYMENT_DB_PASSWORD}
+    hikari:
+      # hibernate.default_schema covers JPA only; the outbox and idempotency ledger use plain JDBC.
+      schema: ${DB_SCHEMA:payment}
+      maximum-pool-size: 12
+      minimum-idle: 2
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: payment
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    schemas: payment
+    default-schema: payment
+    locations: classpath:db/migration,classpath:db/migration/shared
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:payment-service}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 20
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    listener:
+      ack-mode: record
+      # Matches the topic partition count, so each partition has a thread without idle consumers.
+      concurrency: 3
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${SERVER_PORT:8086}
+  error:
+    whitelabel:
+      enabled: false
+
+pos:
+  idempotency:
+    enabled: true
+  security:
+    public-paths:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+      # Daraja cannot present a token; these authenticate by the secret path segment instead.
+      - /api/v1/payments/mpesa/callbacks/**
+
+  payment:
+    dispatch-interval: ${PAYMENT_DISPATCH_INTERVAL:PT0.5S}
+    status-sweep-interval: ${MPESA_STATUS_SWEEP_INTERVAL:PT15S}
+    refund-dispatch-interval: ${REFUND_DISPATCH_INTERVAL:PT5S}
+    mpesa:
+      env: ${MPESA_ENV:sandbox}
+      base-url: ${MPESA_BASE_URL:}
+      # Credentials: from the environment only, never defaulted. Until all are set M-Pesa reports
+      # itself unconfigured and M-Pesa tenders fail fast.
+      consumer-key: ${MPESA_CONSUMER_KEY:}
+      consumer-secret: ${MPESA_CONSUMER_SECRET:}
+      shortcode: ${MPESA_SHORTCODE:}
+      passkey: ${MPESA_PASSKEY:}
+      # The public base URL Daraja can reach (the tunnel in development), without a path.
+      callback-base-url: ${MPESA_CALLBACK_URL:}
+      callback-token: ${MPESA_CALLBACK_TOKEN:}
+      # Reversals (M-Pesa refunds) additionally need an API operator and its encrypted credential.
+      initiator-name: ${MPESA_INITIATOR_NAME:}
+      security-credential: ${MPESA_SECURITY_CREDENTIAL:}
+      transaction-type: ${MPESA_TRANSACTION_TYPE:CustomerPayBillOnline}
+      party-b: ${MPESA_PARTY_B:}
+      callback-allowed-ips: ${MPESA_CALLBACK_ALLOWED_IPS:}
+      trusted-proxy-hops: ${MPESA_TRUSTED_PROXY_HOPS:1}
+      connect-timeout: PT5S
+      # STK Push answers quickly; it is the customer, not Daraja, who takes time.
+      read-timeout: PT20S
+      first-query-after: PT45S
+      query-interval: PT30S
+      max-query-attempts: 20
+      # After this the lane is released (TIMEOUT); money that still arrives is recorded late.
+      give-up-after: PT3M
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.pos: INFO

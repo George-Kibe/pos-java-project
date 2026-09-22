@@ -31,6 +31,7 @@ pos.payments.payment-failed.v1|${RETENTION_DEFAULT}|delete
 pos.payments.payment-refunded.v1|${RETENTION_SALES}|delete
 pos.sales.sale-completed.v1|${RETENTION_SALES}|delete
 pos.sales.sale-voided.v1|${RETENTION_SALES}|delete
+pos.sales.sale-cancelled.v1|${RETENTION_DEFAULT}|delete
 pos.sales.return-processed.v1|${RETENTION_SALES}|delete
 pos.sales.shift-closed.v1|${RETENTION_SALES}|delete
 pos.inventory.stock-deducted.v1|${RETENTION_SALES}|delete

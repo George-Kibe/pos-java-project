@@ -33,6 +33,7 @@
     <module>inventory-service</module>
     <module>purchasing-service</module>
     <module>sales-service</module>
+    <module>payment-service</module>
   </modules>
 
   <properties>

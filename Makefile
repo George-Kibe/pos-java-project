@@ -33,7 +33,7 @@ check-env:
 env: ## Create .env from .env.example with generated secrets (never overwrites)
 	@if [ -f $(ENV_FILE) ]; then echo "$(ENV_FILE) already exists - leaving it alone."; exit 0; fi; \
 	cp .env.example $(ENV_FILE); \
-	for key in $$(grep -oE '^[A-Z_]+PASSWORD=$$' .env.example | tr -d '=' | grep -vx 'SMTP_PASSWORD'); do \
+	for key in $$(grep -oE '^([A-Z_]+PASSWORD|MPESA_CALLBACK_TOKEN)=$$' .env.example | tr -d '=' | grep -vx 'SMTP_PASSWORD'); do \
 		secret=$$(openssl rand -hex 24); \
 		sed -i "s|^$${key}=$$|$${key}=$${secret}|" $(ENV_FILE); \
 	done; \

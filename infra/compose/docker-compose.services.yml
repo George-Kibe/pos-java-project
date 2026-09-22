@@ -208,6 +208,55 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  payment-service:
+    build:
+      context: ../../backend
+      dockerfile: ../infra/docker/service.Dockerfile
+      args:
+        MODULE: payment-service
+    image: pos/payment-service:dev
+    container_name: pos-payment-service
+    restart: unless-stopped
+    networks: [pos]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8086
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-pos}
+      PAYMENT_DB_USER: ${PAYMENT_DB_USER:-payment_user}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?required}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+      # Daraja. Empty values are allowed: M-Pesa then reports itself unconfigured and M-Pesa
+      # tenders fail fast, while cash and card keep working.
+      MPESA_ENV: ${MPESA_ENV:-sandbox}
+      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY:-}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET:-}
+      MPESA_SHORTCODE: ${MPESA_SHORTCODE:-}
+      MPESA_PASSKEY: ${MPESA_PASSKEY:-}
+      MPESA_CALLBACK_URL: ${MPESA_CALLBACK_URL:-}
+      MPESA_CALLBACK_TOKEN: ${MPESA_CALLBACK_TOKEN:-}
+      MPESA_INITIATOR_NAME: ${MPESA_INITIATOR_NAME:-}
+      MPESA_SECURITY_CREDENTIAL: ${MPESA_SECURITY_CREDENTIAL:-}
+      MPESA_CALLBACK_ALLOWED_IPS: ${MPESA_CALLBACK_ALLOWED_IPS:-}
+    # No published port: reachable only through the gateway, callbacks included.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8086/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   notification-service:
     build:
       context: ../../backend
@@ -285,6 +334,7 @@ services:
       INVENTORY_SERVICE_URI: http://inventory-service:8083
       PURCHASING_SERVICE_URI: http://purchasing-service:8084
       SALES_SERVICE_URI: http://sales-service:8085
+      PAYMENT_SERVICE_URI: http://payment-service:8086
       AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
       JWT_ISSUER: ${JWT_ISSUER:-http://auth-service:8081}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}

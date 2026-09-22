@@ -1,0 +1,22 @@
+# Test overlay merged onto the real application.yml by @ActiveProfiles("test").
+# Never name this application.yml in src/test/resources: it shadows the main file.
+spring:
+  kafka:
+    consumer:
+      group-id: payment-test
+      auto-offset-reset: earliest
+
+pos:
+  outbox:
+    # Outbox rows are read straight from the table.
+    enabled: false
+  payment:
+    # Dispatcher and sweeps are driven by the tests, so nothing moves behind an assertion.
+    dispatch-interval: PT1H
+    status-sweep-interval: PT1H
+    refund-dispatch-interval: PT1H
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.pos: INFO
