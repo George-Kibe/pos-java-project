@@ -32,6 +32,7 @@ public final class LogMasker {
                     "clientSecret",
                     "consumerSecret",
                     "passkey",
+                    "securityCredential",
                     "apiKey",
                     "token",
                     "accessToken",
@@ -70,6 +71,13 @@ public final class LogMasker {
     /** MSISDN in local or international form - keep the last 3 so support can match a customer. */
     private static final Pattern PHONE = Pattern.compile("\\b(?:\\+?254|0)(7|1)\\d{7}(\\d)\\b");
 
+    /**
+     * The secret segment of an M-Pesa callback URL. Daraja cannot authenticate to us, so the path
+     * token is the credential, and a logged request path would otherwise hand it out.
+     */
+    private static final Pattern CALLBACK_TOKEN =
+            Pattern.compile("(/mpesa/callbacks/[a-z-]+/)[^/\\s?\"]+");
+
     public static String mask(String input) {
         if (input == null || input.isEmpty()) {
             return input;
@@ -79,6 +87,7 @@ public final class LogMasker {
         // would replace only the scheme word of "Authorization: Bearer <token>", leaving the
         // token in the clear.
         out = BEARER.matcher(out).replaceAll("$1 " + REDACTED);
+        out = CALLBACK_TOKEN.matcher(out).replaceAll("$1" + REDACTED);
         out = JWT.matcher(out).replaceAll(REDACTED);
         out = JSON_FIELD.matcher(out).replaceAll("$1\"" + REDACTED + "\"");
         out = KEY_VALUE.matcher(out).replaceAll("$1" + REDACTED);

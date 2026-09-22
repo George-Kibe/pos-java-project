@@ -18,6 +18,19 @@ class LogMaskerTest {
     }
 
     @Test
+    void redactsDarajaCredentialsAndTheCallbackToken() {
+        String masked =
+                LogMasker.mask(
+                        "{\"Initiator\":\"api\",\"SecurityCredential\":\"Zm9vYmFy+/==\"}"
+                                + " POST /api/v1/payments/mpesa/callbacks/stk/9f2c1e7a44b0 200");
+
+        assertThat(masked)
+                .doesNotContain("Zm9vYmFy")
+                .doesNotContain("9f2c1e7a44b0")
+                .contains("/mpesa/callbacks/stk/***");
+    }
+
+    @Test
     void redactsKeyValueForms() {
         assertThat(LogMasker.mask("login attempt password=hunter2 for ada"))
                 .contains("password=***")
