@@ -23,6 +23,12 @@ public enum PaymentMethod {
     /** Store credit or a gift voucher. */
     VOUCHER,
 
+    /**
+     * Loyalty points spent as money. Settled by customer-service, which owns the balance: a tender
+     * is authorised by whoever holds the value behind it, and no other service can spend points.
+     */
+    LOYALTY,
+
     /** Settled against a customer account for later invoicing. */
     ACCOUNT
 }

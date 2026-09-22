@@ -12,6 +12,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import com.pos.events.customers.LoyaltyAccruedPayload;
+import com.pos.events.customers.TierChangedPayload;
 import com.pos.events.inventory.AdjustmentPostedPayload;
 import com.pos.events.inventory.BatchExpiringPayload;
 import com.pos.events.inventory.LowStockPayload;
@@ -240,7 +242,8 @@ class PayloadContractTest {
                             "KES",
                             "254700000000",
                             null,
-                            Instant.parse("2026-01-02T03:04:05Z"));
+                            Instant.parse("2026-01-02T03:04:05Z"),
+                            ID);
 
             String json = EventJson.write(payload);
             assertThat(json)
@@ -248,6 +251,7 @@ class PayloadContractTest {
                     .contains("\"saleId\"")
                     .contains("\"method\":\"MPESA\"")
                     .contains("\"phoneNumber\"")
+                    .contains("\"customerId\"")
                     .contains("\"requestedAt\"");
 
             assertThat(EventJson.read(json, PaymentRequestedPayload.class)).isEqualTo(payload);
@@ -325,6 +329,60 @@ class PayloadContractTest {
                     .contains("\"failedAt\"");
 
             assertThat(EventJson.read(json, PaymentFailedPayload.class)).isEqualTo(payload);
+        }
+    }
+
+    @Nested
+    class Customers {
+
+        @Test
+        void anAccrualCarriesTheBalanceAndWhatEarnedIt() {
+            LoyaltyAccruedPayload payload =
+                    new LoyaltyAccruedPayload(
+                            ID,
+                            ID,
+                            ID,
+                            ID,
+                            18L,
+                            142L,
+                            new BigDecimal("1852.0000"),
+                            "KES",
+                            "SILVER",
+                            Instant.parse("2027-01-02T03:04:05Z"),
+                            Instant.parse("2026-01-02T03:04:05Z"));
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"points\":18")
+                    .contains("\"balanceAfter\":142")
+                    .contains("\"eligibleSpend\"")
+                    .contains("\"tierCode\":\"SILVER\"")
+                    .contains("\"expiresAt\"");
+
+            assertThat(EventJson.read(json, LoyaltyAccruedPayload.class)).isEqualTo(payload);
+        }
+
+        @Test
+        void aTierChangeSaysWhichWayItWent() {
+            TierChangedPayload payload =
+                    new TierChangedPayload(
+                            ID,
+                            ID,
+                            "BRONZE",
+                            "SILVER",
+                            new BigDecimal("52000.0000"),
+                            "KES",
+                            true,
+                            Instant.parse("2026-01-02T03:04:05Z"));
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"previousTierCode\":\"BRONZE\"")
+                    .contains("\"tierCode\":\"SILVER\"")
+                    .contains("\"upgrade\":true")
+                    .contains("\"rollingSpend\"");
+
+            assertThat(EventJson.read(json, TierChangedPayload.class)).isEqualTo(payload);
         }
     }
 

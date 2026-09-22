@@ -13,6 +13,8 @@ import java.util.UUID;
  * @param paymentIntentId assigned by sales, so a duplicate request is recognisable
  * @param phoneNumber for M-Pesa only, and never logged in full
  * @param terminalReference for a card terminal only; the approval code arrives on authorisation
+ * @param customerId whose account is being spent from, for a tender that draws on one (loyalty
+ *     points); null for anonymous sales and for tenders that need no account
  */
 public record PaymentRequestedPayload(
         UUID paymentIntentId,
@@ -26,4 +28,5 @@ public record PaymentRequestedPayload(
         String currency,
         String phoneNumber,
         String terminalReference,
-        Instant requestedAt) {}
+        Instant requestedAt,
+        UUID customerId) {}
