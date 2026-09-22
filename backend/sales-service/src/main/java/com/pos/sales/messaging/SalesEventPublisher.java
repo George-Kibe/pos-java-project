@@ -65,7 +65,8 @@ public class SalesEventPublisher {
                                         payment.getCurrency(),
                                         phoneNumber,
                                         payment.getTerminalReference(),
-                                        Instant.now()))
+                                        Instant.now(),
+                                        sale.getCustomerId()))
                         .build());
     }
 
