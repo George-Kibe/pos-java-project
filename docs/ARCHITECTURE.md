@@ -98,15 +98,17 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.purchasing.po-approved.v1` | purchasing | notification, reporting | poId, supplierId, total, approvedBy |
 | `pos.purchasing.goods-received.v1` | purchasing | inventory, reporting | grnId, branchId, lines[{productId, qty, batchNo, expiry, unitCost — **landed**}] |
 | `pos.purchasing.supplier-cost-changed.v1` | purchasing | catalog, reporting | supplierId, productId, previousUnitCost, newUnitCost, sourceType |
-| `pos.payments.payment-requested.v1` | sales | payment | paymentIntentId (the dedupe key), saleId, branchId, method, amount, phoneNumber (M-Pesa only), terminalReference (card only) — one event per tender |
-| `pos.payments.payment-authorized.v1` | payment | sales, reporting | paymentIntentId, saleId, method, amountAuthorized (the intent amount when the whole-shilling M-Pesa charge was paid), providerReference, approvalCode |
-| `pos.payments.payment-failed.v1` | payment | sales, notification | paymentIntentId, saleId, method, reasonCode (e.g. CANCELLED_BY_USER, TIMEOUT, PROVIDER_UNAVAILABLE), providerMessage |
+| `pos.payments.payment-requested.v1` | sales | payment, customer | paymentIntentId (the dedupe key), saleId, branchId, method, amount, phoneNumber (M-Pesa only), terminalReference (card only), customerId (loyalty only) — one event per tender, taken by whichever service settles that method |
+| `pos.payments.payment-authorized.v1` | payment, customer (loyalty) | sales, reporting | paymentIntentId, saleId, method, amountAuthorized (the intent amount when the whole-shilling M-Pesa charge was paid), providerReference, approvalCode |
+| `pos.payments.payment-failed.v1` | payment, customer (loyalty) | sales, notification | paymentIntentId, saleId, method, reasonCode (e.g. CANCELLED_BY_USER, TIMEOUT, PROVIDER_UNAVAILABLE), providerMessage |
 | `pos.payments.payment-refunded.v1` | payment | reporting | refundId, paymentIntentId, saleId, returnId, method, amount, providerReference — emitted only once the provider (or a person) confirms it |
 | `pos.sales.sale-completed.v1` | sales | inventory, customer, reporting, notification | saleId, receiptNumber, branchId, registerId, shiftId, cashierId, customerId?, lines[] (as charged, with tax class), net/tax/grand totals, cartId? (the reservation reference inventory consumes) |
-| `pos.sales.sale-voided.v1` | sales | inventory, reporting | saleId, reason, actorId |
-| `pos.sales.sale-cancelled.v1` | sales | inventory | saleId, branchId, cartId? (whose stock holds inventory releases), reason |
+| `pos.sales.sale-voided.v1` | sales | inventory, customer, reporting | saleId, reason, actorId |
+| `pos.sales.sale-cancelled.v1` | sales | inventory, customer | saleId, branchId, cartId? (whose stock holds inventory releases), reason |
 | `pos.sales.return-processed.v1` | sales | inventory, payment, customer, reporting | returnId, saleId, lines[{productId, qty, resaleable, batchNo?}], refundTotal, refundMethod (non-cash is refunded by payment) |
 | `pos.sales.shift-closed.v1` | sales | reporting, notification | shiftId, branchId, registerId, expected, declared, variance |
+| `pos.customers.loyalty-accrued.v1` | customer | reporting, notification | customerId, saleId, points, balanceAfter, eligibleSpend, tierCode, expiresAt |
+| `pos.customers.tier-changed.v1` | customer | reporting, notification | customerId, previousTierCode, tierCode, rollingSpend, upgrade (it falls as well as rises) |
 | `pos.inventory.stock-deducted.v1` | inventory | reporting | saleId, branchId, lines[{productId, qty, batchAllocations[]}] |
 | `pos.inventory.low-stock.v1` | inventory | notification, purchasing | productId, branchId, onHand, reorderPoint |
 | `pos.inventory.batch-expiring.v1` | inventory | notification | batchId, productId, branchId, expiry, qty, value |
@@ -189,6 +191,21 @@ Terminal offline            Terminal reconnects            sales-service
 ```
 Duplicate submission of the same batch is a no-op. Nothing is ever dropped silently: a sale that
 cannot be accepted surfaces in the terminal UI for supervisor action.
+
+### 3.3b Paying with loyalty points
+
+```
+sales --payment-requested(LOYALTY, customerId)--> customer-service
+                                                    | spend points, soonest-to-expire lot first
+        <--------payment-authorized-----------------+
+        (or payment-failed: NO_CUSTOMER, NO_LOYALTY_ACCOUNT, INSUFFICIENT_POINTS)
+
+payment-service ignores the method: it is not its tender.
+```
+**A tender is settled by whoever holds the value behind it.** Points live in customer-service, so
+no other service can spend them or say whether they were spent - and the settling runs in a Kafka
+listener, which has no caller token to call anyone with. A cancelled or voided sale returns the
+points to the lots they came out of, with the expiry they had.
 
 ### 3.4 M-Pesa payment
 

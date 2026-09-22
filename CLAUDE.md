@@ -213,6 +213,12 @@ Caught three times in Phase 3, each looking correct from outside while doing not
 | OTP attempt counter | Reset on every wrong guess, leaving a 6-digit code brute-forceable |
 | Refresh-token reuse revocation | Request was refused, but the stolen family stayed live and worked next time |
 
+**This also applies to an exception you fully intend to catch.** customer-service's redemption
+threw "not enough points" from a service the listener called; the listener caught it and published
+a `payment-failed`, but the throw had already marked the transaction rollback-only, so the failure
+rolled back with it and the till waited for an answer that never came. A refusal the caller is
+expected to handle is a **returned result**, not an exception.
+
 The fix is a `@Transactional(propagation = REQUIRES_NEW)` method **on a different bean** (a
 self-invocation does not go through the proxy). See `LoginAttemptService`, `OtpService.verify` and
 `SessionRevocationService`.
@@ -325,6 +331,10 @@ rollback-only, so the commit fails anyway and takes the batch with it.
 - **A lazy association mapped in a controller is a 500, not a second query.** `open-in-view` is
   off, so the session is gone by the time a DTO maps `order.getSupplier().getName()`. Fetch what
   the response needs with the aggregate.
+- **A partial unique index needs the old row flushed before the new one.** "One default address per
+  customer" is `UNIQUE (customer_id) WHERE is_default`; clearing the old default in memory and
+  saving the new one sends the insert first, and the index refuses it. Same shape as the orphan
+  removal trap below: `saveAndFlush` the clear.
 - **Orphan removal flushes its deletes after the inserts.** Clearing a child collection and adding
   replacements in one go violates a unique constraint on the child's ordinal, because the new row 1
   is inserted while the old row 1 is still there. Flush the clear (`saveAndFlush`) before adding.
@@ -365,6 +375,15 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   need security. messaging-lib's tests broke this way when the idempotency filter moved in. A
   library's non-web tests set `spring.main.web-application-type: none`.
 
+- **An extension a service names explicitly must live in that service's schema.** A role's
+  `search_path` is its own schema alone and `public` is revoked, so `pg_trgm` installed in `public`
+  left `gin_trgm_ops` invisible: the tests passed (the extension landed in the test schema) and the
+  container died on `operator class "gin_trgm_ops" does not exist`. The bootstrap script installs
+  such an extension `WITH SCHEMA "<service>"`, and the migration keeps a guarded
+  `DO $$ ... IF NOT EXISTS ... $$` block so a bare Testcontainers database works. An existing
+  database needs `ALTER EXTENSION ... SET SCHEMA` by hand, like any other init-script change.
+  Default operator classes (catalog's `btree_gist`) are found without this; a named one is not.
+
 ## Testing traps
 
 - **Tests that share a broker must select their own message**, not "the first record on the
@@ -402,6 +421,14 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   exception at any size.
 - Refunds are not negative sales: they reference the original sale, respect a returns policy window,
   and restock to a batch only when the goods are resaleable.
+- **A tender is settled by whoever holds the value behind it.** Loyalty points live in
+  customer-service, so it consumes `payment-requested` for the LOYALTY method and answers with
+  `payment-authorized` / `payment-failed` itself; payment-service lists that method under
+  `pos.payment.delegated-methods` and ignores it. Adding a tender settled elsewhere means adding it
+  to that list, or every such sale is cancelled as METHOD_NOT_SUPPORTED.
+- Points are held in dated lots and spent soonest-to-expire first, and `loyalty_lot_takes` records
+  which lots a spend drew on. A reversal refills those lots rather than creating new points: a
+  cancelled sale must leave a member exactly as they were, not a year better off.
 - **Anything a Kafka listener or a scheduler triggers has no caller token to forward.** Work that
   needs to happen in another service from those paths goes by event, never by a call that would
   borrow the user's token. A basket's stock holds are the example that bit twice: inventory

@@ -769,20 +769,95 @@ uploading the statement, because Daraja cannot provide one.
 
 ---
 
-## Phase 11 — customer-service
+## Phase 11 — customer-service ✅
 
 **Goal:** members are recognised and rewarded.
 
-- `customers`, `membership_tiers`, `loyalty_accounts`, `loyalty_transactions`, `customer_addresses`
-- Customer lookup by phone, card number or name — fast enough for the lane
-- Tier rules driven by rolling spend
-- Point accrual from `sales.sale-completed`, redemption as a tender type on the next sale,
-  expiry rules, manual adjustment with audit
-- Emits `customers.loyalty-accrued`, `.tier-changed`
-- Consent flags and data-export/erasure support
+Delivered:
+- 8 tables: `customers`, `customer_addresses`, `customer_consents`, `membership_tiers`,
+  `loyalty_accounts`, `loyalty_transactions`, `loyalty_lot_takes`, `idempotency_records`
+- **The ledger is the truth.** A balance is never edited: every change is a row saying why and the
+  balance after it. Points are money owed, and "where did my points go" must be answerable a year
+  later
+- **Points are held in dated lots**, like batches on a shelf. Spending takes the soonest to expire
+  first, expiry writes off exactly what lapsed, and `loyalty_lot_takes` records which lots a spend
+  came out of - so a reversal puts the points back where they were, with the expiry they had
+- Lookup for the lane by phone (normalised, so one person cannot become two members), card, member
+  number, or part of a name on a trigram index
+- **Tiers on rolling spend**, as data: thresholds and multipliers are rows a manager edits. They
+  fall as well as rise - spend ages out of the window, and a member who stops shopping comes back
+  down. Emits `tier-changed` either way
+- Accrual from `sale-completed`, idempotent twice over: the consumer records the event, and a
+  unique index on the sale refuses a second accrual whatever the consumer thinks. Anonymous baskets
+  earn nothing; a sale naming a customer this service has never heard of is logged loudly
+- Refunds claw back **in proportion** to what went back, capped at the balance - a member who
+  already spent the points is not pushed negative, and the shortfall is recorded rather than
+  pursued. A voided sale loses the lot
+- **Redemption as a tender**: customer-service consumes `payment-requested` for the LOYALTY method,
+  spends the points and answers with `payment-authorized` or `payment-failed` itself. A tender is
+  settled by whoever holds the value behind it, and the settling path has no caller token to borrow
+- A cancelled or voided sale returns what it spent, into the lots it came from
+- Expiry and tier review run nightly, in batches
+- Manual adjustment with a reason and the actor; consent kept as **history**, not a flag; data
+  export; and erasure that forgets the person, keeps the ledger and writes off what was owed
+- The shared error handler now answers a constraint race with 409 rather than 500
 
 **Done when:** a sale attributed to a member accrues the right points exactly once under redelivery,
 tier upgrade fires at the threshold, and redemption reduces the payable amount correctly.
+
+**Verified — 700 tests in the build, 56 here (27 unit, 29 integration), plus an end-to-end run
+through the gateway against the built images:**
+
+| Check | Result |
+|---|---|
+| A member's sale earns the right points, once, under redelivery | ✅ 1052.5377 earns 10, one accrual, one event |
+| An anonymous basket | ✅ earns nobody anything |
+| Tier upgrade at the threshold | ✅ 49999 stays bronze, 50000 is silver, announced |
+| The new multiplier applies | ✅ silver earns 12 on a thousand, not 10 |
+| A tier falls when its spend ages out | ✅ back to bronze, announced, points kept |
+| A refund | ✅ four tenths back takes four of ten points, and the standing with it |
+| A voided sale | ✅ loses everything it earned |
+| Points already spent | ✅ claw-back stops at zero and says how many were short |
+| Lapsed points | ✅ written off once, oldest lot first |
+| Paying with points | ✅ 120.40 costs 121 points; the sale is settled for 120.40 |
+| Too few points | ✅ the tender fails with the balance and what was needed |
+| An anonymous basket or a customer with no account | ✅ refused, never left hanging |
+| A redelivered tender | ✅ spends once, answers once |
+| A cancelled sale | ✅ points back in their own lots, original expiry intact |
+| Spending order | ✅ the lot about to lapse goes first |
+| Another service's tender | ✅ ignored |
+| Lane lookup | ✅ three ways of typing a number, a card, a member number, part of a name |
+| A duplicate phone | ✅ 409 naming the member that holds it |
+| Consent | ✅ granting and withdrawal both kept, newest first |
+| Export | ✅ details, addresses, consents, balance and every transaction |
+| Erasure | ✅ person forgotten, ledger kept, balance written off, number reusable |
+| Manual adjustment | ✅ audited; more than the balance is refused |
+| Permissions | ✅ viewing is not managing; adjusting needs `loyalty:adjust` |
+| Enrol, look up and earn on the real images | ✅ found by phone, card and part of a name; 1160 spent earned 11 |
+| Paying with points on the real images | ✅ 10 in points + 106 cash settled a 116 sale; balance 11 → 1, then 2 with the new sale's point |
+| Too few points on the real images | ✅ the sale cancelled itself with INSUFFICIENT_POINTS |
+| Coverage gate | ✅ 92.6% |
+
+**Bugs found by the build rather than by a person:**
+- **A reversal invented a new expiry.** It looked for the accrual on the sale being cancelled -
+  which never earned anything - and fell back to "a year from now", handing back points worth more
+  than the ones spent. Spends now record which lots they drew on, and a reversal refills those.
+- **An insufficient balance answered nobody.** `redeem` threw inside the listener's transaction, so
+  the failure event the listener published rolled back with it and the tender hung until the sale
+  timed out. It returns a result now - the rollback trap in yet another guise.
+- **ArchUnit caught two layering slips**: a service returning API DTOs, and a controller reaching
+  into a repository.
+- **A second default address was refused by its own index**, because the old default was cleared in
+  memory and the insert reached the database first.
+- **The duplicate-phone check was dropped by a bad edit**, and the test noticed: the answer was a
+  bare constraint conflict rather than the member's number.
+- **The container would not start while every test passed**: `pg_trgm` was installed in `public`,
+  which a service role cannot see. Found by running the image, not the suite.
+
+**Deferred with reason:** points on the **receipt** and a members' self-service view belong to the
+frontend (Phases 13-15); the events and the read endpoints they need are here. **Birthday and
+campaign rewards** need a campaign model nobody has specified yet; a manual adjustment covers the
+occasional goodwill gesture meanwhile.
 
 ---
 
