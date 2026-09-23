@@ -28,6 +28,24 @@ class GatewayIT extends GatewayTestBase {
     // --- routing --------------------------------------------------------------
 
     @Test
+    @DisplayName("each service's OpenAPI spec is served at /v3/api-docs/<service>, without a token")
+    void apiSpecsAreRoutedPerService() {
+        DOWNSTREAM.stubFor(
+                WireMock.get(WireMock.urlEqualTo("/v3/api-docs"))
+                        .willReturn(
+                                WireMock.aResponse()
+                                        .withStatus(200)
+                                        .withHeader("Content-Type", "application/json")
+                                        .withBody("{\"openapi\":\"3.1.0\"}")));
+
+        ResponseEntity<String> response = get("/v3/api-docs/auth-service", null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("openapi");
+        DOWNSTREAM.verify(WireMock.getRequestedFor(WireMock.urlEqualTo("/v3/api-docs")));
+    }
+
+    @Test
     @DisplayName("a public route reaches the service without a token")
     void publicRouteIsProxied() {
         DOWNSTREAM.stubFor(

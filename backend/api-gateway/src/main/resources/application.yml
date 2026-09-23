@@ -139,6 +139,64 @@ spring:
                     id: reporting-service
                     fallbackPath: /fallback/service-unavailable
 
+            # --- API specs ------------------------------------------------------
+            # Each service's OpenAPI document at /v3/api-docs/<service>, for the Swagger UI below
+            # and for generating the Postman collection (make postman).
+            - id: auth-service-api-docs
+              uri: ${AUTH_SERVICE_URI:http://localhost:8081}
+              predicates:
+                - Path=/v3/api-docs/auth-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: catalog-service-api-docs
+              uri: ${CATALOG_SERVICE_URI:http://localhost:8082}
+              predicates:
+                - Path=/v3/api-docs/catalog-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: inventory-service-api-docs
+              uri: ${INVENTORY_SERVICE_URI:http://localhost:8083}
+              predicates:
+                - Path=/v3/api-docs/inventory-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: purchasing-service-api-docs
+              uri: ${PURCHASING_SERVICE_URI:http://localhost:8084}
+              predicates:
+                - Path=/v3/api-docs/purchasing-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: sales-service-api-docs
+              uri: ${SALES_SERVICE_URI:http://localhost:8085}
+              predicates:
+                - Path=/v3/api-docs/sales-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: payment-service-api-docs
+              uri: ${PAYMENT_SERVICE_URI:http://localhost:8086}
+              predicates:
+                - Path=/v3/api-docs/payment-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: customer-service-api-docs
+              uri: ${CUSTOMER_SERVICE_URI:http://localhost:8087}
+              predicates:
+                - Path=/v3/api-docs/customer-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: notification-service-api-docs
+              uri: ${NOTIFICATION_SERVICE_URI:http://localhost:8088}
+              predicates:
+                - Path=/v3/api-docs/notification-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: reporting-service-api-docs
+              uri: ${REPORTING_SERVICE_URI:http://localhost:8089}
+              predicates:
+                - Path=/v3/api-docs/reporting-service
+              filters:
+                - SetPath=/v3/api-docs
+
 server:
   port: ${SERVER_PORT:8080}
   forward-headers-strategy: framework
@@ -250,6 +308,22 @@ springdoc:
     urls:
       - name: auth-service
         url: /v3/api-docs/auth-service
+      - name: catalog-service
+        url: /v3/api-docs/catalog-service
+      - name: inventory-service
+        url: /v3/api-docs/inventory-service
+      - name: purchasing-service
+        url: /v3/api-docs/purchasing-service
+      - name: sales-service
+        url: /v3/api-docs/sales-service
+      - name: payment-service
+        url: /v3/api-docs/payment-service
+      - name: customer-service
+        url: /v3/api-docs/customer-service
+      - name: notification-service
+        url: /v3/api-docs/notification-service
+      - name: reporting-service
+        url: /v3/api-docs/reporting-service
     disable-swagger-default-url: true
 
 management:
