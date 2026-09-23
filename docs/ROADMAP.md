@@ -21,7 +21,7 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 | 10 | payment-service | Cash, M-Pesa STK, card terminal, refunds | 🟡 built; M-Pesa sandbox run pending |
 | 11 | customer-service | Customers, loyalty, member pricing | ✅ done |
 | 12 | reporting-service | CQRS projections, Z-report, dashboards | ✅ done |
-| 13 | Frontend: foundation & auth | Next.js app, BFF auth, shell, RBAC routing | 3–4 d |
+| 13 | Frontend: foundation & auth | Next.js app, BFF auth, shell, RBAC routing | ✅ done |
 | 14 | Frontend: cashier lane | Checkout, scanner, printer, offline | 5–7 d |
 | 15 | Frontend: back office | Catalog, stock, purchasing, users, reports | 5–7 d |
 | 16 | Hardening & production | Observability, load test, security review, deploy | 4–5 d |
@@ -957,26 +957,76 @@ report needs one, not before.
 
 ---
 
-## Phase 13 — Frontend foundation & auth
+## Phase 13 — Frontend foundation & auth ✅
 
 **Goal:** a person can register, verify by OTP, log in and land on a shell that reflects their
 permissions.
 
-- Next.js 15 App Router, TypeScript strict, Tailwind + shadcn/ui, route groups `(auth)`,
-  `(pos)`, `(admin)`
-- **BFF auth**: route handlers proxy login/refresh and hold the refresh token in an `httpOnly`,
-  `Secure`, `SameSite=Strict` cookie; access tokens stay server-side; middleware guards routes
-- Registration wizard: details → OTP entry (paste-friendly, resend with visible cooldown) → success
-- Typed API client with Zod schemas at every boundary, automatic refresh on `401`, problem+json
-  error surfacing
-- Permission-aware navigation and a `<Can permission="…">` component; branch switcher for
-  multi-branch users
-- Design system: light/dark, large touch targets, toasts, loading and empty states
-- Vitest + Testing Library set up, Playwright bootstrapped
+Delivered:
+- **Next.js 16** App Router (agreed in place of the 15 first written here - the current stable
+  release), TypeScript strict, Tailwind 4 and shadcn/ui on Base UI, route groups `(auth)`, `(pos)`,
+  `(admin)`
+- **BFF auth**: route handlers sign in, register, verify, resend, sign out and change passwords
+  against auth-service; both tokens live in encrypted (JWE, A256GCM) `httpOnly`, `Secure`,
+  `SameSite=Strict` cookies, and no token ever reaches the browser
+- **`proxy.ts` refreshes, and only it**: an expired access token is renewed before any page,
+  prefetch or signed-in API call, with a single-flight exchange so a burst of requests spends the
+  refresh token once. An outage never signs anyone out; a refused refresh does
+- A data access layer (`requireUser`, `can`) checks the session on every render; `/api/gateway/*`
+  carries browser calls to the services with the token attached on the server, and never proxies
+  `auth/*`
+- Registration wizard: details, then the emailed code (paste fills every box, a complete code
+  submits itself, the resend cooldown counts down visibly because auth-service silently ignores an
+  early resend), then done. Signing in to an unverified account points at the code, not at the
+  password
+- A temporary password is replaced before anything else - admin-created accounts are no longer
+  stuck on theirs
+- Typed API client with Zod at every boundary (session cookies included), problem+json errors with
+  field messages, and a sign-in-again path on 401
+- Permission-aware navigation filtered on the server, `<Can permission>`, Alt-key shortcuts, and a
+  branch switcher fed by `/me`'s new `branches` (a cashier has no `branch:view` to look names up)
+- Design system: light and dark, 44px touch targets by default, toasts, loading, empty and error
+  states; a live dashboard from reporting for managers
+- `web` in Compose; `make env-sync` adds generated secrets a newer `.env.example` introduced;
+  `make web-check`, `make web-e2e`
+- Vitest and Testing Library, Playwright against the real stack
 
 **Done when:** the full register → OTP → login → protected page → refresh → logout path works in a
 browser, a cashier and a manager see different navigation, and no token is visible in
 `localStorage` or client state.
+
+**Verified — 47 unit and component tests, 4 browser runs against the built images (three
+consecutive passes), and auth-service's 41:**
+
+| Check | Result |
+|---|---|
+| Register → OTP → login → protected page → refresh → logout in Chromium | ✅ code read from Mailpit, pasted whole |
+| No token in `localStorage`, `sessionStorage`, `document.cookie` or the page | ✅ checked after sign-in and after refresh |
+| Refresh | ✅ access cookie dropped, next page load mints one; refresh token rotated |
+| Sign-out | ✅ back to login; the old refresh cookie is refused by auth-service too |
+| A cashier and a manager | ✅ Till + Account against Till + Dashboard + Account; the dashboard refused to the cashier |
+| A temporary password | ✅ every page leads to the change form until it is changed |
+| Six API calls at once on an expired access token | ✅ all 200, one refresh, no reuse detected |
+| An unverified account signing in | ✅ pointed at its code |
+| Tampered, foreign-key, expired or malformed cookies | ✅ all read as signed out |
+| `next=//evil.example` | ✅ ignored |
+
+**Bugs found by running it rather than by a person:**
+- **Two refreshers signed people out.** The proxy and the route handlers each refreshed, each with
+  its own single-flight map; a link prefetch racing an API call spent the same refresh token twice
+  and auth-service revoked the session. Found only in the browser run. The proxy is now the only
+  refresher.
+- **Every user would have shared one login limit**: through the BFF, all credential calls came
+  from one address. The browser's address now goes with login and refresh.
+- **Admin-created staff could never leave their temporary password**, because nothing acted on
+  `mustChangePassword`.
+- **The web container reported unhealthy while serving**: Alpine resolves `localhost` to IPv6.
+- **The Makefile carried duplicate recipes** from an earlier phase, warning on every run and
+  silently ignoring the first copy.
+
+**Deferred with reason:** forgot/reset password screens and the admin screens for users, roles and
+branches belong with the back office (Phase 15); the endpoints exist. Offline state, Zustand and
+the scanner arrive with the lane (Phase 14), where they are used.
 
 ---
 

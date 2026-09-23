@@ -6,7 +6,7 @@ Working agreement for this repository. Read this before writing code here.
 
 Multi-branch supermarket POS. Spring Boot microservices (Java 21, Maven multi-module) behind a
 Spring Cloud Gateway, Kafka for inter-service events, PostgreSQL with a schema per service, Redis,
-and a Next.js 15 frontend serving both the cashier lane and the back office. Docker Compose for dev
+and a Next.js 16 frontend serving both the cashier lane and the back office. Docker Compose for dev
 and production.
 
 Architecture and scope live in [readme.md](readme.md); the build order lives in
@@ -158,11 +158,20 @@ Rules:
 
 ## Frontend
 
+- **Next.js 16 is not the Next.js you remember.** Middleware is `proxy.ts`, request APIs are async,
+  route types are generated. Read `frontend/web/node_modules/next/dist/docs/` before writing code.
 - App Router, TypeScript `strict`, Server Components by default; `"use client"` only where
-  interactivity demands it.
-- **Auth is BFF.** Next.js route handlers hold the refresh token in an `httpOnly`, `Secure`,
-  `SameSite=Strict` cookie and mint short-lived access tokens server-side. The access token never
-  goes to `localStorage` and never appears in client state.
+  interactivity demands it. Route groups: `(auth)`, `(pos)` for the lane, `(admin)` for the back
+  office.
+- **Auth is BFF.** Route handlers sign in against auth-service and keep both tokens in encrypted
+  (JWE) `httpOnly`, `Secure`, `SameSite=Strict` cookies. No token ever reaches the browser - not
+  `localStorage`, not client state, not the page. Client components get a `SessionProvider` with
+  name, permissions and branches, never a token.
+- **`proxy.ts` is the only place a session is refreshed.** Pages learn who is asking through the
+  data access layer (`lib/auth/dal.ts`); browser code reaches the services through
+  `/api/gateway/<path>`, which never proxies `auth/*`.
+- Permission checks in the UI (`<Can>`, `can()`, the navigation) are conveniences. The services
+  enforce the same permissions; never rely on hiding a button.
 - All server responses are parsed through Zod schemas at the boundary. No `any`, no unchecked casts.
 - TanStack Query for server state, Zustand for terminal-local state (open cart, shift, device).
 - Offline: writes queue in Dexie with a client-generated UUID and are replayed with an
@@ -171,7 +180,10 @@ Rules:
 - The cashier lane is keyboard-first: every action has a shortcut, scanner input is captured
   globally, and nothing on the checkout path requires a mouse.
 - Accessibility and touch targets matter — lanes run on touchscreens under time pressure. Large hit
-  areas, high contrast, no hover-only affordances.
+  areas, high contrast, no hover-only affordances. The design system's buttons and inputs are 44px
+  by default; the smaller sizes are for dense back-office tables only.
+- Frontend checks: `make web-check` (lint, typecheck, Vitest, build) and `make web-e2e` (Playwright
+  against the running stack, email routed to Mailpit for the run).
 
 ## Testing
 
@@ -397,9 +409,40 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   image rebuild leaves build cache behind; at 100% the daemon stops answering and Testcontainers
   reports "Could not find a valid Docker environment". Check `df -h /` first, and
   `docker builder prune` now and then.
+- **The editor's problem count is not the build's.** VS Code's Java extension runs Eclipse's own
+  compiler with null analysis against Spring's annotations; Maven does not. Its settings live in
+  `.vscode/java-compiler.prefs` (unchecked-conversion null warnings off: they fire on every method
+  reference into Spring 7's null-marked API; definite and potential null dereferences stay on).
+  A pile of "cannot be resolved" errors in code that `mvn verify` compiles is a stale editor
+  classpath, not a bug: run "Java: Clean Java Language Server Workspace". To check headlessly, run
+  the extension's bundled `org.eclipse.jdt.core.compiler.batch` jar over a module with those prefs.
+- **OpenPDF's `openpdf` 2.x artifact is the deprecated legacy API** (`com.lowagie.*`, every class
+  deprecated). Use `openpdf-core-modern` (`org.openpdf.*`), same version.
 - **ArchUnit's `layeredArchitecture()` fails on an empty layer.** A service with no `repository`
   package (reporting writes with `JdbcClient` from its services) must leave that layer out of its
   rules, not create an empty package to satisfy it.
+
+## Frontend traps
+
+- **Two refreshers revoke the session.** auth-service treats a refresh token spent twice as theft
+  and revokes the whole family. The proxy is bundled apart from the route handlers, so each had
+  its own single-flight map: a `<Link>` prefetch (which goes through the proxy) racing an API call
+  spent the same token twice and signed the user out. Only `proxy.ts` refreshes; route handlers
+  read the cookies it renewed on the request. Unit tests could not see this - the browser run did.
+- **Behind a BFF every user has the BFF's address.** The gateway limits login and refresh per
+  address (10 a minute), so without forwarding the browser's `X-Forwarded-For` a shift of cashiers
+  signing in shares one bucket. `clientHeaders()` goes on every credential call, refresh included.
+- **A function returned from `beforeEach` is run as that test's teardown.**
+  `beforeEach(() => mock.mockReset())` returns the mock, so Vitest calls it after every test - and a
+  mock that throws then fails a test whose code handled the error. Use braces.
+- **`mockRejectedValue` builds its rejection at once.** Left pending across an `await` in the test,
+  it counts as unhandled and fails the test. Use `mockImplementation(async () => { throw ... })`.
+- **Next's route announcer is `role="alert"` too.** Select an alert by its text, not its role.
+- **Leaving a page aborts its fetch.** An e2e step that navigates straight after a click can cancel
+  the request the click started - wait for the outcome (the redirect, the message) first.
+- **`localhost` in an Alpine container is `::1` first**, and Next listens on IPv4 `0.0.0.0`. Health
+  checks use `127.0.0.1`.
+- **shadcn now builds on Base UI**, not Radix: compose with the `render` prop, not `asChild`.
 
 ## Testing traps
 

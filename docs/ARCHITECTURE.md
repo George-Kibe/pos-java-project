@@ -95,6 +95,19 @@ knows the answer.
 Fact tables are order-independent (each event writes only its own rows; figures are aggregated at
 read time), so a replay in receipt order reproduces the incremental result exactly.
 
+### ADR-012 — The web tier holds the session; the browser holds no token
+**Decision:** the Next.js app is a backend-for-frontend. Its route handlers sign in against
+auth-service and keep the access and refresh tokens in encrypted (JWE) `httpOnly`, `Secure`,
+`SameSite=Strict` cookies; browser code reaches the services through `/api/gateway/*`, and the BFF
+attaches the token on the server. `proxy.ts` is the only place a session is refreshed, with a
+single-flight exchange.
+**Why:** a token in JavaScript's reach is one XSS away from being stolen, and a lane runs all day on
+a shared machine. Stateless cookies keep the web tier free of a session store. One refresher,
+because auth-service revokes a whole session when a refresh token is used twice.
+**Cost:** the single-flight map is per process, so more than one web replica needs sticky sessions
+or a shared store; and every credential call must forward the browser's address, or the gateway's
+per-address login limit would count the BFF instead of people.
+
 ---
 
 ## 2. Event catalogue

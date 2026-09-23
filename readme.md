@@ -4,17 +4,17 @@ A production-grade Point of Sale platform for multi-branch supermarket retail, b
 Spring Boot microservices behind an API gateway, with a Next.js cashier + back-office frontend,
 Kafka for event-driven communication, and PostgreSQL for persistence.
 
-> **Status:** phases 0-9, 11 and 12 of 16 complete - infrastructure, shared libraries,
-> `auth-service`, `api-gateway`, `notification-service`, `catalog-service`, `inventory-service`,
-> `purchasing-service`, `sales-service`, `customer-service` and `reporting-service` are built,
-> tested and running under Docker Compose: stock arrives at its landed cost, leaves through a till
-> whose totals and receipts are the server's, members earn, spend and lose points on a ledger that
-> balances, and the reports - rebuilt from their own event log - reconcile with the till to the
-> cent. Phase 10's `payment-service` is built and running - card and cash settle end to end, M-Pesa
+> **Status:** phases 0-9 and 11-13 of 16 complete - infrastructure, shared libraries, every
+> backend service (`auth`, `api-gateway`, `notification`, `catalog`, `inventory`, `purchasing`,
+> `sales`, `customer`, `reporting`) and the web app's foundation are built, tested and running under
+> Docker Compose: stock arrives at its landed cost, leaves through a till whose totals and receipts
+> are the server's, members earn and spend points on a ledger that balances, reports reconcile with
+> the till to the cent, and people register, verify and sign in through a browser that never holds a
+> token. Phase 10's `payment-service` is built and running - card and cash settle end to end, M-Pesa
 > is verified against a fake of Daraja - and waits only on a real sandbox STK Push, which needs a
-> Daraja app subscribed to M-Pesa Express. 741 tests in the build. The frontend starts at phase 13.
-> Code is built phase by phase per [docs/ROADMAP.md](docs/ROADMAP.md), which records what each
-> phase delivered and how it was verified.
+> Daraja app subscribed to M-Pesa Express. 741 backend tests, 47 frontend tests and a browser
+> end-to-end run. Code is built phase by phase per [docs/ROADMAP.md](docs/ROADMAP.md), which records
+> what each phase delivered and how it was verified.
 
 ---
 
@@ -142,8 +142,8 @@ business logic and no service-specific entities.**
 > `spring-boot-starter-flyway` and `spring-boot-starter-aspectj` — not their Boot 3 names.
 
 **Frontend**
-- Next.js 16.3.5 (App Router), TypeScript strict mode, React 19.3
-- Tailwind CSS + shadcn/ui, TanStack Query, Zustand
+- Next.js 16.3 (App Router), TypeScript strict mode, React 19.2
+- Tailwind CSS 4 + shadcn/ui (on Base UI), TanStack Query, Zustand
 - Dexie (IndexedDB) + Workbox service worker for offline checkout
 - Zod for runtime validation of every API boundary
 
@@ -247,6 +247,7 @@ git clone <repo-url> && cd pos-java-project
 
 make doctor                     # confirm JDK, Node, Docker are usable
 make env                        # writes .env with generated secrets (never overwrites)
+make env-sync                   # an existing .env: add secrets a later phase introduced (never overwrites)
 make up                         # infrastructure + services; gateway on :8080
 make ps                         # container status
 make verify                     # full build: format, tests, integration tests, coverage
@@ -265,7 +266,7 @@ make verify                     # full build: format, tests, integration tests, 
 | localhost:5432 | PostgreSQL (**live now**) |
 | localhost:29092 | Kafka, from the host (`kafka:9092` inside the network) (**live now**) |
 | localhost:6379 | Redis (**live now**) |
-| http://localhost:3000 | Next.js app (Phase 13) |
+| http://localhost:3000 | Next.js app: sign in, register, lane and back office |
 | http://localhost:8080/swagger-ui.html | Aggregated OpenAPI |
 | http://localhost:3001 | Grafana (Phase 16) |
 
@@ -349,6 +350,9 @@ In production these come from Docker secrets, not a `.env` file. Rotation proced
   every use**. Rotation families are tracked: presenting an already-used refresh token revokes the
   entire family and forces re-login. Held in an `httpOnly`, `Secure`, `SameSite=Strict` cookie set
   by the Next.js BFF route handlers, so browser JavaScript never touches it.
+- **In the browser** — neither token. The BFF keeps both in encrypted (JWE) `httpOnly` cookies and
+  attaches the access token itself when it calls the gateway; `proxy.ts` is the one place a session
+  is refreshed, so a burst of requests never spends a refresh token twice.
 - Logout revokes the refresh family; a password change or role change bumps `tv`, invalidating every
   outstanding access token at the next request.
 
