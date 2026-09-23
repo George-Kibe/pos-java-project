@@ -52,14 +52,30 @@ public class AdjustmentService {
 
     @Transactional(readOnly = true)
     public Page<StockAdjustment> list(UUID branchId, Pageable pageable) {
-        return adjustments.findByBranchIdOrderByCreatedAtDesc(branchId, pageable);
+        Page<StockAdjustment> page =
+                adjustments.findByBranchIdOrderByCreatedAtDesc(branchId, pageable);
+        page.forEach(AdjustmentService::loadForResponse);
+        return page;
     }
 
     @Transactional(readOnly = true)
     public StockAdjustment get(UUID id) {
-        return adjustments
-                .findById(id)
-                .orElseThrow(() -> Errors.NotFoundException.of("Adjustment", id));
+        // post and cancel start here too, so their responses are covered as well.
+        return loadForResponse(
+                adjustments
+                        .findById(id)
+                        .orElseThrow(() -> Errors.NotFoundException.of("Adjustment", id)));
+    }
+
+    /**
+     * Loads, inside the transaction, what an adjustment response reads after it: each line's stock
+     * item. The controller maps with no session open, and a lazy proxy touched there is a 500.
+     */
+    private static StockAdjustment loadForResponse(StockAdjustment adjustment) {
+        adjustment
+                .getLines()
+                .forEach(line -> org.hibernate.Hibernate.initialize(line.getStockItem()));
+        return adjustment;
     }
 
     @Transactional

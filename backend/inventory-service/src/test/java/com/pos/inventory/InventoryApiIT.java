@@ -234,6 +234,16 @@ class InventoryApiIT extends InventoryTestBase {
                                 .param("branchId", BRANCH.toString())
                                 .with(at(BRANCH, "inventory:view")))
                 .andExpect(jsonPath("$.quantityOnHand", is(16.000)));
+
+        // Read back in the branch's list. It once answered 500: the response reads each line's
+        // stock item after the transaction has closed, and no test listed a real adjustment.
+        mockMvc.perform(
+                        get("/api/v1/adjustments")
+                                .param("branchId", BRANCH.toString())
+                                .with(at(BRANCH, "inventory:view", "inventory:adjust")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id", is(adjustmentId)))
+                .andExpect(jsonPath("$.content[0].lines[0].productId", is(product.toString())));
     }
 
     @Test

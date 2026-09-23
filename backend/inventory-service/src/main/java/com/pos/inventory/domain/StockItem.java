@@ -26,6 +26,8 @@ import lombok.Setter;
  */
 @Entity
 @Table(name = "stock_items")
+// A page of adjustment lines loads its stock items in one query, not one per line.
+@org.hibernate.annotations.BatchSize(size = 100)
 @Getter
 @Setter
 @NoArgsConstructor
