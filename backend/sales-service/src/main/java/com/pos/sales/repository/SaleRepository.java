@@ -24,7 +24,10 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
             attributePaths = {"tillSession"})
     Optional<Sale> findById(UUID id);
 
-    Optional<Sale> findByReceiptNumber(String receiptNumber);
+    /** Receipt numbers repeat across branches: each branch counts from R-000001. */
+    Optional<Sale> findByBranchIdAndReceiptNumber(UUID branchId, String receiptNumber);
+
+    List<Sale> findByReceiptNumber(String receiptNumber);
 
     /** The dedupe check for an offline batch: the terminal's own id. */
     Optional<Sale> findByClientSaleId(UUID clientSaleId);

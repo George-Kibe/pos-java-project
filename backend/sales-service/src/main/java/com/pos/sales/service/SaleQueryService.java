@@ -1,5 +1,6 @@
 package com.pos.sales.service;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -25,8 +26,13 @@ public class SaleQueryService {
         return sales.findByBranchIdOrderByOccurredAtDesc(branchId, pageable);
     }
 
-    public Sale byReceiptNumber(String receiptNumber) {
-        return sales.findByReceiptNumber(receiptNumber)
+    public Sale byReceiptNumber(UUID branchId, String receiptNumber) {
+        return sales.findByBranchIdAndReceiptNumber(branchId, receiptNumber)
                 .orElseThrow(() -> Errors.NotFoundException.of("Receipt", receiptNumber));
+    }
+
+    /** Every branch's sale with this number: each branch numbers its receipts from R-000001. */
+    public List<Sale> allWithReceiptNumber(String receiptNumber) {
+        return sales.findByReceiptNumber(receiptNumber);
     }
 }

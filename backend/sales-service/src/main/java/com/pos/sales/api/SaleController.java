@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.pos.common.error.Errors;
 import com.pos.common.security.AuthenticatedUser;
 import com.pos.common.security.BranchAccessGuard;
 import com.pos.common.web.PageResponse;
@@ -124,11 +125,30 @@ public class SaleController {
 
     @GetMapping("/receipt/{receiptNumber}")
     @PreAuthorize("hasAnyAuthority('sale:create', 'report:view:branch')")
-    @Operation(summary = "Look a sale up by the number printed on its receipt")
-    public SalesDtos.SaleResponse byReceipt(@PathVariable String receiptNumber) {
-        Sale sale = query.byReceiptNumber(receiptNumber);
-        branchAccess.requireAccess(sale.getBranchId());
-        return SalesDtos.SaleResponse.from(sale);
+    @Operation(
+            summary =
+                    "Look a sale up by the number printed on its receipt. Numbers repeat across"
+                            + " branches; without branchId, the caller's own branches are searched")
+    public SalesDtos.SaleResponse byReceipt(
+            @PathVariable String receiptNumber, @RequestParam(required = false) UUID branchId) {
+        if (branchId != null) {
+            branchAccess.requireAccess(branchId);
+            return SalesDtos.SaleResponse.from(query.byReceiptNumber(branchId, receiptNumber));
+        }
+        List<Sale> mine =
+                query.allWithReceiptNumber(receiptNumber).stream()
+                        .filter(sale -> branchAccess.hasAccess(sale.getBranchId()))
+                        .toList();
+        if (mine.isEmpty()) {
+            throw Errors.NotFoundException.of("Receipt", receiptNumber);
+        }
+        if (mine.size() > 1) {
+            throw new Errors.BadRequestException(
+                    "receipt.branch_required",
+                    "Receipt %s exists at more than one of your branches: name the branch"
+                            .formatted(receiptNumber));
+        }
+        return SalesDtos.SaleResponse.from(mine.getFirst());
     }
 
     @GetMapping("/{id}/receipts")

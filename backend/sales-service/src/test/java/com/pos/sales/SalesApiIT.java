@@ -32,7 +32,12 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import com.jayway.jsonpath.JsonPath;
 
 import com.pos.events.EventJson;
+import com.pos.events.payments.PaymentMethod;
+import com.pos.sales.domain.Cart;
+import com.pos.sales.domain.Sale;
 import com.pos.sales.domain.TillSession;
+import com.pos.sales.service.CartService;
+import com.pos.sales.service.CheckoutService;
 import com.pos.sales.service.TillSessionService;
 
 /** The sales HTTP surface: who may do what, where, and what a retried request does. */
@@ -44,8 +49,90 @@ class SalesApiIT extends SalesTestBase {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private TillSessionService tills;
+    @Autowired private CartService carts;
+    @Autowired private CheckoutService checkout;
 
     /** A token for someone assigned to one branch, carrying exactly these permissions. */
+    /** A caller assigned to several branches. */
+    private static RequestPostProcessor atBranches(List<UUID> branches, String... permissions) {
+        UUID user = UUID.randomUUID();
+        return jwt().jwt(
+                        Jwt.withTokenValue("test")
+                                .header("alg", "RS256")
+                                .subject(user.toString())
+                                .claim("uid", user.toString())
+                                .claim("perms", List.of(permissions))
+                                .claim("branches", branches.stream().map(UUID::toString).toList())
+                                .build())
+                .authorities(
+                        Arrays.stream(permissions)
+                                .map(SimpleGrantedAuthority::new)
+                                .toArray(GrantedAuthority[]::new));
+    }
+
+    /** A cash sale of one juice at {@code branch}, on a till of its own. */
+    private Sale paidSaleAt(UUID branch) {
+        TillSession till = tills.open(branch, UUID.randomUUID(), new java.math.BigDecimal("1000"));
+        Cart cart = carts.open(till.getId(), null, false);
+        cart =
+                carts.addLine(
+                        cart.getId(),
+                        JUICE.id(),
+                        JUICE.sku(),
+                        null,
+                        java.math.BigDecimal.ONE,
+                        false,
+                        TOKEN);
+        Sale sale = checkout.checkout(cart.getId(), null, TOKEN);
+        return checkout.tender(
+                sale.getId(),
+                List.of(
+                        new CheckoutService.Tender(
+                                PaymentMethod.CASH, sale.getGrandTotal(), null, null)),
+                sale.getGrandTotal());
+    }
+
+    @Test
+    @DisplayName(
+            "every branch numbers its receipts from R-000001, and a lookup knows whose it means")
+    void receiptNumbersArePerBranch() throws Exception {
+        UUID north = UUID.randomUUID();
+        UUID south = UUID.randomUUID();
+        actingAs(CASHIER, CASHIER_PERMISSIONS);
+
+        Sale atNorth = paidSaleAt(north);
+        Sale atSouth = paidSaleAt(south);
+
+        // Once refused as a duplicate: only the first branch could ever trade.
+        assertThat(atNorth.getReceiptNumber()).isEqualTo("R-000001");
+        assertThat(atSouth.getReceiptNumber()).isEqualTo("R-000001");
+
+        // A caller at one branch never has to say which.
+        mockMvc.perform(
+                        get("/api/v1/sales/receipt/R-000001")
+                                .with(atBranches(List.of(north), "sale:create")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(atNorth.getId().toString())));
+        // A caller at both names the branch, or is asked to.
+        mockMvc.perform(
+                        get("/api/v1/sales/receipt/R-000001")
+                                .param("branchId", south.toString())
+                                .with(atBranches(List.of(north, south), "sale:create")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(atSouth.getId().toString())));
+        mockMvc.perform(
+                        get("/api/v1/sales/receipt/R-000001")
+                                .with(atBranches(List.of(north, south), "sale:create")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code", is("receipt.branch_required")));
+        // Naming a branch the caller does not work at is refused, not answered.
+        mockMvc.perform(
+                        get("/api/v1/sales/receipt/R-000001")
+                                .param("branchId", south.toString())
+                                .with(atBranches(List.of(north), "sale:create")))
+                .andExpect(status().isForbidden());
+    }
+
     private static RequestPostProcessor at(UUID branch, UUID user, String... permissions) {
         GrantedAuthority[] authorities =
                 Arrays.stream(permissions)
