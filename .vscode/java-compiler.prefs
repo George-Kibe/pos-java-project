@@ -1,0 +1,12 @@
+# Eclipse JDT compiler settings for this workspace, applied by the Java extension via
+# "java.settings.url" in .vscode/settings.json.
+#
+# Null analysis stays on (java.compile.nullAnalysis.mode = automatic): definite and potential null
+# dereferences and violations of Spring's @NonNull/@Nullable contracts are still reported.
+#
+# Only "unchecked conversion" is turned off. It fires where an unannotated type meets Spring 7's
+# null-marked API - almost always a method reference such as `.map(User::getId)`, whose receiver
+# comes from java.util.function.Function, which the JDK does not annotate. Eclipse cannot prove
+# the receiver non-null, although a stream never hands a method reference null. The Maven build
+# does not run this analysis; these were 141 editor warnings with nothing behind them.
+org.eclipse.jdt.core.compiler.problem.nullUncheckedConversion=ignore

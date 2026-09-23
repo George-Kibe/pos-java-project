@@ -1,0 +1,13 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    // Compiler options for the workspace; see the comments in the file.
+    "java.settings.url": ".vscode/java-compiler.prefs",
+    // Re-read a pom.xml when it changes. Left on "interactive", a missed prompt leaves the editor on
+    // a stale classpath: it then reports types that `mvn verify` compiles as unresolved.
+    "java.configuration.updateBuildConfiguration": "automatic",
+    // The web app's CSS is Tailwind 4 (@theme, @custom-variant), which the built-in CSS checker
+    // reports as unknown at-rules.
+    "files.associations": {
+        "*.css": "tailwindcss"
+    }
+}

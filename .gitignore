@@ -48,6 +48,7 @@ kafka-data/
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+!.vscode/java-compiler.prefs
 .settings/
 .project
 .classpath
