@@ -1,0 +1,21 @@
+# Overlay for browser end-to-end runs (`make web-e2e`).
+#
+# Development may send mail through a real provider. A test that registers throwaway accounts
+# must not email real inboxes, so for the run notification-service delivers to Mailpit, where the
+# test reads the OTP back. `make web-e2e` puts notification-service back as it was afterwards.
+services:
+  notification-service:
+    environment:
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      SMTP_AUTH: "false"
+      SMTP_STARTTLS: "false"
+
+  # Every test in the run comes from one address and signs in far more often than a person does,
+  # so the per-address limit on credential endpoints (10 a minute) is raised for the run and put
+  # back afterwards. The limit itself is covered by api-gateway's own tests.
+  api-gateway:
+    environment:
+      POS_GATEWAY_RATELIMIT_AUTH_CAPACITY: "500"
