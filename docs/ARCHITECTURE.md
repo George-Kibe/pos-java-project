@@ -300,7 +300,6 @@ time.
 | postgres | 5432 |
 | kafka | 9092 |
 | redis | 6379 |
-| mailpit (SMTP / UI) | 1025 / 8025 |
 | prometheus | 9090 |
 | grafana | 3001 |
 | tempo | 3200 |

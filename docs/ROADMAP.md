@@ -1030,6 +1030,23 @@ the scanner arrive with the lane (Phase 14), where they are used.
 
 ---
 
+## Infrastructure refresh (after Phase 13) ✅
+
+Not a phase: a change of footing between two. The records above describe what was true when each
+phase closed; this is what changed afterwards.
+
+- **Images moved to the current stable lines**: Postgres 16 → 18, Redis 7 → 8, Kafka 3.9 → 4.3
+  (and Confluent 7.8 → 8.3 for Testcontainers). Java stays on 21 and Node on 24, both the LTS lines
+  in use.
+- **Mailpit is gone.** Development mail goes through Gmail and production will use AWS SES, both
+  over SMTP with the same client. The SMTP host is now required rather than defaulting to a sink.
+- **Browser e2e runs capture mail instead of sending it**: `MAIL_TRANSPORT=capture` makes
+  notification-service write each message to a file in its own container, and the tests read the
+  code with `docker exec`. No endpoint exposes the files; only the e2e overlay sets the mode.
+- The dev database started fresh on Postgres 18 (a major upgrade cannot reuse the old volume).
+
+---
+
 ## Phase 14 — Frontend cashier lane
 
 **Goal:** a cashier can work a full shift, including through a network outage.

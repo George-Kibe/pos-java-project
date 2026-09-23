@@ -133,7 +133,7 @@ business logic and no service-specific entities.**
 - **Spring Boot 4.0.8** with **Spring Cloud 2025.1.3** (the aligned pair — Cloud 2025.1.x targets
   Boot 4.0.x; Boot 4.1 has no matching Cloud release yet and we need Cloud Gateway)
 - Spring Security (OAuth2 resource server), Spring Data JPA, Spring for Apache Kafka
-- PostgreSQL 16, Flyway, Redis 7
+- PostgreSQL 18, Flyway, Redis 8
 - MapStruct 1.6.3, Lombok, Bean Validation, springdoc-openapi 3.1.1
 - Maven 3.9.16 via the wrapper (`backend/mvnw`), multi-module, all versions in the parent POM
 
@@ -149,7 +149,7 @@ business logic and no service-specific entities.**
 
 **Platform**
 - Docker + Docker Compose (dev and production profiles)
-- Kafka in KRaft mode (no ZooKeeper)
+- Kafka 4 in KRaft mode (no ZooKeeper)
 - OpenTelemetry Collector, Tempo, Prometheus, Grafana, Loki
 - GitHub Actions CI: build → unit tests → Testcontainers integration tests → Trivy scan → image push
 
@@ -226,14 +226,16 @@ Accounts and credentials needed before the phases that use them:
 
 | Needed for | What to obtain | Phase |
 |---|---|---|
-| Outbound email | Gmail/Workspace account with **2FA enabled** and an **App Password** (16 chars), or Workspace SMTP relay credentials | 5 |
+| Outbound email (dev) | Gmail account with **2FA enabled** and an **App Password** (16 chars) | 5 |
+| Outbound email (prod) | **AWS SES**: a verified sending domain, production access (out of the sandbox), and SES **SMTP credentials** | 16 |
 | M-Pesa | Safaricom Daraja **sandbox** app: consumer key, consumer secret, shortcode, passkey. Production shortcode later. | 10 |
 | Public callbacks | A tunnel (`cloudflared` or `ngrok`) so Daraja can reach your local callback URL | 10 |
 | Deployment | A VPS (4 vCPU / 8 GB RAM minimum), a domain name, DNS access | 15 |
 
-Local dev sends mail to a **Mailpit** container (an SMTP sink with a web UI) so no real mail is
-sent during development; production points the same SMTP client at Gmail/Workspace. One code path,
-different config.
+Mail is real in every environment: development sends through **Gmail**, production through **AWS
+SES**'s SMTP interface. One SMTP client, one code path, different config. Browser end-to-end runs
+never send mail: the e2e overlay switches notification-service to *capture* mode, which writes each
+message to a file inside its container for the test to read.
 
 ---
 
@@ -262,7 +264,6 @@ make verify                     # full build: format, tests, integration tests, 
 |---|---|
 | http://localhost:8080 | **API gateway — the only way in** (live now) |
 | http://localhost:8080/api/v1/pricing/resolve | Price a basket, with the full tax and discount breakdown |
-| http://localhost:8025 | Mailpit — catches all dev email, OTP codes land here (**live now**) |
 | localhost:5432 | PostgreSQL (**live now**) |
 | localhost:29092 | Kafka, from the host (`kafka:9092` inside the network) (**live now**) |
 | localhost:6379 | Redis (**live now**) |
@@ -307,12 +308,13 @@ REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_PASSWORD=
 
-# --- SMTP (Mailpit in dev, Gmail/Workspace in prod) ---
-SMTP_HOST=mailpit
-SMTP_PORT=1025
+# --- SMTP (Gmail in dev, AWS SES in prod; both port 587 with STARTTLS) ---
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
 SMTP_USERNAME=
 SMTP_PASSWORD=
-SMTP_STARTTLS=false
+SMTP_AUTH=true
+SMTP_STARTTLS=true
 MAIL_FROM="Supermarket POS <no-reply@example.com>"
 
 # --- OTP policy ---
@@ -470,7 +472,7 @@ error rate, p95 latency, low disk and failed payment callbacks.
 ## Deployment
 
 **Development** — `docker-compose.yml` + `docker-compose.dev.yml`: hot reload via Spring DevTools,
-debug ports exposed, Mailpit, seed data.
+debug ports exposed, seed data; mail through Gmail.
 
 **Production** — `docker-compose.prod.yml`: multi-stage distroless images built by CI and pinned by
 digest, Traefik terminating TLS with automatic Let's Encrypt certificates, Docker secrets rather

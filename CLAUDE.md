@@ -183,7 +183,8 @@ Rules:
   areas, high contrast, no hover-only affordances. The design system's buttons and inputs are 44px
   by default; the smaller sizes are for dense back-office tables only.
 - Frontend checks: `make web-check` (lint, typecheck, Vitest, build) and `make web-e2e` (Playwright
-  against the running stack, email routed to Mailpit for the run).
+  against the running stack; notification-service captures mail to files for the run instead of
+  sending it, and the tests read the codes with `docker exec`).
 
 ## Testing
 
@@ -405,6 +406,13 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   common-lib gives listeners platform threads; do not remove it. To diagnose a silent hang, a
   plain thread dump hides virtual threads - use `jcmd <pid> Thread.dump_to_file`, which the
   runtime image lacks, so install a JDK into the running container temporarily.
+- **Infrastructure images follow the current stable line** (Postgres 18, Redis 8, Kafka 4; Confluent
+  8 for Testcontainers' Kafka). Check Docker Hub before pinning. There is no local SMTP sink: mail
+  goes through Gmail in development and AWS SES in production, and e2e runs use
+  `MAIL_TRANSPORT=capture`.
+- **Postgres 18 moved its data directory.** The volume mounts at `/var/lib/postgresql`, not
+  `.../data` - the 18 entrypoint refuses the old path. A major-version bump never reuses the
+  previous major's volume: dump and restore, or start fresh.
 - **A full host disk looks like a Docker bug.** Docker Desktop keeps its VM disk on `/`, and every
   image rebuild leaves build cache behind; at 100% the daemon stops answering and Testcontainers
   reports "Could not find a valid Docker environment". Check `df -h /` first, and
