@@ -55,6 +55,9 @@ import com.pos.reporting.domain.policy.BusinessDates;
 @ActiveProfiles("test")
 public abstract class ReportingTestBase {
 
+    // Never closed on purpose: it lives for the whole JVM and Testcontainers' reaper removes it.
+
+    @SuppressWarnings("resource")
     static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer("postgres:16-alpine")
                     .withDatabaseName("pos")

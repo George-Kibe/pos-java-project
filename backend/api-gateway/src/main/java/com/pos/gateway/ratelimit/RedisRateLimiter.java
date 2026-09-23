@@ -64,13 +64,17 @@ public class RedisRateLimiter {
             """;
 
     private final StringRedisTemplate redis;
-    private final RedisScript<List> script;
+    private final RedisScript<List<Long>> script;
 
     public RedisRateLimiter(StringRedisTemplate redis) {
         this.redis = redis;
-        DefaultRedisScript<List> redisScript = new DefaultRedisScript<>();
+        DefaultRedisScript<List<Long>> redisScript = new DefaultRedisScript<>();
         redisScript.setScriptText(SCRIPT);
-        redisScript.setResultType(List.class);
+        // A class literal cannot carry type arguments; the script returns integers, which Redis
+        // hands back as Longs.
+        @SuppressWarnings("unchecked")
+        Class<List<Long>> resultType = (Class<List<Long>>) (Class<?>) List.class;
+        redisScript.setResultType(resultType);
         this.script = redisScript;
     }
 
@@ -93,18 +97,16 @@ public class RedisRateLimiter {
         long ttl = window.toMillis() * 2;
 
         try {
-            @SuppressWarnings("unchecked")
             List<Long> result =
                     script.getResultType() == null
                             ? null
-                            : (List<Long>)
-                                    redis.execute(
-                                            script,
-                                            List.of(key),
-                                            String.valueOf(capacity),
-                                            String.valueOf(ratePerMs),
-                                            String.valueOf(System.currentTimeMillis()),
-                                            String.valueOf(ttl));
+                            : redis.execute(
+                                    script,
+                                    List.of(key),
+                                    String.valueOf(capacity),
+                                    String.valueOf(ratePerMs),
+                                    String.valueOf(System.currentTimeMillis()),
+                                    String.valueOf(ttl));
 
             if (result == null || result.size() < 3) {
                 return Decision.allowedWith(capacity);

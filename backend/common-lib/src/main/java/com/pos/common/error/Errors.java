@@ -12,6 +12,8 @@ public final class Errors {
 
     /** The thing does not exist, or the caller may not know that it does. */
     public static class NotFoundException extends ApiException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         public NotFoundException(String code, String message) {
             super(HttpStatus.NOT_FOUND, code, message);
         }
@@ -24,6 +26,8 @@ public final class Errors {
 
     /** The request conflicts with current state: duplicate key, concurrent edit, wrong status. */
     public static class ConflictException extends ApiException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         public ConflictException(String code, String message) {
             super(HttpStatus.CONFLICT, code, message);
         }
@@ -35,6 +39,8 @@ public final class Errors {
 
     /** Authenticated, but not permitted. */
     public static class ForbiddenException extends ApiException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         public ForbiddenException(String code, String message) {
             super(HttpStatus.FORBIDDEN, code, message);
         }
@@ -42,6 +48,8 @@ public final class Errors {
 
     /** Not authenticated, or credentials are no longer valid. */
     public static class UnauthorizedException extends ApiException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         public UnauthorizedException(String code, String message) {
             super(HttpStatus.UNAUTHORIZED, code, message);
         }
@@ -49,6 +57,8 @@ public final class Errors {
 
     /** Syntactically valid but semantically wrong for this domain. */
     public static class BadRequestException extends ApiException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         public BadRequestException(String code, String message) {
             super(HttpStatus.BAD_REQUEST, code, message);
         }
@@ -59,17 +69,21 @@ public final class Errors {
      * returns window, closing a shift with an unresolved variance.
      */
     public static class BusinessRuleException extends ApiException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         public BusinessRuleException(String code, String message) {
-            super(HttpStatus.UNPROCESSABLE_ENTITY, code, message);
+            super(HttpStatus.UNPROCESSABLE_CONTENT, code, message);
         }
 
         public BusinessRuleException(String code, String message, Map<String, Object> details) {
-            super(HttpStatus.UNPROCESSABLE_ENTITY, code, message, details);
+            super(HttpStatus.UNPROCESSABLE_CONTENT, code, message, details);
         }
     }
 
     /** Rate limited. */
     public static class TooManyRequestsException extends ApiException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         public TooManyRequestsException(String code, String message) {
             super(HttpStatus.TOO_MANY_REQUESTS, code, message);
         }
@@ -83,6 +97,8 @@ public final class Errors {
      * the basket, not fail the sale ambiguously.
      */
     public static class ServiceUnavailableException extends ApiException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         public ServiceUnavailableException(String code, String message) {
             super(HttpStatus.SERVICE_UNAVAILABLE, code, message);
         }

@@ -208,6 +208,8 @@ public class DarajaClient {
 
     /** Daraja refused the token itself, before looking at the request. */
     private static final class TokenRejected extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         TokenRejected(String message) {
             super(message);
         }

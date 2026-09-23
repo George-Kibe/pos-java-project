@@ -93,9 +93,11 @@ public class GatewaySecurityConfig {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
         decoder.setJwtValidator(
                 JwtValidators.createDefaultWithValidators(
-                        new org.springframework.security.oauth2.jwt.JwtTimestampValidator(
-                                Duration.ofSeconds(30)),
-                        new org.springframework.security.oauth2.jwt.JwtIssuerValidator(issuer)));
+                        java.util.List.of(
+                                new org.springframework.security.oauth2.jwt.JwtTimestampValidator(
+                                        Duration.ofSeconds(30)),
+                                new org.springframework.security.oauth2.jwt.JwtIssuerValidator(
+                                        issuer))));
         return decoder;
     }
 

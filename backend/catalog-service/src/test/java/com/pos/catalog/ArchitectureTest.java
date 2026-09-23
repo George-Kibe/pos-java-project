@@ -43,7 +43,6 @@ class ArchitectureTest {
                     .mayOnlyBeAccessedByLayers("Service", "Api");
 
     @ArchTest
-    @SuppressWarnings("unused")
     static final ArchRule thePricingEngineStaysPure =
             noClasses()
                     .that()

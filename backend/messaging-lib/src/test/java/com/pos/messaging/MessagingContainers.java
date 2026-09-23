@@ -15,6 +15,9 @@ final class MessagingContainers {
 
     private MessagingContainers() {}
 
+    // Never closed on purpose: it lives for the whole JVM and Testcontainers' reaper removes it.
+
+    @SuppressWarnings("resource")
     static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer("postgres:16-alpine")
                     .withDatabaseName("pos")

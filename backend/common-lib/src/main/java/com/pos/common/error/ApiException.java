@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
  * never contain a secret, a token, or another user's data.
  */
 public abstract class ApiException extends RuntimeException {
+    @java.io.Serial private static final long serialVersionUID = 1L;
 
     private final HttpStatus status;
     private final String code;

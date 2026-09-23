@@ -8,6 +8,7 @@ package com.pos.payment.client.daraja;
  * an STK Push "no answer" includes "the push may have gone out", so it is never retried blindly.
  */
 public class DarajaException extends RuntimeException {
+    @java.io.Serial private static final long serialVersionUID = 1L;
 
     public enum Kind {
         REJECTED,

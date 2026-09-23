@@ -31,7 +31,6 @@ import com.pos.sales.domain.SaleStatus;
 import com.pos.sales.domain.TillSession;
 import com.pos.sales.domain.totals.TaxClassTotal;
 import com.pos.sales.repository.PriceOverrideRepository;
-import com.pos.sales.repository.SaleRepository;
 import com.pos.sales.service.CartService;
 import com.pos.sales.service.CheckoutService;
 import com.pos.sales.service.PaymentTimeoutSweeper;
@@ -54,7 +53,6 @@ class CheckoutFlowIT extends SalesTestBase {
     @Autowired private CheckoutService checkout;
     @Autowired private ReceiptService receipts;
     @Autowired private PaymentTimeoutSweeper sweeper;
-    @Autowired private SaleRepository sales;
     @Autowired private PriceOverrideRepository overrides;
 
     // --- the mixed basket -------------------------------------------------------

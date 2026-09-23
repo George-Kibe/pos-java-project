@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.pos.common.error.Errors;
 import com.pos.common.security.AuthenticatedUser;
 import com.pos.events.payments.PaymentMethod;
-import com.pos.sales.client.InventoryClient;
 import com.pos.sales.domain.Cart;
 import com.pos.sales.domain.CartLine;
 import com.pos.sales.domain.CartStatus;
@@ -61,7 +60,6 @@ public class CheckoutService {
     private final ReceiptNumberService receiptNumbers;
     private final ReceiptService receipts;
     private final SalesEventPublisher events;
-    private final InventoryClient inventory;
 
     /** One tender at checkout. */
     public record Tender(

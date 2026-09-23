@@ -222,11 +222,12 @@ class GatewayIT extends GatewayTestBase {
         }
 
         assertThat(allowed).isEqualTo(10);
-        assertThat(limited).isNotNull();
-        assertThat(json(limited).get("code").asString()).isEqualTo("rate_limit.exceeded");
+        ResponseEntity<String> refused =
+                java.util.Objects.requireNonNull(limited, "the eleventh login should be refused");
+        assertThat(json(refused).get("code").asString()).isEqualTo("rate_limit.exceeded");
         // Without Retry-After a client retries immediately and makes the overload worse.
-        assertThat(limited.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isNotNull();
-        assertThat(limited.getHeaders().getFirst("X-RateLimit-Remaining")).isEqualTo("0");
+        assertThat(refused.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isNotNull();
+        assertThat(refused.getHeaders().getFirst("X-RateLimit-Remaining")).isEqualTo("0");
     }
 
     @Test

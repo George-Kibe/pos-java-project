@@ -49,6 +49,8 @@ public abstract class AuthTestBase {
      * built for the first one - every request then fails against a dead port, with a 500 that says
      * nothing about why. Ryuk removes this container when the JVM exits.
      */
+    // Never closed on purpose: it lives for the whole JVM and Testcontainers' reaper removes it.
+    @SuppressWarnings("resource")
     static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer("postgres:16-alpine")
                     .withDatabaseName("pos")

@@ -1,7 +1,5 @@
 package com.pos.sales.messaging;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,8 +25,6 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class PaymentEventListener {
-
-    private static final Logger log = LoggerFactory.getLogger(PaymentEventListener.class);
 
     private static final String AUTHORIZED_CONSUMER = "sales.settle-on-payment-authorized";
     private static final String FAILED_CONSUMER = "sales.compensate-on-payment-failed";

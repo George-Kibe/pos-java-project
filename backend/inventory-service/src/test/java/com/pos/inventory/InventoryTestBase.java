@@ -35,6 +35,8 @@ import com.pos.inventory.repository.StockMovementRepository;
 public abstract class InventoryTestBase {
 
     /** Started once for the JVM; see the note in the auth test base about @Container. */
+    // Never closed on purpose: it lives for the whole JVM and Testcontainers' reaper removes it.
+    @SuppressWarnings("resource")
     static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer("postgres:16-alpine")
                     .withDatabaseName("pos")

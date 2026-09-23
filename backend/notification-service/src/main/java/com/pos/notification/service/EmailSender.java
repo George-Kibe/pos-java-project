@@ -18,6 +18,8 @@ public interface EmailSender {
 
     /** Thrown when delivery fails. Unchecked, so it propagates out of a Kafka listener. */
     class EmailDeliveryException extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
         public EmailDeliveryException(String message, Throwable cause) {
             super(message, cause);
         }

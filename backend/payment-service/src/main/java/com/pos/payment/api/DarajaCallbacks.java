@@ -34,7 +34,6 @@ final class DarajaCallbacks {
             String resultDesc,
             String transactionId) {}
 
-    @SuppressWarnings("unchecked")
     static MpesaTransactionService.StkResult stk(Map<String, Object> body) {
         Map<String, Object> callback = map(map(body, "Body"), "stkCallback");
         String checkoutRequestId = text(callback, "CheckoutRequestID");

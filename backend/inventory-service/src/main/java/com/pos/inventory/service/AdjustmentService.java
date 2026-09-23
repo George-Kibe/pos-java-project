@@ -42,7 +42,6 @@ public class AdjustmentService {
     private final StockAdjustmentRepository adjustments;
     private final StockService stock;
     private final BatchConsumer batchConsumer;
-    private final StockLedgerService ledger;
     private final OutboxRecorder outbox;
 
     /**

@@ -331,7 +331,7 @@ class CatalogApiIT extends CatalogTestBase {
                                 .with(withPermissions("product:manage"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code", is("product.weight_needs_decimal_uom")));
     }
 }

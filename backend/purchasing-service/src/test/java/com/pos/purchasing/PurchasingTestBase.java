@@ -37,6 +37,8 @@ import com.pos.purchasing.repository.SupplierRepository;
 public abstract class PurchasingTestBase {
 
     /** Started once for the JVM; @Container would stop it while Spring still hands out its port. */
+    // Never closed on purpose: it lives for the whole JVM and Testcontainers' reaper removes it.
+    @SuppressWarnings("resource")
     static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer("postgres:16-alpine")
                     .withDatabaseName("pos")

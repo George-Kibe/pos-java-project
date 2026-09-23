@@ -24,7 +24,7 @@ class ErrorsTest {
         assertThat(new Errors.BadRequestException("p.bad", "x").status())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(new Errors.BusinessRuleException("p.rule", "x").status())
-                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(new Errors.TooManyRequestsException("p.rate", "x").status())
                 .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }

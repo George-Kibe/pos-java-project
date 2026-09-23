@@ -39,6 +39,9 @@ import com.pos.events.EventJson;
 @ActiveProfiles("test")
 public abstract class SalesTestBase {
 
+    // Never closed on purpose: it lives for the whole JVM and Testcontainers' reaper removes it.
+
+    @SuppressWarnings("resource")
     static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer("postgres:16-alpine")
                     .withDatabaseName("pos")

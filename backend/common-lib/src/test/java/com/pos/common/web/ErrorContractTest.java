@@ -134,7 +134,7 @@ class ErrorContractTest {
     @Test
     void businessRuleFailuresReturn422WithTheirContext() throws Exception {
         mockMvc.perform(get("/api/v1/probe/business-rule").with(cashier()))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code", is("sale.outside_returns_window")))
                 .andExpect(jsonPath("$.daysSinceSale", is(45)))
                 .andExpect(jsonPath("$.windowDays", is(30)));
