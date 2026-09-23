@@ -253,7 +253,15 @@ make env-sync                   # an existing .env: add secrets a later phase in
 make up                         # infrastructure + services; gateway on :8080
 make ps                         # container status
 make verify                     # full build: format, tests, integration tests, coverage
+make demo-seed                  # demo data through the APIs: 5 branches, 20 staff, products, suppliers, sales...
+make demo-clear                 # remove the demo data again, and nothing else (repeatable)
+make postman                    # regenerate the Postman/Insomnia collection in postman/
+make api-smoke                  # send every GET in the collection to the stack; fails on a 5xx
 ```
+
+Demo sign-in: any `...@demo.pos.local` user with `Demo-Password-2026` (see
+[scripts/demo/README.md](scripts/demo/README.md)). The API collection and how to import it are in
+[postman/README.md](postman/README.md).
 
 `make infra-up` brings up only the infrastructure, for running a service from your IDE against it.
 

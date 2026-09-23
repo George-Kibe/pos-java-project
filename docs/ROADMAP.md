@@ -1047,6 +1047,26 @@ phase closed; this is what changed afterwards.
 
 ---
 
+## Demo data and API collection (after the infrastructure refresh) ✅
+
+- `make demo-seed` / `make demo-clear`: demo data through the public APIs (5 branches, 20 staff,
+  20 products, 20 suppliers with orders, receipts and invoices, 20 customers, shifts and sales), and
+  a clear that removes exactly what the seed made - proven repeatable by comparing row counts.
+- `make postman`: a Postman/Insomnia collection of all 177 endpoints, generated from the services'
+  specs; `make api-smoke` sends every GET to the stack and fails on any server error.
+
+**Bugs found by the demo data, all with regression tests that fail without the fix:**
+- **Only one branch could ever trade**: receipt numbers restart at each branch, but were unique
+  across the business, so the second branch's first sale was refused.
+- **Four back-office reads answered 500** once real rows existed - products (list and single),
+  adjustments, supplier invoices - each mapping a lazy association after its transaction closed.
+  Their tests had only ever listed empty tables.
+- **A request in the wrong format was a 500** rather than a 415 (or a wrong method, a 405): the
+  shared error handler swallowed the status Spring had already given it.
+- **The gateway served no service's API spec**, although its Swagger UI and the docs said it did.
+
+---
+
 ## Phase 14 — Frontend cashier lane
 
 **Goal:** a cashier can work a full shift, including through a network outage.

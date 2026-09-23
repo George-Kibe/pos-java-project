@@ -426,6 +426,22 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   the extension's bundled `org.eclipse.jdt.core.compiler.batch` jar over a module with those prefs.
 - **OpenPDF's `openpdf` 2.x artifact is the deprecated legacy API** (`com.lowagie.*`, every class
   deprecated). Use `openpdf-core-modern` (`org.openpdf.*`), same version.
+- **A list tested against an empty table proves nothing about its mapping.** Four reads answered
+  500 the first time real rows existed (`GET /products`, `/products/{id}`, `/adjustments`,
+  `/supplier-invoices`): each response read a lazy association after the transaction had closed,
+  and every test listed an empty table, so the mapping never ran. A read test creates the record
+  first, then reads it back through the list and the single endpoint. `make api-smoke` sends every
+  GET in the collection against seeded data and fails on a 5xx.
+- **Numbers that restart per branch are unique per branch.** Receipt numbers count from R-000001 at
+  each branch, but V1 made them unique across the business, so the second branch's first sale was
+  refused - invisible while every test traded at one branch. Unique on `(branch_id, number)`, and a
+  lookup by number either names the branch or searches only the caller's own.
+- **The catch-all error handler keeps a framework exception's status.** Spring's
+  `HttpMediaTypeNotSupportedException` (415), `HttpRequestMethodNotSupportedException` (405) and
+  their kind implement `ErrorResponse`; turning them into 500 told clients the server broke when
+  they had sent the wrong thing.
+- **Every service's OpenAPI spec is routed at the gateway**: `/v3/api-docs/<service>`, listed in
+  the gateway's Swagger UI and read by `make postman`. A new service needs its route there too.
 - **ArchUnit's `layeredArchitecture()` fails on an empty layer.** A service with no `repository`
   package (reporting writes with `JdbcClient` from its services) must leave that layer out of its
   rules, not create an empty package to satisfy it.
