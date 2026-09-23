@@ -3,10 +3,10 @@ package com.pos.notification.service;
 /**
  * Sends a rendered message.
  *
- * <p>An interface with one implementation today, which earns its place: the provider is the part of
- * this service most likely to change. Local development uses an SMTP sink, production uses Gmail or
- * Workspace, and a transactional API such as Resend or SES would be a second implementation rather
- * than a rewrite of everything that calls this.
+ * <p>The provider is the part of this service most likely to change. SMTP serves development
+ * (Gmail) and production (AWS SES's SMTP interface) alike; {@link CapturingEmailSender} stands in
+ * for browser test runs; and a provider's own API would be another implementation rather than a
+ * rewrite of everything that calls this.
  */
 public interface EmailSender {
 

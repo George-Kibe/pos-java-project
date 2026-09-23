@@ -25,4 +25,21 @@ public class NotificationProperties {
      * renders arbitrary templates with supplied values and belongs only on a developer's machine.
      */
     private boolean templatePreviewEnabled = false;
+
+    /** How mail leaves this service. SMTP unless a test run says otherwise. */
+    private MailTransport mailTransport = MailTransport.SMTP;
+
+    /** Where {@link MailTransport#CAPTURE} writes messages; inside the container, never shared. */
+    private String captureDirectory = "/tmp/pos-captured-mail";
+
+    public enum MailTransport {
+        /** Send through the configured SMTP server: Gmail in development, AWS SES in production. */
+        SMTP,
+        /**
+         * Send nothing: write each message to a file in {@link #captureDirectory}. For browser
+         * end-to-end runs, which register throwaway accounts whose codes must not be emailed to
+         * made-up addresses, and read the code back with {@code docker exec}.
+         */
+        CAPTURE
+    }
 }

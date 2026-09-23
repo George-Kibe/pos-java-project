@@ -58,17 +58,18 @@ spring:
       concurrency: 3
 
   mail:
-    # Mailpit locally, Gmail or Workspace in production. Same code path either way.
+    # Gmail in development, AWS SES's SMTP interface in production. Same code path either way;
+    # the defaults are the submission settings both use.
     host: ${SMTP_HOST:localhost}
-    port: ${SMTP_PORT:1025}
+    port: ${SMTP_PORT:587}
     username: ${SMTP_USERNAME:}
     password: ${SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
-          auth: ${SMTP_AUTH:false}
+          auth: ${SMTP_AUTH:true}
           starttls:
-            enable: ${SMTP_STARTTLS:false}
+            enable: ${SMTP_STARTTLS:true}
           # Bounded, so a hanging provider fails and retries instead of holding the consumer.
           connectiontimeout: 5000
           timeout: 10000
@@ -104,6 +105,10 @@ pos:
     support-email: ${SUPPORT_EMAIL:support@example.com}
     app-base-url: ${APP_BASE_URL:http://localhost:3000}
     mail-from: ${MAIL_FROM:Supermarket POS <no-reply@example.com>}
+    # smtp, or capture: write mail to files in the container instead of sending it. Only the
+    # browser e2e overlay sets capture; nobody receives anything while it is on.
+    mail-transport: ${MAIL_TRANSPORT:smtp}
+    capture-directory: ${MAIL_CAPTURE_DIRECTORY:/tmp/pos-captured-mail}
     # Renders templates on demand; a developer convenience, not a production endpoint. Still
     # requires authentication when switched on.
     template-preview-enabled: ${TEMPLATE_PREVIEW_ENABLED:false}

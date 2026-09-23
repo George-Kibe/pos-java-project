@@ -15,10 +15,9 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 /**
  * Sends over SMTP.
  *
- * <p>The same code serves both environments: locally it points at Mailpit, which accepts everything
- * and shows it in a browser so no real mail leaves the machine, and in production at Gmail or
- * Workspace. Only configuration differs, so the path exercised in development is the path that runs
- * in production.
+ * <p>The same code serves both environments: Gmail in development, AWS SES's SMTP interface in
+ * production. Only configuration differs, so the path exercised in development is the path that
+ * runs in production.
  */
 public class SmtpEmailSender implements EmailSender {
 
