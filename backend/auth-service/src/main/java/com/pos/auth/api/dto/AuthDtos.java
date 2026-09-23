@@ -76,7 +76,14 @@ public final class AuthDtos {
             Set<String> roles,
             Set<String> permissions,
             Set<UUID> branchIds,
-            boolean mustChangePassword) {}
+            boolean mustChangePassword,
+            /**
+             * The caller's own branches, named - what a branch switcher shows. A cashier holds no
+             * {@code branch:view} and could not look the names up otherwise.
+             */
+            java.util.List<BranchSummary> branches) {}
+
+    public record BranchSummary(UUID id, String code, String name) {}
 
     /**
      * Deliberately vague. Used for register, resend and forgot-password, all of which must look the

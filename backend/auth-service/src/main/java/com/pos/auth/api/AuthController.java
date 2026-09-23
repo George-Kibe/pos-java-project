@@ -147,6 +147,14 @@ public class AuthController {
                 user.roleCodes(),
                 user.permissionCodes(),
                 user.branchIds(),
-                user.isMustChangePassword());
+                user.isMustChangePassword(),
+                user.getBranches().stream()
+                        .filter(com.pos.auth.domain.Branch::isActive)
+                        .sorted(java.util.Comparator.comparing(com.pos.auth.domain.Branch::getName))
+                        .map(
+                                branch ->
+                                        new AuthDtos.BranchSummary(
+                                                branch.getId(), branch.getCode(), branch.getName()))
+                        .toList());
     }
 }

@@ -147,6 +147,45 @@ class AdminManagementIT extends AuthTestBase {
     }
 
     @Test
+    @DisplayName("a cashier's own branches come named on /me, without branch:view")
+    void aCashierSeesTheirOwnBranchesByName() {
+        String admin = adminAccessToken();
+        String email = "branches-" + System.nanoTime() + "@pos.test";
+        String password = "TemporaryPassword1";
+        String userId =
+                json(post(
+                                "/api/v1/users",
+                                Map.of(
+                                        "email",
+                                        email,
+                                        "temporaryPassword",
+                                        password,
+                                        "fullName",
+                                        "Branch Cashier",
+                                        "roles",
+                                        List.of("CASHIER")),
+                                admin))
+                        .get("id")
+                        .asString();
+        JsonNode branch = json(get("/api/v1/branches", admin)).get(0);
+        put(
+                "/api/v1/users/" + userId + "/branches",
+                Map.of("branchIds", List.of(branch.get("id").asString())),
+                admin);
+
+        String token =
+                json(post("/api/v1/auth/login", Map.of("email", email, "password", password)))
+                        .get("accessToken")
+                        .asString();
+        JsonNode me = json(get("/api/v1/auth/me", token));
+
+        assertThat(me.get("branches")).hasSize(1);
+        assertThat(me.get("branches").get(0).get("name").asString())
+                .isEqualTo(branch.get("name").asString());
+        assertThat(get("/api/v1/branches", token).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     @DisplayName("suspending a user stops them signing in and ends their sessions")
     void suspendingAUserEndsAccess() {
         String admin = adminAccessToken();
