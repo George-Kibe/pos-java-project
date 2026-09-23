@@ -1,9 +1,9 @@
-# Overlay for browser end-to-end runs (`make web-e2e`).
+# Overlay for browser end-to-end runs (`make web-e2e`) and demo seeding (`make demo-seed`).
 #
-# The run registers throwaway accounts, and their codes must not be emailed to made-up addresses
+# Both create throwaway accounts, and their codes must not be emailed to made-up addresses
 # through the real provider. For the run, notification-service writes each message to a file inside
 # its own container instead of sending it; the test reads the code back with `docker exec`.
-# `make web-e2e` puts notification-service back as configured afterwards.
+# Both targets put notification-service back as configured afterwards.
 services:
   notification-service:
     environment:

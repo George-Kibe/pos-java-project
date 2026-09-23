@@ -16,7 +16,7 @@ INFRA_SERVICES := postgres kafka redis
 .DEFAULT_GOAL := help
 .PHONY: help env env-sync doctor infra-up infra-down infra-restart infra-logs topics ps logs \
         up down images service-logs \
-        build fmt test it verify web-check web-e2e psql redis-cli kafka-topics kafka-topics-sync clean nuke \
+        build fmt test it verify web-check web-e2e demo-seed demo-clear postman api-smoke psql redis-cli kafka-topics kafka-topics-sync clean nuke \
 		check-env
 
 ## ---------------------------------------------------------------------------
@@ -145,6 +145,33 @@ web-e2e: check-env ## Web app: browser end-to-end run against the running stack 
 		(cd frontend/web && npm run e2e); status=$$?; \
 		$(DC_ALL) up -d --wait notification-service api-gateway; \
 		exit $$status
+
+## ---------------------------------------------------------------------------
+## API collection
+## ---------------------------------------------------------------------------
+postman: ## Regenerate the Postman collection (postman/) from the running services' OpenAPI specs
+	python3 scripts/postman/generate.py --base-url http://localhost:$${GATEWAY_PORT:-8080} --out postman
+
+api-smoke: check-env ## Send every GET in the collection to the stack; fails on any 5xx (needs demo-seed)
+	@set -a; . ./$(ENV_FILE); set +a; python3 scripts/postman/smoke.py
+
+## ---------------------------------------------------------------------------
+## Demo data
+## ---------------------------------------------------------------------------
+demo-seed: check-env ## Seed demo data through the APIs (repeatable after demo-clear; no mail is sent)
+	@# Seeding creates staff and customers, whose welcome emails must not go out through Gmail, and
+	@# signs in dozens of times from one address: the same overlay as web-e2e covers both. Both
+	@# services are put back as configured afterwards, pass or fail.
+	$(DC_ALL) -f infra/compose/docker-compose.e2e.yml up -d --wait notification-service api-gateway
+	@set -a; . ./$(ENV_FILE); set +a; \
+		python3 scripts/demo/seed.py --env-out postman/local.postman_environment.json; status=$$?; \
+		$(DC_ALL) up -d --wait notification-service api-gateway; \
+		exit $$status
+
+demo-clear: check-env ## Remove the demo data (DEMO codes, @demo.pos.local) and nothing else
+	@set -a; . ./$(ENV_FILE); set +a; \
+		$(DC) exec -T -e PGPASSWORD="$$POSTGRES_SUPERUSER_PASSWORD" postgres \
+		psql -h localhost -U "$$POSTGRES_SUPERUSER" -d "$$POSTGRES_DB" -q < scripts/demo/clear.sql
 
 ## ---------------------------------------------------------------------------
 ## Shells and inspection
