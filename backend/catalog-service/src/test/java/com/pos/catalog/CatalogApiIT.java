@@ -121,16 +121,38 @@ class CatalogApiIT extends CatalogTestBase {
                                 "barcodes",
                                 List.of("5060001111111")));
 
+        String created =
+                mockMvc.perform(
+                                post("/api/v1/products")
+                                        .with(withPermissions("product:manage", "product:view"))
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(body))
+                        .andExpect(status().isCreated())
+                        .andExpect(header().exists("Location"))
+                        // SKUs are normalised, so a lookup by SKU is unambiguous.
+                        .andExpect(jsonPath("$.sku", is("API-1")))
+                        .andExpect(jsonPath("$.barcodes", hasSize(1)))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        String id = com.jayway.jsonpath.JsonPath.read(created, "$.id");
+
+        // Read back through every read path. Each once answered 500: the response maps the
+        // category and barcodes after the transaction has closed, and the list tests ran against
+        // an empty table, so the mapping never ran.
+        mockMvc.perform(get("/api/v1/products/" + id).with(withPermissions("product:view")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.barcodes[0]", is("5060001111111")))
+                .andExpect(jsonPath("$.categoryName", is("Grocery")));
+        mockMvc.perform(get("/api/v1/products").with(withPermissions("product:view")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.sku == 'API-1')].barcodes[0]", hasSize(1)));
         mockMvc.perform(
-                        post("/api/v1/products")
-                                .with(withPermissions("product:manage", "product:view"))
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(body))
-                .andExpect(status().isCreated())
-                .andExpect(header().exists("Location"))
-                // SKUs are normalised, so a lookup by SKU is unambiguous.
-                .andExpect(jsonPath("$.sku", is("API-1")))
-                .andExpect(jsonPath("$.barcodes", hasSize(1)));
+                        get("/api/v1/products")
+                                .param("query", "api-1")
+                                .with(withPermissions("product:view")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].barcodes", hasSize(1)));
     }
 
     @Test

@@ -93,6 +93,8 @@ public class Product extends BaseEntity {
             cascade = CascadeType.ALL,
             fetch = FetchType.LAZY,
             orphanRemoval = true)
+    // Fetched for a whole page of products in one query, not one query per product.
+    @org.hibernate.annotations.BatchSize(size = 100)
     private List<ProductBarcode> barcodes = new ArrayList<>();
 
     public Money basePriceAsMoney() {

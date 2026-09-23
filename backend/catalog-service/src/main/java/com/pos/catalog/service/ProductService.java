@@ -37,19 +37,33 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<Product> search(String query, UUID categoryId, Pageable pageable) {
+        Page<Product> page;
         if (categoryId != null) {
-            return products.findByCategoryId(categoryId, pageable);
+            page = products.findByCategoryId(categoryId, pageable);
+        } else if (query == null || query.isBlank()) {
+            page = products.findAll(pageable);
+        } else {
+            page = products.search(query.trim(), pageable);
         }
-        if (query == null || query.isBlank()) {
-            return products.findAll(pageable);
-        }
-        return products.search(query.trim(), pageable);
+        page.forEach(ProductService::loadForResponse);
+        return page;
     }
 
     @Transactional(readOnly = true)
     public Product get(UUID id) {
-        return products.findWithDetailsById(id)
-                .orElseThrow(() -> Errors.NotFoundException.of("Product", id));
+        Product product =
+                products.findWithDetailsById(id)
+                        .orElseThrow(() -> Errors.NotFoundException.of("Product", id));
+        loadForResponse(product);
+        return product;
+    }
+
+    /**
+     * Loads, inside the transaction, what a product response reads after it: the controller maps
+     * with no session open, and a lazy collection touched there is a 500.
+     */
+    private static void loadForResponse(Product product) {
+        org.hibernate.Hibernate.initialize(product.getBarcodes());
     }
 
     @Transactional
