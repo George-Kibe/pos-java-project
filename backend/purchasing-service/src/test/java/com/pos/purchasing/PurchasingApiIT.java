@@ -326,6 +326,16 @@ class PurchasingApiIT extends PurchasingTestBase {
                 .andExpect(jsonPath("$.variances[0].type", is("PRICE_VARIANCE")))
                 .andExpect(jsonPath("$.variances[0].amountEffect", is(500.0)))
                 .andExpect(jsonPath("$.justifiedTotal", is(9500.0)));
+
+        // Read back in the unfiltered list. It once answered 500: that query had no fetch graph,
+        // the response reads the supplier's name after the transaction has closed, and the list
+        // test ran against an empty table.
+        mockMvc.perform(get("/api/v1/supplier-invoices").with(at(BRANCH, "supplier-invoice:view")))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath(
+                                "$.content[?(@.invoiceNumber == 'INV-API-1')].supplierName",
+                                hasSize(1)));
     }
 
     @Test

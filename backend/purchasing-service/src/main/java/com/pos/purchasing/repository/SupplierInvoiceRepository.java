@@ -35,5 +35,12 @@ public interface SupplierInvoiceRepository extends JpaRepository<SupplierInvoice
             attributePaths = {"supplier", "purchaseOrder", "grn"})
     Page<SupplierInvoice> findByMatchStatus(InvoiceMatchStatus status, Pageable pageable);
 
+    /** The unfiltered list needs the same graph: its response reads the supplier's name. */
+    @Override
+    @EntityGraph(
+            type = EntityGraphType.LOAD,
+            attributePaths = {"supplier", "purchaseOrder", "grn"})
+    Page<SupplierInvoice> findAll(Pageable pageable);
+
     List<SupplierInvoice> findByGrnId(UUID grnId);
 }
