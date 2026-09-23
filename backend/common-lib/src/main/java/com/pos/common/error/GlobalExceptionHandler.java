@@ -16,6 +16,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -213,6 +214,20 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex) {
+        // Spring's own web exceptions - wrong method, wrong content type, missing header - know
+        // their status. Answering them with a 500 tells a client the server broke when the client
+        // sent something this endpoint does not take, and invites it to retry forever.
+        if (ex instanceof ErrorResponse framework) {
+            HttpStatus status = HttpStatus.resolve(framework.getStatusCode().value());
+            if (status != null && status.is4xxClientError()) {
+                log.warn("{} -> {}", status.value(), ex.getMessage());
+                String detail = framework.getBody().getDetail();
+                return problem(
+                        status,
+                        "request." + status.name().toLowerCase(java.util.Locale.ROOT),
+                        detail != null ? detail : status.getReasonPhrase());
+            }
+        }
         // Full detail to the log, nothing to the caller.
         log.error("Unhandled exception", ex);
         return problem(

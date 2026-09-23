@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -129,6 +130,22 @@ class ErrorContractTest {
                 .andExpect(jsonPath("$.code", is("product.not_found")))
                 .andExpect(jsonPath("$.status", is(404)))
                 .andExpect(jsonPath("$.correlationId", notNullValue()));
+    }
+
+    @Test
+    @DisplayName("a request the endpoint does not take is the client's error, with its own status")
+    void frameworkRejectionsKeepTheirStatus() throws Exception {
+        mockMvc.perform(
+                        post("/api/v1/probe/validate")
+                                .with(cashier())
+                                .contentType(MediaType.TEXT_PLAIN)
+                                .content("hello"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code", is("request.unsupported_media_type")));
+        mockMvc.perform(delete("/api/v1/probe/not-found").with(cashier()))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code", is("request.method_not_allowed")));
     }
 
     @Test
