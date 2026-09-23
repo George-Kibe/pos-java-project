@@ -48,13 +48,13 @@ public abstract class CustomerTestBase {
 
     @SuppressWarnings("resource")
     static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer("postgres:16-alpine")
+            new PostgreSQLContainer("postgres:18-alpine")
                     .withDatabaseName("pos")
                     .withUsername("test")
                     .withPassword("test");
 
     static final ConfluentKafkaContainer KAFKA =
-            new ConfluentKafkaContainer("confluentinc/cp-kafka:7.8.0");
+            new ConfluentKafkaContainer("confluentinc/cp-kafka:8.3.2");
 
     static {
         // Started once and never stopped: Spring's context cache outlives any one test class.

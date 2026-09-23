@@ -52,13 +52,13 @@ public abstract class AuthTestBase {
     // Never closed on purpose: it lives for the whole JVM and Testcontainers' reaper removes it.
     @SuppressWarnings("resource")
     static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer("postgres:16-alpine")
+            new PostgreSQLContainer("postgres:18-alpine")
                     .withDatabaseName("pos")
                     .withUsername("test")
                     .withPassword("test");
 
     /** Token-version publications go here, and the gateway reads them from the same key. */
-    static final RedisContainer REDIS = new RedisContainer("redis:7-alpine");
+    static final RedisContainer REDIS = new RedisContainer("redis:8-alpine");
 
     static {
         POSTGRES.start();

@@ -1,4 +1,5 @@
-# Base infrastructure stack: PostgreSQL, Kafka (KRaft), Redis, Mailpit.
+# Base infrastructure stack: PostgreSQL, Kafka (KRaft), Redis.
+# Images track the current stable line of each (checked on Docker Hub); bump deliberately.
 # Application services are layered on in later phases via docker-compose.services.yml.
 #
 # Run through the Makefile from the repository root, which supplies --env-file .env:
@@ -27,7 +28,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: pos-postgres
     restart: unless-stopped
     networks: [pos]
@@ -60,7 +61,10 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      # Postgres 18 keeps its data under a versioned directory inside /var/lib/postgresql and
+      # refuses to start with a volume on the old .../data path. A major upgrade cannot reuse the
+      # previous major's volume: dump and restore, or start fresh.
+      - pg_data:/var/lib/postgresql
       - ../postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-pos_admin} -d ${POSTGRES_DB:-pos}"]
@@ -70,7 +74,7 @@ services:
       start_period: 10s
 
   kafka:
-    image: apache/kafka:3.9.0
+    image: apache/kafka:4.3.1
     container_name: pos-kafka
     restart: unless-stopped
     networks: [pos]
@@ -110,7 +114,7 @@ services:
 
   # One-shot: creates the event-catalogue topics, then exits.
   kafka-init:
-    image: apache/kafka:3.9.0
+    image: apache/kafka:4.3.1
     container_name: pos-kafka-init
     restart: "no"
     networks: [pos]
@@ -126,7 +130,7 @@ services:
     entrypoint: ["/bin/bash", "/create-topics.sh"]
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: pos-redis
     restart: unless-stopped
     networks: [pos]
@@ -153,25 +157,3 @@ services:
       start_period: 5s
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
-
-  # Development SMTP sink: catches every outbound mail, nothing leaves the machine.
-  # Production points the same SMTP client at Gmail/Workspace instead.
-  mailpit:
-    image: axllent/mailpit:v1.26
-    container_name: pos-mailpit
-    restart: unless-stopped
-    networks: [pos]
-    <<: *logging
-    environment:
-      MP_SMTP_AUTH_ACCEPT_ANY: "true"
-      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
-      MP_MAX_MESSAGES: "2000"
-    ports:
-      - "${MAILPIT_SMTP_PORT:-1025}:1025"
-      - "${MAILPIT_UI_PORT:-8025}:8025"
-    healthcheck:
-      test: ["CMD", "/mailpit", "readyz"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 5s

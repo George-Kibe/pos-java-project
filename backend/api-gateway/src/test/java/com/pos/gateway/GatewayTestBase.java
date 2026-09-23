@@ -57,7 +57,7 @@ public abstract class GatewayTestBase {
     protected static final String ISSUER = "http://auth-service-under-test";
 
     /** Started once for the JVM; see the note in auth-service's test base about @Container. */
-    static final RedisContainer REDIS = new RedisContainer("redis:7-alpine");
+    static final RedisContainer REDIS = new RedisContainer("redis:8-alpine");
 
     /** Stands in for auth-service: serves the JWKS and any downstream endpoint under test. */
     static final WireMockServer DOWNSTREAM =
