@@ -1,10 +1,14 @@
+import { execFileSync } from "node:child_process";
+
 import { expect, type Page } from "@playwright/test";
 
 /**
- * Helpers that reach past the browser: Mailpit for the emailed code, and the gateway as the
- * bootstrap administrator to hand out roles - the admin screens arrive in Phase 15.
+ * Helpers that reach past the browser: the emailed code, read from notification-service's capture
+ * directory (the e2e overlay sets MAIL_TRANSPORT=capture, so nothing is sent), and the gateway as
+ * the bootstrap administrator to hand out roles - the admin screens arrive in Phase 15.
  */
-const MAILPIT = process.env.MAILPIT_URL ?? "http://localhost:8025";
+const NOTIFICATION_CONTAINER = process.env.NOTIFICATION_CONTAINER ?? "pos-notification-service";
+const CAPTURE_DIRECTORY = process.env.MAIL_CAPTURE_DIRECTORY ?? "/tmp/pos-captured-mail";
 const GATEWAY = process.env.GATEWAY_URL ?? "http://localhost:8080";
 
 export const PASSWORD = "Correct-Horse-Battery-9";
@@ -13,21 +17,28 @@ export function uniqueEmail(label: string): string {
   return `e2e-${label}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 }
 
+/** The newest message captured for {@code email}, or "" while none has been. */
+function latestCapturedMessage(email: string): string {
+  // The address and directory go to the container's shell as arguments, never spliced into the
+  // script: a "+" or quote in an address stays data.
+  const script = 'f=$(grep -lFx "To: $1" "$2"/*.txt 2>/dev/null | sort | tail -n 1); [ -n "$f" ] && cat "$f"; true';
+  return execFileSync(
+    "docker",
+    ["exec", NOTIFICATION_CONTAINER, "sh", "-c", script, "sh", email, CAPTURE_DIRECTORY],
+    { encoding: "utf8" },
+  );
+}
+
 /** The latest code emailed to {@code email}, waiting for it to arrive. */
 export async function otpFor(email: string): Promise<string> {
   let code: string | undefined;
   await expect
     .poll(
-      async () => {
-        const search = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
-        const found = (await search.json()) as { messages?: { ID: string }[] };
-        const latest = found.messages?.[0];
-        if (!latest) return undefined;
-        const message = (await (await fetch(`${MAILPIT}/api/v1/message/${latest.ID}`)).json()) as { Text: string };
-        code = message.Text.match(/^\s+(\d{4,10})\s*$/m)?.[1];
+      () => {
+        code = latestCapturedMessage(email).match(/^\s+(\d{4,10})\s*$/m)?.[1];
         return code;
       },
-      { timeout: 30_000, message: `an OTP email to ${email}` },
+      { timeout: 30_000, message: `a captured OTP email to ${email}` },
     )
     .toBeTruthy();
   return code as string;

@@ -36,9 +36,10 @@ npm run build
 make web-e2e         # from the repo root: Playwright against the running stack
 ```
 
-`make web-check` runs lint, typecheck, unit tests and the build. `make web-e2e` points
-notification-service at Mailpit for the run (no real inbox receives the throwaway accounts' codes),
-raises the gateway's per-address login limit while it runs, and restores both afterwards.
+`make web-check` runs lint, typecheck, unit tests and the build. `make web-e2e` switches
+notification-service to capture mode for the run (it writes each email to a file in its container
+instead of sending it, and the tests read the codes back with `docker exec`), raises the gateway's
+per-address login limit while it runs, and restores both afterwards.
 
 ## Configuration
 

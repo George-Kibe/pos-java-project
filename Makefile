@@ -11,7 +11,7 @@ GENERATED_SECRETS := [A-Z_]+PASSWORD|MPESA_CALLBACK_TOKEN|WEB_SESSION_SECRET
 MVN          := ./mvnw
 BACKEND      := backend
 
-INFRA_SERVICES := postgres kafka redis mailpit
+INFRA_SERVICES := postgres kafka redis
 
 .DEFAULT_GOAL := help
 .PHONY: help env env-sync doctor infra-up infra-down infra-restart infra-logs topics ps logs \
@@ -70,13 +70,12 @@ doctor: ## Check that required tooling is present
 ## ---------------------------------------------------------------------------
 ## Infrastructure
 ## ---------------------------------------------------------------------------
-infra-up: check-env ## Start Postgres, Kafka, Redis, Mailpit and create topics
+infra-up: check-env ## Start Postgres, Kafka, Redis and create topics
 	$(DC) up -d --wait $(INFRA_SERVICES)
 	$(DC) up kafka-init
 	@echo
 	@$(MAKE) --no-print-directory ps
 	@echo "  Postgres  localhost:5432   Kafka  localhost:29092   Redis  localhost:6379"
-	@echo "  Mailpit   http://localhost:8025"
 
 infra-down: check-env ## Stop infrastructure (data volumes are kept)
 	$(DC) down --remove-orphans
@@ -106,7 +105,6 @@ up: check-env ## Start infrastructure and all services (gateway on :8080)
 	@echo
 	@echo "  Web app                     http://localhost:3000"
 	@echo "  Gateway (the only ingress)  http://localhost:8080"
-	@echo "  Mailpit                     http://localhost:8025"
 
 down: check-env ## Stop services and infrastructure (volumes kept)
 	$(DC_ALL) down --remove-orphans
@@ -138,10 +136,10 @@ verify: ## Full gate: format check, build, unit + integration tests, coverage
 web-check: ## Web app: lint, typecheck, unit tests and a production build
 	cd frontend/web && npm run lint && npm run typecheck && npm test && npm run build
 
-web-e2e: check-env ## Web app: browser end-to-end run against the running stack (email goes to Mailpit)
-	@# The run registers throwaway accounts, so their OTP emails go to Mailpit, never to a real
-	@# inbox, and the gateway's per-address credential limit is raised for the run. Both services
-	@# are put back as configured afterwards, pass or fail.
+web-e2e: check-env ## Web app: browser end-to-end run against the running stack (no mail is sent)
+	@# The run registers throwaway accounts, so notification-service captures their emails to files
+	@# in its container instead of sending them, and the gateway's per-address credential limit is
+	@# raised for the run. Both services are put back as configured afterwards, pass or fail.
 	$(DC_ALL) -f infra/compose/docker-compose.e2e.yml up -d --wait notification-service api-gateway
 	@set -a; . ./$(ENV_FILE); set +a; \
 		(cd frontend/web && npm run e2e); status=$$?; \

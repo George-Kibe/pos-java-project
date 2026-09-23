@@ -1,17 +1,13 @@
 # Overlay for browser end-to-end runs (`make web-e2e`).
 #
-# Development may send mail through a real provider. A test that registers throwaway accounts
-# must not email real inboxes, so for the run notification-service delivers to Mailpit, where the
-# test reads the OTP back. `make web-e2e` puts notification-service back as it was afterwards.
+# The run registers throwaway accounts, and their codes must not be emailed to made-up addresses
+# through the real provider. For the run, notification-service writes each message to a file inside
+# its own container instead of sending it; the test reads the code back with `docker exec`.
+# `make web-e2e` puts notification-service back as configured afterwards.
 services:
   notification-service:
     environment:
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMTP_USERNAME: ""
-      SMTP_PASSWORD: ""
-      SMTP_AUTH: "false"
-      SMTP_STARTTLS: "false"
+      MAIL_TRANSPORT: capture
 
   # Every test in the run comes from one address and signs in far more often than a person does,
   # so the per-address limit on credential endpoints (10 a minute) is raised for the run and put

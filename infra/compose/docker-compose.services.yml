@@ -314,8 +314,6 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      mailpit:
-        condition: service_healthy
     environment:
       SERVER_PORT: 8088
       POSTGRES_HOST: postgres
@@ -325,14 +323,16 @@ services:
       NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?required}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
-      # Mailpit in development: it accepts everything and shows it in a browser, so no real mail
-      # ever leaves the machine. Production points these at Gmail or Workspace - same code path.
-      SMTP_HOST: ${SMTP_HOST:-mailpit}
-      SMTP_PORT: ${SMTP_PORT:-1025}
+      # Real mail in every environment: Gmail in development, AWS SES's SMTP interface in
+      # production. Same code path; only these values differ. See .env.example.
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required - set the Gmail (dev) or SES (prod) SMTP host in .env}
+      SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_AUTH: ${SMTP_AUTH:-false}
-      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      # smtp, or capture (browser e2e runs only - see docker-compose.e2e.yml).
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-smtp}
       MAIL_FROM: ${MAIL_FROM:-Supermarket POS <no-reply@example.com>}
       BRAND_NAME: ${BRAND_NAME:-Supermarket POS}
       SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@example.com}

@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Browser runs against the real stack (`make up`), not a mock: the point is to prove the whole
  * path - browser, BFF, gateway, auth-service, email - holds together. Run through `make web-e2e`,
- * which routes email to Mailpit for the run.
+ * which captures email inside notification-service for the run instead of sending it.
  */
 export default defineConfig({
   testDir: "./e2e",
