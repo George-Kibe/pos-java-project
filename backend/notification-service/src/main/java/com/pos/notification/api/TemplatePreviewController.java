@@ -69,7 +69,11 @@ public class TemplatePreviewController {
                     + org.springframework.web.util.HtmlUtils.htmlEscape(message.text())
                     + "</pre>";
         }
-        return message.html();
+        // The sent message carries the logo as an attachment; a browser needs it inline.
+        return message.html()
+                .replace(
+                        "cid:" + com.pos.notification.service.SmtpEmailSender.LOGO_CONTENT_ID,
+                        com.pos.notification.service.BrandLogo.dataUri());
     }
 
     private Map<String, Object> sampleModel(NotificationType type) {

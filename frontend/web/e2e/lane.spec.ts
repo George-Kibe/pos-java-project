@@ -130,6 +130,7 @@ test("a mixed basket with a supervisor-approved price, paid part card and part c
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Change: 90.00" })).toBeVisible({ timeout: 30_000 });
   const receipt = page.getByTestId("receipt");
+  await expect(receipt.locator('img[src="/brand/realhive-logo.svg"]')).toBeVisible();
   await expect(receipt).toContainText("Card");
   await expect(receipt).toContainText("Cash");
   const receiptNumber = (await receipt.textContent())?.match(/Receipt (R-\d{6})/)?.[1];

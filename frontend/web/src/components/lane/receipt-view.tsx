@@ -2,13 +2,15 @@
 
 import { createPortal } from "react-dom";
 
+import { BrandLogo } from "@/components/brand";
 import type { ReceiptDocument } from "@/lib/lane/receipt";
 
 /** A receipt on screen, laid out like the paper one. */
 export function ReceiptView({ receipt }: { receipt: ReceiptDocument }) {
   return (
     <div className="mx-auto w-full max-w-[22rem] font-mono text-sm leading-snug" data-testid="receipt">
-      <div className="text-center">
+      <div className="flex flex-col items-center text-center">
+        <BrandLogo size={56} className="mb-1" />
         <p className="font-bold">{receipt.brand}</p>
         <p>{receipt.branchName}</p>
         {receipt.notice ? <p className="my-1 font-bold">{receipt.notice}</p> : null}

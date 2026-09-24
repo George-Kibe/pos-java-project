@@ -16,6 +16,7 @@ import org.openpdf.text.DocumentException;
 import org.openpdf.text.Element;
 import org.openpdf.text.Font;
 import org.openpdf.text.FontFactory;
+import org.openpdf.text.Image;
 import org.openpdf.text.PageSize;
 import org.openpdf.text.Paragraph;
 import org.openpdf.text.Phrase;
@@ -62,6 +63,40 @@ public class ExportService {
         return bytes.toByteArray();
     }
 
+    /** The business's name, as it heads every exported report. */
+    static final String BUSINESS_NAME = "Realhive Group of Supermarkets";
+
+    /**
+     * The Realhive mark and name across the top of the page. The mark is generated with the other
+     * brand assets by scripts/brand/generate.py.
+     */
+    private static PdfPTable letterhead() throws DocumentException {
+        PdfPTable head = new PdfPTable(new float[] {1, 9});
+        head.setWidthPercentage(100);
+        head.setSpacingAfter(10);
+        try (var in = ExportService.class.getResourceAsStream("/brand/logo.png")) {
+            if (in == null) {
+                throw new IllegalStateException("Missing /brand/logo.png on the classpath");
+            }
+            Image logo = Image.getInstance(in.readAllBytes());
+            logo.scaleToFit(36, 36);
+            PdfPCell mark = new PdfPCell(logo, false);
+            mark.setBorder(PdfPCell.NO_BORDER);
+            head.addCell(mark);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        PdfPCell name =
+                new PdfPCell(
+                        new Phrase(
+                                BUSINESS_NAME,
+                                FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12)));
+        name.setBorder(PdfPCell.NO_BORDER);
+        name.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        head.addCell(name);
+        return head;
+    }
+
     public byte[] pdf(Table table) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         Document document =
@@ -74,6 +109,7 @@ public class ExportService {
         try {
             PdfWriter.getInstance(document, bytes);
             document.open();
+            document.add(letterhead());
             document.add(
                     new Paragraph(
                             table.title(), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14)));

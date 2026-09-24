@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { Providers } from "@/components/providers";
+import { BRAND_NAME } from "@/lib/brand";
 
 import "./globals.css";
 
@@ -9,7 +10,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "Realhive Group of Supermarkets POS", template: "%s · Realhive Group of Supermarkets POS" },
+  title: { default: BRAND_NAME, template: `%s · ${BRAND_NAME}` },
   description: "Point of sale and back office",
 };
 

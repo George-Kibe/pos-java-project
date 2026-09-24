@@ -130,6 +130,14 @@ class EmailDeliveryIT extends NotificationTestBase {
         // content is a code somebody needs to sign in.
         assertThat(message.getContentType()).containsIgnoringCase("multipart/alternative");
 
+        // The logo travels with the message, referenced by Content-ID from the HTML.
+        assertThat(inlineParts(message.getContent()))
+                .anySatisfy(
+                        part -> {
+                            assertThat(part.getContentID()).isEqualTo("<brand-logo>");
+                            assertThat(part.getContentType()).startsWith("image/png");
+                        });
+
         String body = GreenMailUtil.getBody(message);
         assertThat(body).contains("<!DOCTYPE html>");
         assertThat(body).contains("Use this code to verify your email address");
@@ -285,5 +293,19 @@ class EmailDeliveryIT extends NotificationTestBase {
                                 OtpPurpose.REGISTRATION,
                                 Instant.now().plusSeconds(600)))
                 .build();
+    }
+
+    /** Every body part below {@code content}, however deeply the multiparts nest. */
+    private static java.util.List<jakarta.mail.internet.MimeBodyPart> inlineParts(Object content)
+            throws Exception {
+        java.util.List<jakarta.mail.internet.MimeBodyPart> parts = new java.util.ArrayList<>();
+        if (content instanceof jakarta.mail.Multipart multipart) {
+            for (int i = 0; i < multipart.getCount(); i++) {
+                var part = (jakarta.mail.internet.MimeBodyPart) multipart.getBodyPart(i);
+                parts.add(part);
+                parts.addAll(inlineParts(part.getContent()));
+            }
+        }
+        return parts;
     }
 }

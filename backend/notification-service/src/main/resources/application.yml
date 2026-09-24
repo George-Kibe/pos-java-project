@@ -101,7 +101,7 @@ pos:
       - /swagger-ui.html
 
   notification:
-    brand-name: ${BRAND_NAME:Supermarket POS}
+    brand-name: ${BRAND_NAME:Realhive Group of Supermarkets}
     support-email: ${SUPPORT_EMAIL:support@example.com}
     app-base-url: ${APP_BASE_URL:http://localhost:3000}
     display-time-zone: ${DISPLAY_TIME_ZONE:Africa/Nairobi}

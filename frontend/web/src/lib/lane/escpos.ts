@@ -1,4 +1,5 @@
 import type { ReceiptDocument } from "./receipt";
+import { RECEIPT_LOGO } from "./receipt-logo";
 
 /**
  * ESC/POS, the command language of nearly every thermal receipt printer. Only the handful of
@@ -68,6 +69,18 @@ export class EscPos {
     return this.raw(GS, 0x56, 66, 3);
   }
 
+  /**
+   * A 1-bit image, printed with `GS v 0`: {@code widthBytes} bytes per row, most significant bit
+   * leftmost, a set bit printed black. Centred by the current alignment on most printers.
+   */
+  raster(image: { widthBytes: number; height: number; data: Uint8Array }): this {
+    const { widthBytes, height, data } = image;
+    if (data.length !== widthBytes * height) throw new Error("Raster data does not match its size");
+    this.raw(GS, 0x76, 0x30, 0, widthBytes & 0xff, widthBytes >> 8, height & 0xff, height >> 8);
+    for (const byte of data) this.bytes.push(byte);
+    return this.raw(LF);
+  }
+
   /** A pulse on the drawer connector (pin 2), which is how a cash drawer is opened. */
   kickDrawer(): this {
     return this.raw(ESC, 0x70, 0, 25, 250);
@@ -99,11 +112,27 @@ function ascii(value: string): string {
     .replace(/[^\x20-\x7e]/g, "?");
 }
 
-/** The receipt, laid out for a thermal printer. */
-export function encodeReceipt(receipt: ReceiptDocument, options: { width?: number; kickDrawer?: boolean } = {}): Uint8Array {
+/** The mark as the printer takes it, decoded once. */
+let logo: { widthBytes: number; height: number; data: Uint8Array } | null = null;
+function receiptLogo() {
+  logo ??= {
+    widthBytes: RECEIPT_LOGO.widthBytes,
+    height: RECEIPT_LOGO.height,
+    data: Uint8Array.from(atob(RECEIPT_LOGO.data), (char) => char.charCodeAt(0)),
+  };
+  return logo;
+}
+
+/** The receipt, laid out for a thermal printer, headed by the Realhive mark. */
+export function encodeReceipt(
+  receipt: ReceiptDocument,
+  options: { width?: number; kickDrawer?: boolean; logo?: boolean } = {},
+): Uint8Array {
   const out = new EscPos(options.width ?? 48);
   if (options.kickDrawer) out.kickDrawer();
-  out.align("center").bold(true).line(receipt.brand).bold(false).line(receipt.branchName);
+  out.align("center");
+  if (options.logo !== false) out.raster(receiptLogo());
+  out.bold(true).line(receipt.brand).bold(false).line(receipt.branchName);
   if (receipt.notice) out.bold(true).line(receipt.notice).bold(false);
   out.line(`Receipt ${receipt.receiptNumber}`).line(receipt.issuedAt).line(`Served by ${receipt.cashier}`);
   out.align("left").rule();

@@ -65,5 +65,8 @@ class BusinessDatesAndFiltersTest {
         byte[] pdf = exports.pdf(table);
         assertThat(new String(pdf, 0, 5, java.nio.charset.StandardCharsets.US_ASCII))
                 .isEqualTo("%PDF-");
+        // Headed by the Realhive mark: the page carries an image.
+        assertThat(new String(pdf, java.nio.charset.StandardCharsets.ISO_8859_1))
+                .containsPattern("/Subtype\\s*/Image");
     }
 }

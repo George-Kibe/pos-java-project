@@ -34,6 +34,24 @@ describe("ESC/POS", () => {
     expect(printed).toContain("81.80");
   });
 
+  it("heads the receipt with the mark as a raster image, unless told not to", () => {
+    const withLogo = encodeReceipt(RECEIPT);
+    const at = [...withLogo].findIndex((byte, i) => byte === 0x1d && withLogo[i + 1] === 0x76 && withLogo[i + 2] === 0x30);
+    expect(at).toBeGreaterThan(0);
+    const widthBytes = withLogo[at + 4] | (withLogo[at + 5] << 8);
+    const height = withLogo[at + 6] | (withLogo[at + 7] << 8);
+    expect(widthBytes).toBe(24);
+    expect(height).toBe(192);
+    // Some dots are black, and not all of them: it is a picture, not a block.
+    const image = withLogo.slice(at + 8, at + 8 + widthBytes * height);
+    const inked = image.reduce((count, byte) => count + (byte !== 0 ? 1 : 0), 0);
+    expect(inked).toBeGreaterThan(image.length / 10);
+    expect(inked).toBeLessThan(image.length);
+
+    const without = encodeReceipt(RECEIPT, { logo: false });
+    expect(without.length).toBe(withLogo.length - (8 + widthBytes * height + 1));
+  });
+
   it("opens the drawer only when asked", () => {
     const kick = [0x1b, 0x70, 0, 25, 250];
     const contains = (bytes: Uint8Array) => text(bytes).includes(String.fromCharCode(...kick));
