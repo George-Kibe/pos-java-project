@@ -93,7 +93,7 @@ def money(value: float | Decimal) -> float:
 
 
 def ean13(body12: str) -> str:
-    """A valid EAN-13 from 12 digits (the 2 prefix is GS1's in-store range: no real product)."""
+    """A valid EAN-13 from 12 digits (the 2x prefixes are GS1's in-store range: no real product)."""
     total = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(body12))
     return body12 + str((10 - total % 10) % 10)
 
@@ -253,7 +253,8 @@ def seed(api: Api, admin_email: str, admin_password: str, env_out: Path | None) 
             "categoryId": categories[category], "unitOfMeasureId": units[unit],
             "taxClassId": taxes[tax], "sellByWeight": weighed, "priceIncludesTax": True,
             "basePrice": price, "reorderPoint": 15, "reorderQuantity": 60, "active": True,
-            "barcodes": [ean13(f"20260{suffix}0000"[:12])]})
+            # 29: GS1's in-store range, clear of the 20/21 prefixes catalog reads as scale labels.
+            "barcodes": [ean13(f"2990000{suffix}00")]})
         products.append({"id": product["id"], "sku": f"DEMO-{suffix}", "name": name,
                          "price": price, "weighed": weighed, "tax": tax})
 

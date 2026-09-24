@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "20defcde-142c-59ae-b659-6e74d460d832",
-    "name": "Supermarket POS API",
+    "name": "Realhive Group of Supermarkets POS API",
     "description": "Every endpoint of the POS, through the API gateway. Generated from the services' OpenAPI specs by `make postman`.\n\n1. Import this collection and an environment (postman/pos-api.postman_environment.json, or postman/local.postman_environment.json after `make demo-seed`, which holds real ids).\n2. Run *Start here > Sign in*: the token is stored and used by every other request.\n3. Ids in paths are variables ({{productId}}, {{saleId}}, ...): set them in the environment, or from a previous response.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -895,6 +895,128 @@
           ]
         },
         {
+          "name": "Supervisor approvals",
+          "item": [
+            {
+              "name": "Approve one action with a supervisor's PIN; returns a short-lived token",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/auth/approvals",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "approvals"
+                  ],
+                  "query": []
+                },
+                "description": "Approve one action with a supervisor's PIN; returns a short-lived token",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"approverId\": \"{{approverId}}\",\n  \"pin\": \"\",\n  \"permission\": \"\",\n  \"branchId\": \"{{branchId}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Who can approve an action at a branch",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/auth/approvers?branchId={{branchId}}&permission=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "approvers"
+                  ],
+                  "query": [
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "permission",
+                      "value": "",
+                      "disabled": false,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "Who can approve an action at a branch"
+              }
+            },
+            {
+              "name": "Set your own supervisor PIN, confirmed with your password",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/auth/pin",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "pin"
+                  ],
+                  "query": []
+                },
+                "description": "Set your own supervisor PIN, confirmed with your password",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"{{password}}\",\n  \"pin\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "Users",
           "item": [
             {
@@ -1595,6 +1717,31 @@
                     }
                   }
                 }
+              }
+            },
+            {
+              "name": "The active scale barcode formats, so an offline lane decodes weighed and priced labels exactly as the server does",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/scale-barcode-rules",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "scale-barcode-rules"
+                  ],
+                  "query": []
+                },
+                "description": "The active scale barcode formats, so an offline lane decodes weighed and priced labels exactly as the server does"
               }
             },
             {
@@ -4643,6 +4790,52 @@
                   "query": []
                 },
                 "description": "The receipts issued for a sale, with the tax breakdown per class"
+              }
+            },
+            {
+              "name": "Email a copy of a paid sale's receipt; sent asynchronously",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}",
+                    "description": "Makes a retry harmless; a fresh one per call."
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/sales/{{saleId}}/receipts/email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "sales",
+                    "{{saleId}}",
+                    "receipts",
+                    "email"
+                  ],
+                  "query": []
+                },
+                "description": "Email a copy of a paid sale's receipt; sent asynchronously",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{email}}\",\n  \"recipientName\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
             },
             {
