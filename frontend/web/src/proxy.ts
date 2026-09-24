@@ -79,10 +79,12 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Pages (and their prefetches), not static assets.
-    "/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|ico|webp)$).*)",
+    "/((?!api/|serwist/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|ico|webp)$).*)",
     // The signed-in API routes. Login, registration and logout manage their own cookies.
     "/api/gateway/:path*",
     "/api/session/:path*",
+    "/api/lane/:path*",
     "/api/auth/change-password",
+    "/api/auth/pin",
   ],
 };

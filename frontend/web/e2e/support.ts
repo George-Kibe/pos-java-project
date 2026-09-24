@@ -18,7 +18,7 @@ export function uniqueEmail(label: string): string {
 }
 
 /** The newest message captured for {@code email}, or "" while none has been. */
-function latestCapturedMessage(email: string): string {
+export function latestCapturedMessage(email: string): string {
   // The address and directory go to the container's shell as arguments, never spliced into the
   // script: a "+" or quote in an address stays data.
   const script = 'f=$(grep -lFx "To: $1" "$2"/*.txt 2>/dev/null | sort | tail -n 1); [ -n "$f" ] && cat "$f"; true';
@@ -67,7 +67,7 @@ async function signInAsAdministrator(): Promise<string> {
   return ((await response.json()) as { accessToken: string }).accessToken;
 }
 
-async function admin(path: string, init: RequestInit = {}): Promise<unknown> {
+export async function admin(path: string, init: RequestInit = {}): Promise<unknown> {
   const token = await adminToken();
   const response = await fetch(`${GATEWAY}/api/v1${path}`, {
     ...init,
@@ -78,13 +78,17 @@ async function admin(path: string, init: RequestInit = {}): Promise<unknown> {
 }
 
 /** An active account with these roles at the first branch, created by the administrator. */
-export async function staffMember(roles: string[], label: string): Promise<{ email: string; temporaryPassword: string }> {
+export async function staffMember(
+  roles: string[],
+  label: string,
+  fullName = `E2E ${label}`,
+): Promise<{ email: string; temporaryPassword: string }> {
   const email = uniqueEmail(label);
   const temporaryPassword = "Temporary-Password-1";
   const branches = (await admin("/branches")) as { id: string }[];
   const user = (await admin("/users", {
     method: "POST",
-    body: JSON.stringify({ email, temporaryPassword, fullName: `E2E ${label}`, roles }),
+    body: JSON.stringify({ email, temporaryPassword, fullName, roles }),
   })) as { id: string };
   await admin(`/users/${user.id}/branches`, {
     method: "PUT",
@@ -133,4 +137,61 @@ export async function expectNoTokensInTheBrowser(page: Page): Promise<void> {
   expect(exposed.session).not.toMatch(jwt);
   expect(exposed.cookies).not.toMatch(/pos_(at|rt)/);
   expect(exposed.html).not.toMatch(jwt);
+}
+
+/** The branch staffMember assigns people to. */
+export async function firstBranchId(): Promise<string> {
+  return ((await admin("/branches")) as { id: string }[])[0].id;
+}
+
+/** A valid EAN-13 from twelve digits. */
+export function ean13(twelve: string): string {
+  let total = 0;
+  for (let i = 0; i < 12; i++) total += Number(twelve[i]) * (i % 2 === 0 ? 1 : 3);
+  return twelve + String((10 - (total % 10)) % 10);
+}
+
+export interface TestProduct {
+  id: string;
+  sku: string;
+  name: string;
+  barcode: string;
+  request: Record<string, unknown>;
+}
+
+/**
+ * A product of this run's own, tax-inclusive at the standard rate. Barcodes start 29 - GS1's
+ * in-store range, clear of the 20/21 prefixes read as scale labels.
+ */
+export async function createProduct(options: { name: string; sku: string; price: number; weighed: boolean }): Promise<TestProduct> {
+  const categories = (await admin("/categories")) as { id: string; code: string }[];
+  const units = (await admin("/units-of-measure")) as { id: string; code: string }[];
+  const taxes = (await admin("/tax-classes")) as { id: string; code: string }[];
+  const barcode = ean13(`29${String(Date.now()).slice(-7)}${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}`);
+  const request = {
+    sku: options.sku,
+    name: options.name,
+    categoryId: (categories.find((c) => c.code === "GROCERY") ?? categories[0]).id,
+    unitOfMeasureId: units.find((u) => u.code === (options.weighed ? "KG" : "EA"))!.id,
+    taxClassId: taxes.find((t) => t.code === "STANDARD")!.id,
+    sellByWeight: options.weighed,
+    priceIncludesTax: true,
+    basePrice: options.price,
+    active: true,
+    barcodes: [barcode],
+  };
+  const product = (await admin("/products", { method: "POST", body: JSON.stringify(request) })) as { id: string };
+  return { id: product.id, sku: options.sku, name: options.name, barcode, request };
+}
+
+export async function setPrice(product: TestProduct, price: number): Promise<void> {
+  await admin(`/products/${product.id}`, { method: "PUT", body: JSON.stringify({ ...product.request, basePrice: price }) });
+}
+
+/** The branch's most recent sales, as the server holds them. */
+export async function recentSales(branchId: string): Promise<{ id: string; clientSaleId: string | null; grandTotal: number; status: string }[]> {
+  const page = (await admin(`/sales?branchId=${branchId}&size=100`)) as {
+    content: { id: string; clientSaleId: string | null; grandTotal: number; status: string }[];
+  };
+  return page.content;
 }

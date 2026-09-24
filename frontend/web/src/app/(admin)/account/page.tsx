@@ -5,7 +5,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireUser } from "@/lib/auth/dal";
+import { can, requireUser } from "@/lib/auth/dal";
+import { APPROVER_PERMISSIONS } from "@/lib/lane/approvals";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -44,9 +45,16 @@ export default async function AccountPage() {
             <dt className="text-muted-foreground">Branches</dt>
             <dd>{user.branches.length === 0 ? "None yet" : user.branches.map((b) => b.name).join(", ")}</dd>
           </dl>
-          <Link href="/account/password" className={buttonVariants({ variant: "outline" })}>
-            Change password
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/account/password" className={buttonVariants({ variant: "outline" })}>
+              Change password
+            </Link>
+            {can(user, ...APPROVER_PERMISSIONS) ? (
+              <Link href="/account/pin" className={buttonVariants({ variant: "outline" })}>
+                {user.hasPin ? "Change supervisor PIN" : "Set a supervisor PIN"}
+              </Link>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
     </div>

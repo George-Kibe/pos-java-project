@@ -29,6 +29,11 @@ export function UserMenu() {
     } catch {
       toast.warning("Signed out on this device; the server could not be told.");
     }
+    // The lane's pages are cached for offline reloads and were rendered for this person. The
+    // offline sales queue is not touched: a sale not yet synced is never dropped.
+    if ("caches" in window) {
+      await Promise.all(["lane-pages", "lane-rsc"].map((name) => caches.delete(name))).catch(() => undefined);
+    }
     // A full load on purpose: the session is over, so every cached query and piece of client
     // state that belonged to it goes too.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination

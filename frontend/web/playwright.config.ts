@@ -17,5 +17,12 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      // PLAYWRIGHT_CHANNEL=chrome runs the installed Google Chrome instead of Playwright's own build,
+      // for a machine where that download is not practical. Unset, nothing changes.
+      use: { ...devices["Desktop Chrome"], channel: process.env.PLAYWRIGHT_CHANNEL || undefined },
+    },
+  ],
 });

@@ -1,3 +1,4 @@
+import { withSerwist } from "@serwist/turbopack";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -13,11 +14,13 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          // USB and serial stay allowed for this site alone: the receipt printer is reached that way.
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), usb=(self), serial=(self)" },
         ],
       },
     ];
   },
 };
 
-export default nextConfig;
+// withSerwist keeps esbuild out of the server bundle; the worker itself is built by its route.
+export default withSerwist(nextConfig);

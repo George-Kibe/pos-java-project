@@ -49,6 +49,8 @@ export const MeSchema = z.object({
   branchIds: z.array(z.uuid()),
   mustChangePassword: z.boolean(),
   branches: z.array(BranchSummarySchema),
+  /** Whether a supervisor PIN is set; absent from an older auth-service. */
+  hasPin: z.boolean().optional(),
 });
 export type Me = z.infer<typeof MeSchema>;
 

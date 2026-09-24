@@ -128,3 +128,24 @@
     @apply font-sans;
   }
 }
+/*
+ * Browser printing of a receipt, when no thermal printer is connected: only the receipt prints,
+ * sized for 80mm paper.
+ */
+.print-receipt {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 4mm;
+  }
+  body > *:not(.print-receipt) {
+    display: none !important;
+  }
+  .print-receipt {
+    display: block;
+    width: 72mm;
+    color: #000;
+  }
+}

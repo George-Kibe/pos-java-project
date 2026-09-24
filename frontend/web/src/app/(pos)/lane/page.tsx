@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 
 import { Forbidden } from "@/components/forbidden";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LaneApp } from "@/components/lane/lane-app";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { can, getActiveBranch, requireUser } from "@/lib/auth/dal";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = { title: "Till" };
 
@@ -12,22 +14,15 @@ export default async function LanePage() {
     return <Forbidden what="selling at a till" />;
   }
   const branch = await getActiveBranch(user);
-  return (
-    <div className="grid gap-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Till</h1>
+  if (!branch) {
+    return (
       <Card className="max-w-xl">
         <CardHeader>
-          <CardTitle>{branch ? branch.name : "No branch assigned"}</CardTitle>
-          <CardDescription>
-            {branch
-              ? `Signed in as ${user.fullName}. The checkout screen arrives with the cashier lane.`
-              : "Ask a manager to assign you to a branch before opening a till."}
-          </CardDescription>
+          <CardTitle>No branch assigned</CardTitle>
+          <CardDescription>Ask a manager to assign you to a branch before opening a till.</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Shortcuts work everywhere: Alt+T comes back here.
-        </CardContent>
       </Card>
-    </div>
-  );
+    );
+  }
+  return <LaneApp branch={{ id: branch.id, name: branch.name }} cashier={user.fullName} brand={BRAND_NAME} />;
 }
