@@ -2,14 +2,25 @@ package com.pos.auth.repository;
 
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.pos.auth.domain.AuditEntry;
 
 /**
- * Audit entries are written here and read by the audit viewer, which arrives with the back office
- * in Phase 15. The filtered query lands then, with its own tests - rather than shipping now as
- * untested code carrying the same null-parameter hazard that broke user search: PostgreSQL rejects
- * an untyped null string parameter inside a function call.
+ * The audit trail, newest first. One derived query per filter combination rather than a single
+ * {@code :x IS NULL OR ...} query: PostgreSQL rejects an untyped null parameter, which is what
+ * broke user search.
  */
-public interface AuditEntryRepository extends JpaRepository<AuditEntry, UUID> {}
+public interface AuditEntryRepository extends JpaRepository<AuditEntry, UUID> {
+
+    Page<AuditEntry> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    Page<AuditEntry> findByActionOrderByCreatedAtDesc(String action, Pageable pageable);
+
+    Page<AuditEntry> findByActorIdOrderByCreatedAtDesc(UUID actorId, Pageable pageable);
+
+    Page<AuditEntry> findByActionAndActorIdOrderByCreatedAtDesc(
+            String action, UUID actorId, Pageable pageable);
+}
