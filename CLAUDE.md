@@ -580,6 +580,10 @@ rollback-only, so the commit fails anyway and takes the batch with it.
 - **Change the cashier chooses is checked, never trusted**: it must equal the payable change and be
   covered by the drawer plus the customer's notes (`CashDrawerService.checkedChange`). An exchange
   (`EXCHANGE_IN` / `EXCHANGE_OUT`) must balance and touches no money counter.
+- **Cash between a till and the intraday is approved by someone else.** Deposits, replenishments
+  and the closing handover need `cash:intraday` and are refused to the cashier on the shift
+  (`till.approver_is_cashier`); the lane always asks for the PIN. A shift closes only after the
+  handover, and the amount the supervisor received is its count - `close` takes no count of its own.
 - **Replenishments are float in and deposits are drops** in the money arithmetic, on purpose: the
   shift-closed figures, and reporting's `ShiftArithmetic`, are unchanged by the intraday ledger.
 - **A device has one till identity per branch** (lane meta `registerId:<branchId>`), because a till's

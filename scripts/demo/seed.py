@@ -492,15 +492,18 @@ def seed(api: Api, admin_email: str, admin_password: str, env_out: Path | None) 
                            "resaleable": True}]})
             returns_made += 1
 
-        # A safe drop is a supervisor's job (cash:drop), so the administrator makes it.
+        # A deposit to intraday is approved by someone other than the cashier (cash:intraday), so
+        # the administrator makes it.
         api.post(f"/api/v1/till-sessions/{shift['id']}/drops",
                  {"amount": 1000, "reason": "Demo safe drop", "reference": f"DEMO-BAG-{s_index + 1}"})
         # All but the last shift close, a little over or short; the last stays open (an X-report).
         if s_index < len(cashiers) - 1:
             closing = api.post(f"/api/v1/till-sessions/{shift['id']}/begin-close", token=token)
             counted = money(float(closing["expectedCash"]) + rng.choice([0, 0, -20, 10, -5]))
+            # The cash goes back to a supervisor - here the administrator - before the close.
+            api.post(f"/api/v1/till-sessions/{shift['id']}/handover", {"countedCash": counted})
             api.post(f"/api/v1/till-sessions/{shift['id']}/close",
-                     {"countedCash": counted, "notes": "Demo close"}, token=token)
+                     {"notes": "Demo close"}, token=token)
 
     # --- reporting and payments -----------------------------------------------------------------
     # (No payment reconciliation run: it reconciles an uploaded M-Pesa statement, and the demo

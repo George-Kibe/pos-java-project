@@ -179,6 +179,7 @@ class ReturnsAndShiftIT extends SalesTestBase {
     void aLaterRefundIsPaidFromTheShiftThatPaysIt() {
         TillSession monday = openTill();
         Sale sale = paidSale(monday, SOAP, "2");
+        handOver(monday.getId(), money("5232.00"));
         tills.close(monday.getId(), money("5232.00"), null);
 
         TillSession tuesday = openTill();
@@ -232,6 +233,7 @@ class ReturnsAndShiftIT extends SalesTestBase {
     void aSaleOnAClosedShiftCannotBeVoided() {
         TillSession till = openTill();
         Sale sale = paidSale(till, SOAP, "1");
+        handOver(till.getId(), money("5116.00"));
         tills.close(till.getId(), money("5116.00"), null);
         actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
 
@@ -278,6 +280,7 @@ class ReturnsAndShiftIT extends SalesTestBase {
                         new ReturnLineRequest(
                                 sale.getLines().getFirst().getId(), money("1"), true, null)),
                 shift());
+        actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
         tills.recordDrop(till.getId(), money("1000.00"), "Mid-shift drop", "SAFE-BAG-7");
         tills.addFloat(till.getId(), money("200.00"), "More coins");
 
@@ -287,7 +290,14 @@ class ReturnsAndShiftIT extends SalesTestBase {
         // 5000 float + 200 top-up + 348 sold - 116 refunded - 1000 dropped.
         assertThat(closing.getExpectedCash()).isEqualByComparingTo("4432.00");
 
-        TillSession closed = tills.close(till.getId(), money("4430.00"), "Two shillings short");
+        // Not closed until a supervisor has the cash.
+        assertThatThrownBy(() -> tills.close(till.getId(), money("4430.00"), null))
+                .satisfies(
+                        failure ->
+                                assertThat(((ApiException) failure).code())
+                                        .isEqualTo("till.not_handed_over"));
+        handOver(till.getId(), money("4430.00"));
+        TillSession closed = tills.close(till.getId(), null, "Two shillings short");
 
         assertThat(closed.getStatus()).isEqualTo(TillSessionStatus.CLOSED);
         assertThat(closed.getVariance()).isEqualByComparingTo("-2.00");
@@ -347,6 +357,7 @@ class ReturnsAndShiftIT extends SalesTestBase {
                 .isInstanceOf(Errors.ForbiddenException.class);
 
         actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
+        handOver(till.getId(), money("5000.00"));
         TillSession closed = tills.close(till.getId(), money("5000.00"), null);
         assertThat(closed.getVariance()).isEqualByComparingTo("0");
         assertThat(closed.getClosedBy()).isEqualTo(SUPERVISOR);
@@ -364,6 +375,7 @@ class ReturnsAndShiftIT extends SalesTestBase {
     @Test
     void aClosedShiftTakesNoMoreSales() {
         TillSession till = openTill();
+        handOver(till.getId(), money("5000.00"));
         tills.close(till.getId(), money("5000.00"), null);
 
         assertThatThrownBy(() -> carts.open(till.getId(), null, false))
@@ -376,7 +388,7 @@ class ReturnsAndShiftIT extends SalesTestBase {
 
     /** The open shift on this test's register: the drawer a refund is paid from. */
     private UUID shift() {
-        return tills.requireOpenForRegister(REGISTER).getId();
+        return tills.requireCurrentForRegister(REGISTER).getId();
     }
 
     private TillSession openTill() {

@@ -10,9 +10,11 @@ describe("what a supervisor's PIN can be spent on", () => {
     expect(isAllowedAction("price:override", "POST", `carts/${CART}/lines/${LINE}/price-override`)).toBe(true);
     expect(isAllowedAction("sale:void", "POST", `sales/${CART}/void`)).toBe(true);
     expect(isAllowedAction("sale:refund", "POST", "returns")).toBe(true);
-    expect(isAllowedAction("cash:drop", "POST", `till-sessions/${CART}/drops`)).toBe(true);
+    expect(isAllowedAction("cash:intraday", "POST", `till-sessions/${CART}/drops`)).toBe(true);
     expect(isAllowedAction("cash:intraday", "POST", `till-sessions/${CART}/replenishments`)).toBe(true);
-    expect(isAllowedAction("cash:intraday", "POST", `till-sessions/${CART}/drops`)).toBe(false);
+    expect(isAllowedAction("cash:intraday", "POST", `till-sessions/${CART}/handover`)).toBe(true);
+    expect(isAllowedAction("cash:intraday", "POST", `till-sessions/${CART}/close`)).toBe(false);
+    expect(isAllowedAction("cash:intraday", "POST", `till-sessions/${CART}/float`)).toBe(false);
   });
 
   it("refuses the same PIN for another action, another method or a crafted path", () => {
@@ -20,6 +22,7 @@ describe("what a supervisor's PIN can be spent on", () => {
     expect(isAllowedAction("sale:void", "PUT", `sales/${CART}/void`)).toBe(false);
     expect(isAllowedAction("sale:void", "POST", `sales/${CART}/void/../../users`)).toBe(false);
     expect(isAllowedAction("sale:refund", "POST", "returns?x=1")).toBe(false);
-    expect(isAllowedAction("cash:drop", "POST", `till-sessions/not-an-id/drops`)).toBe(false);
+    expect(isAllowedAction("cash:intraday", "POST", `till-sessions/not-an-id/drops`)).toBe(false);
+    expect(isAllowedAction("cash:intraday", "POST", `till-sessions/${CART}/dropsx`)).toBe(false);
   });
 });

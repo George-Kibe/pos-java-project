@@ -93,6 +93,24 @@ public class TillSession extends BaseEntity {
     @Column(name = "tracks_denominations", nullable = false)
     private boolean tracksDenominations;
 
+    /**
+     * The cash returned at the close, as the supervisor who received it confirmed. Set once, while
+     * the shift is CLOSING; the close then takes it as the counted cash.
+     */
+    @Column(name = "handed_over_cash", precision = 19, scale = 4)
+    private BigDecimal handedOverCash;
+
+    @Column(name = "handed_over_at")
+    private Instant handedOverAt;
+
+    /** Who received the cash: the supervisor or branch manager whose PIN confirmed it. */
+    @Column(name = "handed_over_to")
+    private UUID handedOverTo;
+
+    public boolean isHandedOver() {
+        return handedOverAt != null;
+    }
+
     public TillSession(UUID branchId, UUID registerId, UUID cashierId, BigDecimal openingFloat) {
         this.branchId = branchId;
         this.registerId = registerId;

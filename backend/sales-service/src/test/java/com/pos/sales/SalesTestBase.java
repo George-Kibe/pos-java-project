@@ -122,6 +122,7 @@ public abstract class SalesTestBase {
 
     @Autowired protected KafkaTemplate<String, String> kafka;
     @Autowired protected JdbcClient jdbc;
+    @Autowired private com.pos.sales.service.TillSessionService shiftsForHandover;
 
     @BeforeEach
     void cleanSlate() {
@@ -174,6 +175,7 @@ public abstract class SalesTestBase {
         "shift:close",
         "shift:close:any",
         "cash:drop",
+        "cash:intraday",
         "cart:manage",
         "sale:create",
         "sale:void",
@@ -183,6 +185,24 @@ public abstract class SalesTestBase {
         "product:view",
         "report:view:branch"
     };
+
+    /**
+     * The close's handover: stops the till if it is still selling, and a supervisor receives {@code
+     * cash} - then the caller is put back, so the close is theirs.
+     */
+    protected void handOver(UUID tillId, java.math.BigDecimal cash) {
+        var caller = SecurityContextHolder.getContext().getAuthentication();
+        if (shiftsForHandover.require(tillId).getStatus()
+                == com.pos.sales.domain.TillSessionStatus.OPEN) {
+            shiftsForHandover.beginClose(tillId);
+        }
+        actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
+        try {
+            shiftsForHandover.handOver(tillId, cash, null, null);
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(caller);
+        }
+    }
 
     /** Puts a verified-looking token in the security context, as the resource server would. */
     protected static void actingAs(UUID userId, String... permissions) {

@@ -46,24 +46,15 @@ export const laneApi = {
   shift: (id: string) => api(`till-sessions/${id}`, TillSessionSchema),
   beginClose: (id: string) =>
     api(`till-sessions/${id}/begin-close`, TillSessionSchema, { method: "POST", idempotencyKey: idempotent() }),
-  closeShift: (id: string, countedCash: string, notes?: string, countedNotes?: CashLine[]) =>
+  /** Closes after the handover: the count is what the supervisor received. */
+  closeShift: (id: string, notes?: string) =>
     api(`till-sessions/${id}/close`, TillSessionSchema, {
       method: "POST",
-      json: { countedCash, notes, countedNotes },
+      json: { notes },
       idempotencyKey: idempotent(),
     }),
-  cashDrop: (id: string, amount: string, reason: string, notes?: CashLine[]) =>
-    api(`till-sessions/${id}/drops`, TillSessionSchema, {
-      method: "POST",
-      json: { amount, reason, notes },
-      idempotencyKey: idempotent(),
-    }),
-  replenish: (id: string, notes: CashLine[], reason?: string) =>
-    api(`till-sessions/${id}/replenishments`, TillSessionSchema, {
-      method: "POST",
-      json: { notes, reason },
-      idempotencyKey: idempotent(),
-    }),
+  // Deposits, replenishments and the closing handover have no direct call here: each is approved
+  // by a supervisor's PIN and made by the BFF (`approved`, below), whoever is signed in.
 
   openCart: (tillSessionId: string, customerId?: string | null) =>
     api("carts", CartSchema, {

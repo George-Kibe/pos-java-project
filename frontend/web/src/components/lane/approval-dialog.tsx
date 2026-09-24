@@ -41,6 +41,35 @@ export function ApprovalDialog({
   /** Does the approved action; throws to refuse. */
   perform: (approverId: string, pin: string) => Promise<void>;
 }) {
+  return (
+    <Dialog open={open} onOpenChange={(next) => (!next ? onCancel() : undefined)}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        {open ? <ApprovalForm permission={permission} branchId={branchId} perform={perform} /> : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Choosing the approver and taking their PIN, in a dialog of its own or as a step inside another
+ * (the close's handover).
+ */
+export function ApprovalForm({
+  permission,
+  branchId,
+  perform,
+  submitLabel = "Approve",
+}: {
+  permission: ApprovablePermission;
+  branchId: string;
+  /** Does the approved action; throws to refuse. */
+  perform: (approverId: string, pin: string) => Promise<void>;
+  submitLabel?: string;
+}) {
   const [people, setPeople] = useState<Approver[] | null>(null);
   const [selected, setSelected] = useState(0);
   const [chosen, setChosen] = useState<Approver | null>(null);
@@ -49,7 +78,6 @@ export function ApprovalDialog({
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     loadApprovers(branchId, permission)
       .then((list) => {
@@ -66,12 +94,8 @@ export function ApprovalDialog({
       });
     return () => {
       cancelled = true;
-      setPeople(null);
-      setChosen(null);
-      setPin("");
-      setError(undefined);
     };
-  }, [open, branchId, permission]);
+  }, [branchId, permission]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -110,12 +134,7 @@ export function ApprovalDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (!next ? onCancel() : undefined)}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
+    <>
         {people === null ? (
           <p className="text-muted-foreground">Finding who can approve…</p>
         ) : people.length === 0 ? (
@@ -174,11 +193,10 @@ export function ApprovalDialog({
               </p>
             ) : null}
             <Button type="submit" size="lg" disabled={busy}>
-              Approve
+              {submitLabel}
             </Button>
           </form>
         )}
-      </DialogContent>
-    </Dialog>
+    </>
   );
 }

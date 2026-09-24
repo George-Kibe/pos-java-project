@@ -32,7 +32,9 @@ public class IntradayMovement extends BaseEntity {
         /** A till's deposit. */
         FROM_TILL,
         /** A till's replenishment. */
-        TO_TILL
+        TO_TILL,
+        /** A till's cash, returned to the supervisor at the close of its shift. */
+        TILL_CLOSE
     }
 
     @Column(name = "branch_id", nullable = false)

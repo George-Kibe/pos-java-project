@@ -29,9 +29,15 @@ import lombok.RequiredArgsConstructor;
 /**
  * Shifts, and the money in the drawer.
  *
- * <p>The close is a two-step on purpose: CLOSING stops new sales so the expected figure cannot move
- * while a cashier is counting, and only then is the count accepted. Closing in one step means the
- * variance is computed against a total that may have changed since the drawer was counted.
+ * <p>The close is a process on purpose. CLOSING stops new sales so the expected figure cannot move
+ * while a cashier is counting; the cashier then returns the cash to a supervisor, who confirms with
+ * their PIN what they received (the handover); and only then can the shift be closed, with what was
+ * received as its count. Closing in one step means the variance is computed against a total that
+ * may have changed since the drawer was counted - and a count nobody else saw is one nobody can
+ * vouch for.
+ *
+ * <p>Every movement between a till and the branch's intraday cash - a deposit, a replenishment, the
+ * handover - is approved by someone other than the cashier on the shift.
  */
 @Service
 @RequiredArgsConstructor
@@ -58,13 +64,16 @@ public class TillSessionService {
         return movements.findByTillSessionIdOrderByOccurredAt(sessionId);
     }
 
-    /** The session a register is on, for a terminal that has just been switched on. */
-    public TillSession requireOpenForRegister(UUID registerId) {
+    /**
+     * The shift a register is on, for a terminal that has just been switched on - CLOSING included,
+     * so a lane reloaded while its cash is with the supervisor comes back to the close rather than
+     * to a shift it believes is still selling.
+     */
+    public TillSession requireCurrentForRegister(UUID registerId) {
         return sessions.findByRegisterIdAndStatusNot(registerId, TillSessionStatus.CLOSED)
-                .filter(session -> session.getStatus().acceptsSales())
                 .orElseThrow(
                         () ->
-                                new Errors.BusinessRuleException(
+                                new Errors.NotFoundException(
                                         "till.no_open_session",
                                         "This register has no open shift. Open one before"
                                                 + " selling."));
@@ -138,8 +147,8 @@ public class TillSessionService {
 
     /**
      * A deposit: cash from the drawer into the branch's intraday cash, where the supervisor holds
-     * it. For a tracked drawer, the notes named - or, unnamed, the fewest that make the amount -
-     * must be in it.
+     * it, approved by whoever receives it. For a tracked drawer, the notes named - or, unnamed, the
+     * fewest that make the amount - must be in it.
      */
     @Transactional
     public TillSession recordDrop(
@@ -149,6 +158,7 @@ public class TillSessionService {
             String reference,
             java.util.List<CashCount.Line> notes) {
         TillSession session = requireOpen(sessionId);
+        requireSomeoneElseApproves(session);
         CashCount cash = notes == null ? null : CashCount.of(notes);
         if (cash != null && amount == null) {
             amount = cash.total();
@@ -269,6 +279,7 @@ public class TillSessionService {
     public TillSession replenish(
             UUID sessionId, java.util.List<CashCount.Line> notes, String reason) {
         TillSession session = requireOpen(sessionId);
+        requireSomeoneElseApproves(session);
         CashCount cash = CashCount.of(notes);
         String why = reason == null || reason.isBlank() ? "Replenished from intraday" : reason;
         intraday.toTill(session.getBranchId(), session.getId(), cash, why);
@@ -297,25 +308,47 @@ public class TillSessionService {
     }
 
     /**
-     * Accepts the count and closes the shift.
+     * The cashier returns the drawer's cash to a supervisor or branch manager, who confirms with
+     * their PIN what they received. That amount is the shift's count: it goes into the branch's
+     * intraday cash, and a tracked drawer's notes are kept beside what it should have held.
      *
-     * <p>A variance never blocks the close. The shift is over whatever the drawer says, and a close
-     * that could be refused is a close a cashier would work around by not counting at all.
+     * <p>Only once the shift is CLOSING, so the expected figure has stopped moving, and only once:
+     * the cash has left the drawer, and a second handover would count it twice.
      */
     @Transactional
-    public TillSession close(UUID sessionId, BigDecimal countedCash, String notes) {
-        return close(sessionId, countedCash, notes, null);
-    }
-
-    /** Closes with the count; given note by note, it is kept beside what the drawer should hold. */
-    @Transactional
-    public TillSession close(
+    public TillSession handOver(
             UUID sessionId,
             BigDecimal countedCash,
-            String notes,
-            java.util.List<CashCount.Line> countedNotes) {
+            java.util.List<CashCount.Line> countedNotes,
+            String notes) {
         TillSession session = require(sessionId);
+        switch (session.getStatus()) {
+            case OPEN ->
+                    throw new Errors.ConflictException(
+                            "till.not_closing",
+                            "Stop the till first, so nothing more is sold while its cash is"
+                                    + " counted.");
+            case CLOSED ->
+                    throw new Errors.ConflictException(
+                            "till.already_closed", "This shift is already closed");
+            case CLOSING -> {
+                // Counted while nothing can be sold.
+            }
+        }
+        if (session.isHandedOver()) {
+            throw new Errors.ConflictException(
+                    "till.already_handed_over",
+                    "This shift's cash was already handed over (%s)."
+                            .formatted(session.getHandedOverCash()));
+        }
+        requireSomeoneElseApproves(session);
+
         CashCount counted = countedNotes == null ? null : CashCount.of(countedNotes);
+        if (session.isTracksDenominations() && counted == null) {
+            throw new Errors.BadRequestException(
+                    "till.count_by_note_required",
+                    "This drawer is tracked note by note: count what is handed over the same way.");
+        }
         if (counted != null && countedCash == null) {
             countedCash = counted.total();
         }
@@ -324,32 +357,87 @@ public class TillSessionService {
                     "till.count_mismatch",
                     "The notes counted come to %s, not %s".formatted(counted.total(), countedCash));
         }
+        if (countedCash == null || countedCash.signum() < 0) {
+            throw new Errors.BusinessRuleException(
+                    "till.count_required", "Handing over the cash needs the amount counted");
+        }
 
+        CashCount cash = counted != null ? counted : ChangeMaker.asHandedOver(countedCash);
+        if (!cash.isEmpty()) {
+            intraday.fromTillAtClose(
+                    session.getBranchId(),
+                    session.getId(),
+                    cash,
+                    notes == null || notes.isBlank()
+                            ? "Returned at the close of the shift"
+                            : notes);
+        }
+        if (counted != null) {
+            drawer.countAtClose(session, counted);
+        }
+        session.setHandedOverCash(countedCash);
+        session.setHandedOverAt(Instant.now());
+        session.setHandedOverTo(currentActor());
+        return sessions.save(session);
+    }
+
+    /**
+     * Closes the shift, with the cash the supervisor received at the handover as its count.
+     *
+     * <p>A variance never blocks the close. The shift is over whatever the drawer says, and a close
+     * that could be refused is a close a cashier would work around by not counting at all. What
+     * blocks it is cash nobody has taken back.
+     */
+    @Transactional
+    public TillSession close(UUID sessionId, BigDecimal countedCash, String notes) {
+        TillSession session = require(sessionId);
         if (session.getStatus() == TillSessionStatus.CLOSED) {
             throw new Errors.ConflictException(
                     "till.already_closed", "This shift is already closed");
         }
         requireMayClose(session);
-        if (countedCash == null || countedCash.signum() < 0) {
-            throw new Errors.BusinessRuleException(
-                    "till.count_required", "Closing a shift needs the counted cash");
+        if (!session.isHandedOver()) {
+            throw new Errors.ConflictException(
+                    "till.not_handed_over",
+                    "Return the cash to a supervisor first: once they confirm what they received,"
+                            + " the shift can close.");
+        }
+        if (countedCash != null && countedCash.compareTo(session.getHandedOverCash()) != 0) {
+            throw new Errors.BadRequestException(
+                    "till.count_mismatch",
+                    "The supervisor received %s, not %s"
+                            .formatted(session.getHandedOverCash(), countedCash));
         }
 
-        TillReconciliation reconciliation = session.reconcile(countedCash);
+        TillReconciliation reconciliation = session.reconcile(session.getHandedOverCash());
         session.setExpectedCash(reconciliation.expectedCash());
         session.setCountedCash(reconciliation.countedCash());
         session.setVariance(reconciliation.variance());
         session.setStatus(TillSessionStatus.CLOSED);
         session.setClosedAt(Instant.now());
         session.setClosedBy(currentActor());
-        session.setNotes(notes);
-
-        if (counted != null && session.isTracksDenominations()) {
-            drawer.countAtClose(session, counted);
+        if (notes != null && !notes.isBlank()) {
+            session.setNotes(notes);
         }
         TillSession closed = sessions.save(session);
         events.shiftClosed(closed, reconciliation);
         return closed;
+    }
+
+    /**
+     * Cash between a till and the branch's intraday cash needs a second person: whoever holds the
+     * intraday - a supervisor or branch manager, by their PIN at the lane - and never the cashier
+     * on the shift, who would otherwise vouch for their own deposit, replenishment or count. The
+     * endpoints require {@code cash:intraday}; this adds that it is someone else's.
+     */
+    private static void requireSomeoneElseApproves(TillSession session) {
+        AuthenticatedUser caller = AuthenticatedUser.current().orElse(null);
+        if (caller != null && caller.userId().equals(session.getCashierId())) {
+            throw new Errors.ForbiddenException(
+                    "till.approver_is_cashier",
+                    "Someone other than the cashier on this shift has to approve cash to or from"
+                            + " the intraday.");
+        }
     }
 
     /**

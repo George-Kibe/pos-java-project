@@ -8,14 +8,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api/errors";
 import { amount, amountString, money, quantity, quantityString } from "@/lib/lane/decimal";
-import { laneApi } from "@/lib/lane/lane-api";
+import { approved, laneApi } from "@/lib/lane/lane-api";
 import { type CashCount, lines as cashLines, total as cashTotal } from "@/lib/lane/cash";
-import type { Cart, Customer, Drawer, TillSession } from "@/lib/lane/schemas";
+import { type Cart, type Customer, type Drawer, type TillSession, TillSessionSchema } from "@/lib/lane/schemas";
 
+import { ApprovalForm } from "./approval-dialog";
 import { CashCounter } from "./cash-counter";
 import { cn } from "@/lib/utils";
 
-/** The frame every lane dialog shares: a title, a line of help, Esc to leave. */
+/**
+ * The frame every lane dialog shares: a title, a line of help, Esc to leave. It scrolls rather than
+ * grow past the screen - the close's approver list can be long at a busy branch.
+ */
 function LaneDialog({
   open,
   title,
@@ -31,7 +35,7 @@ function LaneDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => (!next ? onCancel() : undefined)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
@@ -398,35 +402,49 @@ export function CustomerDialog({
 }
 
 /**
- * Closing the shift: the drawer is counted blind - the expected figure is shown only after the
- * count is entered, so the count is a count and not a copy. A tracked drawer is counted note by
- * note, and any difference is shown per denomination.
+ * Closing the shift is a handover, in three steps.
+ *
+ * 1. The till stops selling and the drawer is counted blind - the expected figure is shown only
+ *    after the close, so the count is a count and not a copy. A tracked drawer is counted note by
+ *    note.
+ * 2. The cash goes to a supervisor or branch manager, who confirms with their PIN what they
+ *    received. That is the shift's count, and it goes into the branch's intraday cash.
+ * 3. Then, and only then, the cashier closes the shift.
+ *
+ * A lane reloaded after the handover comes back at step 3.
  */
 export function CloseShiftDialog({
   open,
   shift,
+  branchId,
+  onShiftChanged,
   onClosed,
   onCancel,
 }: {
   open: boolean;
   shift: TillSession;
+  branchId: string;
+  onShiftChanged: (shift: TillSession) => void;
   onClosed: () => void;
   onCancel: () => void;
 }) {
   const tracked = Boolean(shift.tracksDenominations);
+  const [step, setStep] = useState<"count" | "handover" | "close">(shift.handedOverAt ? "close" : "count");
   const [counted, setCounted] = useState("");
   const [countedNotes, setCountedNotes] = useState<CashCount>({});
+  const [value, setValue] = useState<string | null>(null);
+  const [receivedBy, setReceivedBy] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [closed, setClosed] = useState<TillSession | null>(null);
   const [lines, setLines] = useState<Drawer["closingCount"]>([]);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
-  async function close(event: FormEvent) {
+  async function countDone(event: FormEvent) {
     event.preventDefault();
-    let value: string;
+    let total: string;
     try {
-      value = amountString(tracked ? amount(cashTotal(countedNotes)) : amount(counted));
+      total = amountString(tracked ? amount(cashTotal(countedNotes)) : amount(counted));
     } catch {
       setError("Enter the cash counted in the drawer.");
       return;
@@ -434,8 +452,40 @@ export function CloseShiftDialog({
     setBusy(true);
     setError(undefined);
     try {
-      if (shift.status === "OPEN") await laneApi.beginClose(shift.id);
-      const result = await laneApi.closeShift(shift.id, value, notes.trim() || undefined, tracked ? cashLines(countedNotes) : undefined);
+      // The till stops selling first, so nothing moves the figure while its cash is away.
+      if (shift.status === "OPEN") onShiftChanged(await laneApi.beginClose(shift.id));
+      setValue(total);
+      setStep("handover");
+    } catch (failure) {
+      setError(message(failure, "The till could not be stopped for the count."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handOver(approverId: string, pin: string) {
+    const { approverName, result } = await approved(
+      {
+        approverId,
+        pin,
+        permission: "cash:intraday",
+        branchId,
+        path: `till-sessions/${shift.id}/handover`,
+        body: { countedCash: value, countedNotes: tracked ? cashLines(countedNotes) : undefined },
+      },
+      TillSessionSchema,
+    );
+    onShiftChanged(result);
+    setReceivedBy(approverName);
+    setStep("close");
+  }
+
+  async function close(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(undefined);
+    try {
+      const result = await laneApi.closeShift(shift.id, notes.trim() || undefined);
       if (tracked) setLines((await laneApi.drawer(shift.id)).closingCount);
       setClosed(result);
     } catch (failure) {
@@ -490,22 +540,53 @@ export function CloseShiftDialog({
           </Button>
         </div>
       ) : (
-        <form onSubmit={close} className="grid gap-4">
-          {tracked ? (
-            <CashCounter idPrefix="close" value={countedNotes} onChange={setCountedNotes} compact />
-          ) : (
-            <Field id="counted-cash" label="Cash counted in the drawer" inputMode="decimal" autoFocus value={counted} onChange={(event) => setCounted(event.target.value)} />
-          )}
-          <Field id="close-notes" label="Notes (optional)" value={notes} onChange={(event) => setNotes(event.target.value)} />
-          {error ? (
-            <p role="alert" className="text-sm font-medium text-destructive">
-              {error}
+        step === "count" ? (
+          <form onSubmit={countDone} className="grid gap-4" data-testid="close-count">
+            <p className="text-sm text-muted-foreground">
+              Step 1 of 3: count the drawer. The till stops selling while its cash is counted and handed over.
             </p>
-          ) : null}
-          <Button type="submit" size="lg" disabled={busy}>
-            Close shift
-          </Button>
-        </form>
+            {tracked ? (
+              <CashCounter idPrefix="close" value={countedNotes} onChange={setCountedNotes} compact />
+            ) : (
+              <Field id="counted-cash" label="Cash counted in the drawer" inputMode="decimal" autoFocus value={counted} onChange={(event) => setCounted(event.target.value)} />
+            )}
+            {error ? (
+              <p role="alert" className="text-sm font-medium text-destructive">
+                {error}
+              </p>
+            ) : null}
+            <Button type="submit" size="lg" disabled={busy}>
+              Hand the cash to a supervisor
+            </Button>
+          </form>
+        ) : step === "handover" ? (
+          <div className="grid gap-3" data-testid="close-handover">
+            <p>
+              Step 2 of 3: hand <span className="font-medium">{money(value ?? "0")}</span> to a supervisor or branch
+              manager. They count it and confirm with their PIN what they received.
+            </p>
+            <ApprovalForm permission="cash:intraday" branchId={branchId} perform={handOver} submitLabel="Confirm cash received" />
+            <Button variant="outline" onClick={() => setStep("count")}>
+              Count again
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={close} className="grid gap-4" data-testid="close-final">
+            <p>
+              Step 3 of 3: {money(shift.handedOverCash ?? value ?? "0")} received{receivedBy ? ` by ${receivedBy}` : ""}. The
+              shift can now close.
+            </p>
+            <Field id="close-notes" label="Notes (optional)" value={notes} onChange={(event) => setNotes(event.target.value)} />
+            {error ? (
+              <p role="alert" className="text-sm font-medium text-destructive">
+                {error}
+              </p>
+            ) : null}
+            <Button type="submit" size="lg" autoFocus disabled={busy}>
+              Close shift
+            </Button>
+          </form>
+        )
       )}
     </LaneDialog>
   );

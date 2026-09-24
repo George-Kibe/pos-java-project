@@ -11,8 +11,9 @@ export const APPROVABLE_ACTIONS = {
   "price:override": { method: "POST", path: new RegExp(`^carts/${ID}/lines/${ID}/price-override$`) },
   "sale:void": { method: "POST", path: new RegExp(`^sales/${ID}/void$`) },
   "sale:refund": { method: "POST", path: /^returns$/ },
-  "cash:drop": { method: "POST", path: new RegExp(`^till-sessions/${ID}/drops$`) },
-  "cash:intraday": { method: "POST", path: new RegExp(`^till-sessions/${ID}/replenishments$`) },
+  // Every movement between a till and the branch's intraday cash: a deposit, a replenishment, and
+  // the cash returned at the close.
+  "cash:intraday": { method: "POST", path: new RegExp(`^till-sessions/${ID}/(drops|replenishments|handover)$`) },
 } as const;
 
 export type ApprovablePermission = keyof typeof APPROVABLE_ACTIONS;

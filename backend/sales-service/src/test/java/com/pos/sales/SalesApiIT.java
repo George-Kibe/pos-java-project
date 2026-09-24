@@ -552,6 +552,12 @@ class SalesApiIT extends SalesTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("CLOSING")));
         mockMvc.perform(
+                        post("/api/v1/till-sessions/" + tillId + "/handover")
+                                .with(supervisor)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json(Map.of("countedCash", "4232.00"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(
                         post("/api/v1/till-sessions/" + tillId + "/close")
                                 .with(cashier())
                                 .contentType(MediaType.APPLICATION_JSON)

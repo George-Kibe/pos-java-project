@@ -95,16 +95,22 @@ public class TillSessionController {
 
     @GetMapping("/registers/{registerId}/current")
     @PreAuthorize("hasAuthority('shift:open')")
-    @Operation(summary = "The open shift on a register, for a terminal that has just started")
+    @Operation(
+            summary =
+                    "The shift a register is on - open, or closing - for a terminal that has just"
+                            + " started")
     public SalesDtos.TillSessionResponse current(@PathVariable UUID registerId) {
-        TillSession session = sessions.requireOpenForRegister(registerId);
+        TillSession session = sessions.requireCurrentForRegister(registerId);
         branchAccess.requireAccess(session.getBranchId());
         return respond(session);
     }
 
     @PostMapping("/{id}/drops")
-    @PreAuthorize("hasAuthority('cash:drop')")
-    @Operation(summary = "Move cash from the drawer to the safe")
+    @PreAuthorize("hasAuthority('cash:intraday')")
+    @Operation(
+            summary =
+                    "Deposit cash from the drawer to the branch's intraday cash; approved by whoever"
+                            + " holds it, never the cashier on the shift")
     public SalesDtos.TillSessionResponse drop(
             @PathVariable UUID id, @Valid @RequestBody SalesDtos.CashMovementRequest request) {
         branchAccess.requireAccess(sessions.require(id).getBranchId());
@@ -132,7 +138,8 @@ public class TillSessionController {
     @PreAuthorize("hasAuthority('cash:intraday')")
     @Operation(
             summary =
-                    "Change for a till from the branch's intraday cash; approved by whoever holds it")
+                    "Change for a till from the branch's intraday cash; approved by whoever holds"
+                            + " it, never the cashier on the shift")
     public SalesDtos.TillSessionResponse replenish(
             @PathVariable UUID id, @Valid @RequestBody SalesDtos.ReplenishRequest request) {
         branchAccess.requireAccess(sessions.require(id).getBranchId());
@@ -194,18 +201,30 @@ public class TillSessionController {
         return respond(sessions.beginClose(id));
     }
 
+    @PostMapping("/{id}/handover")
+    @PreAuthorize("hasAuthority('cash:intraday')")
+    @Operation(
+            summary =
+                    "The cashier returns the drawer's cash; the supervisor receiving it confirms the"
+                            + " amount, which becomes the shift's count")
+    public SalesDtos.TillSessionResponse handOver(
+            @PathVariable UUID id, @Valid @RequestBody SalesDtos.HandoverRequest request) {
+        branchAccess.requireAccess(sessions.require(id).getBranchId());
+        return respond(
+                sessions.handOver(
+                        id,
+                        request.countedCash(),
+                        SalesDtos.lines(request.countedNotes()),
+                        request.notes()));
+    }
+
     @PostMapping("/{id}/close")
     @PreAuthorize("hasAuthority('shift:close')")
-    @Operation(summary = "Accept the counted cash and close the shift")
+    @Operation(summary = "Close the shift once its cash has been handed over")
     public SalesDtos.TillSessionResponse close(
             @PathVariable UUID id, @Valid @RequestBody SalesDtos.CloseSessionRequest request) {
         branchAccess.requireAccess(sessions.require(id).getBranchId());
-        return respond(
-                sessions.close(
-                        id,
-                        request.countedCash(),
-                        request.notes(),
-                        SalesDtos.lines(request.countedNotes())));
+        return respond(sessions.close(id, request.countedCash(), request.notes()));
     }
 
     @GetMapping("/{id}/z-report")

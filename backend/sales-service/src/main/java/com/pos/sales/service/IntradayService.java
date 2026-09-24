@@ -62,6 +62,12 @@ public class IntradayService {
         record(branchId, Kind.FROM_TILL, tillSessionId, cash, 1, reason);
     }
 
+    /** A till's cash, returned to the supervisor when its shift closes. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void fromTillAtClose(UUID branchId, UUID tillSessionId, CashCount cash, String reason) {
+        record(branchId, Kind.TILL_CLOSE, tillSessionId, cash, 1, reason);
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public void toTill(UUID branchId, UUID tillSessionId, CashCount cash, String reason) {
         requireSome(cash);

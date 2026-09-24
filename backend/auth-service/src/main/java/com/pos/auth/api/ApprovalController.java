@@ -42,9 +42,7 @@ public class ApprovalController {
 
     @PutMapping("/pin")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize(
-            "hasAnyAuthority('price:override', 'sale:void', 'sale:refund', 'cash:drop',"
-                    + " 'cash:intraday')")
+    @PreAuthorize("hasAnyAuthority('price:override', 'sale:void', 'sale:refund', 'cash:intraday')")
     @Operation(summary = "Set your own supervisor PIN, confirmed with your password")
     public void setPin(@Valid @RequestBody AuthDtos.SetPinRequest request) {
         service.setPin(

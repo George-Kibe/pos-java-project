@@ -125,7 +125,9 @@ test("a mixed basket with a supervisor-approved price, paid part card and part c
   await page.keyboard.press("F1");
   await expect(page.getByRole("radio", { name: /^Cash/ })).toHaveAttribute("aria-checked", "true");
   await page.getByLabel("Cash handed over").fill("200");
-  await page.keyboard.press("Enter");
+  // Enter on the field itself: the drawer reloads as the payment opens, and a bare key press can
+  // land before the field has the focus back.
+  await page.getByLabel("Cash handed over").press("Enter");
   // Change due: the till suggests the fewest pieces from the drawer; the cashier confirms.
   await expect(page.getByTestId("change-tally")).toContainText("Tallies");
   await page.getByRole("button", { name: "Give change" }).click();
@@ -160,7 +162,9 @@ test("selling with the network pulled, then every sale synced exactly once with 
   const branchId = await firstBranchId();
 
   // The lane has its catalogue before the network goes.
+  // Both items it will sell: the catalogue is paged, and the weighed one may be on a later page.
   await expect.poll(() => cachedProduct(page, milk.id), { timeout: 30_000 }).toBe(true);
+  await expect.poll(() => cachedProduct(page, bananas.id), { timeout: 30_000 }).toBe(true);
 
   await context.setOffline(true);
   await expect(page.getByTestId("connectivity")).toHaveText("Offline", { timeout: 20_000 });
@@ -179,7 +183,7 @@ test("selling with the network pulled, then every sale synced exactly once with 
   await expect(page.getByTestId("basket-total")).toHaveText("60.00");
   await page.keyboard.press("F10");
   await page.getByLabel("Cash handed over").fill("100");
-  await page.keyboard.press("Enter");
+  await page.getByLabel("Cash handed over").press("Enter");
   await page.getByRole("button", { name: "Give change" }).click();
   await expect(page.getByRole("heading", { name: "Change: 40.00" })).toBeVisible();
   await page.getByRole("button", { name: "Next sale" }).click();

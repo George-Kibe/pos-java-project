@@ -138,7 +138,8 @@ export function Checkout({
   const [results, setResults] = useState<Pick[]>([]);
   const [resultIndex, setResultIndex] = useState(0);
   const [selected, setSelected] = useState(0);
-  const [dialog, setDialog] = useState<LaneDialogState | null>(null);
+  // A shift already CLOSING (the lane was reloaded mid-handover) goes straight back to the close.
+  const [dialog, setDialog] = useState<LaneDialogState | null>(shift.status === "CLOSING" ? { kind: "close" } : null);
   const [busy, setBusy] = useState(false);
   const [lastSale, setLastSale] = useState<{ sale: Sale; receipt?: Receipt } | null>(null);
   const [drawer, setDrawer] = useState<Drawer | null>(null);
@@ -422,13 +423,18 @@ export function Checkout({
   }
 
   /** Does {@code action} as the cashier if they may, or asks a supervisor's PIN first. */
+  /**
+   * Does a privileged action: directly for someone who holds the permission, otherwise on a
+   * supervisor's PIN. With no direct path (`null`) the PIN is always asked - cash to and from the
+   * intraday is vouched for by a second person even when a supervisor is on the till.
+   */
   function withApproval(
     permission: ApprovablePermission,
     description: string,
-    direct: () => Promise<void>,
+    direct: (() => Promise<void>) | null,
     viaApproval: (approverId: string, pin: string) => Promise<string>,
   ) {
-    if (can(permission)) {
+    if (direct && can(permission)) {
       void direct().catch((failure) => fail(failure, "That was refused."));
       return;
     }
@@ -649,22 +655,18 @@ export function Checkout({
     setCustomer(chosen);
   }
 
-  /** Notes from the drawer to the branch's intraday cash; a supervisor confirms. */
+  /** Notes from the drawer to the branch's intraday cash; the supervisor receiving them approves. */
   function deposit(move: { cash: CashCount; reason: string }) {
     closeDialog();
     const total = amountString(amount(cashTotal(move.cash)));
     const body = { amount: total, reason: move.reason, notes: cashLines(move.cash) };
     withApproval(
-      "cash:drop",
+      "cash:intraday",
       `Deposit of ${money(amount(total))} to intraday: ${describeCash(move.cash)}`,
-      async () => {
-        onShiftChanged(await laneApi.cashDrop(shift.id, total, move.reason, body.notes));
-        toast.success("Deposit recorded.");
-        await reloadDrawer();
-      },
+      null,
       async (approverId, pin) => {
         const { approverName, result } = await approved(
-          { approverId, pin, permission: "cash:drop", branchId: branch.id, path: `till-sessions/${shift.id}/drops`, body },
+          { approverId, pin, permission: "cash:intraday", branchId: branch.id, path: `till-sessions/${shift.id}/drops`, body },
           TillSessionSchema,
         );
         onShiftChanged(result);
@@ -693,11 +695,7 @@ export function Checkout({
     withApproval(
       "cash:intraday",
       `Replenish ${money(amount(cashTotal(move.cash)))} from intraday: ${describeCash(move.cash)}`,
-      async () => {
-        onShiftChanged(await laneApi.replenish(shift.id, body.notes, move.reason));
-        toast.success("Replenishment recorded.");
-        await reloadDrawer();
-      },
+      null,
       async (approverId, pin) => {
         const { approverName, result } = await approved(
           { approverId, pin, permission: "cash:intraday", branchId: branch.id, path: `till-sessions/${shift.id}/replenishments`, body },
@@ -1041,15 +1039,19 @@ export function Checkout({
           onCancel={closeDialog}
         />
       ) : null}
-      <CloseShiftDialog
-        open={dialog?.kind === "close"}
-        shift={shift}
-        onClosed={() => {
-          setDialog(null);
-          onShiftClosed();
-        }}
-        onCancel={closeDialog}
-      />
+      {dialog?.kind === "close" ? (
+        <CloseShiftDialog
+          open
+          shift={shift}
+          branchId={branch.id}
+          onShiftChanged={onShiftChanged}
+          onClosed={() => {
+            setDialog(null);
+            onShiftClosed();
+          }}
+          onCancel={closeDialog}
+        />
+      ) : null}
       <PaymentDialog
         open={dialog?.kind === "payment"}
         offline={offline}

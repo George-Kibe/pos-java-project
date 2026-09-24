@@ -98,11 +98,20 @@ public final class SalesDtos {
     public record ReplenishRequest(
             @NotEmpty @Valid List<CashLine> notes, @Size(max = 500) String reason) {}
 
+    /**
+     * Closing after the handover. The counted cash is what the supervisor received; given here, it
+     * must agree with it.
+     */
     public record CloseSessionRequest(
             @DecimalMin("0.0") @Digits(integer = 15, fraction = 4) BigDecimal countedCash,
-            @Size(max = 1000) String notes,
-            /** The count note by note; the counted cash is then its total. */
-            @Valid List<CashLine> countedNotes) {}
+            @Size(max = 1000) String notes) {}
+
+    /** The drawer's cash returned to a supervisor, as counted in front of them. */
+    public record HandoverRequest(
+            @DecimalMin("0.0") @Digits(integer = 15, fraction = 4) BigDecimal countedCash,
+            /** The count note by note - required for a drawer tracked by denomination. */
+            @Valid List<CashLine> countedNotes,
+            @Size(max = 1000) String notes) {}
 
     /**
      * What the drawer holds right now, note by note, and where it stands against its cash limit.
@@ -159,7 +168,11 @@ public final class SalesDtos {
             String currency,
             Integer tillNumber,
             String tillLabel,
-            boolean tracksDenominations) {
+            boolean tracksDenominations,
+            /** The cash returned at the close, and who received it; null until the handover. */
+            BigDecimal handedOverCash,
+            Instant handedOverAt,
+            UUID handedOverTo) {
 
         public static TillSessionResponse from(TillSession session) {
             return from(session, null);
@@ -191,7 +204,10 @@ public final class SalesDtos {
                     session.getCurrency(),
                     register == null ? null : register.getNumber(),
                     register == null ? null : register.label(),
-                    session.isTracksDenominations());
+                    session.isTracksDenominations(),
+                    session.getHandedOverCash(),
+                    session.getHandedOverAt(),
+                    session.getHandedOverTo());
         }
     }
 

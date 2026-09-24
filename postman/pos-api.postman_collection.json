@@ -5331,7 +5331,7 @@
               }
             },
             {
-              "name": "The open shift on a register, for a terminal that has just started",
+              "name": "The shift a register is on - open, or closing - for a terminal that has just started",
               "request": {
                 "method": "GET",
                 "header": [
@@ -5355,7 +5355,7 @@
                   ],
                   "query": []
                 },
-                "description": "The open shift on a register, for a terminal that has just started"
+                "description": "The shift a register is on - open, or closing - for a terminal that has just started"
               }
             },
             {
@@ -5444,7 +5444,7 @@
               }
             },
             {
-              "name": "Accept the counted cash and close the shift",
+              "name": "Close the shift once its cash has been handed over",
               "request": {
                 "method": "POST",
                 "header": [
@@ -5476,10 +5476,10 @@
                   ],
                   "query": []
                 },
-                "description": "Accept the counted cash and close the shift",
+                "description": "Close the shift once its cash has been handed over",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"countedCash\": 100,\n  \"notes\": \"Recorded from Postman\",\n  \"countedNotes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ]\n}",
+                  "raw": "{\n  \"countedCash\": 100,\n  \"notes\": \"Recorded from Postman\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5516,7 +5516,7 @@
               }
             },
             {
-              "name": "Move cash from the drawer to the safe",
+              "name": "Deposit cash from the drawer to the branch's intraday cash; approved by whoever holds it, never the cashier on the shift",
               "request": {
                 "method": "POST",
                 "header": [
@@ -5548,7 +5548,7 @@
                   ],
                   "query": []
                 },
-                "description": "Move cash from the drawer to the safe",
+                "description": "Deposit cash from the drawer to the branch's intraday cash; approved by whoever holds it, never the cashier on the shift",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"amount\": 100,\n  \"reason\": \"Recorded from Postman\",\n  \"reference\": \"\",\n  \"notes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ]\n}",
@@ -5651,7 +5651,52 @@
               }
             },
             {
-              "name": "Change for a till from the branch's intraday cash; approved by whoever holds it",
+              "name": "The cashier returns the drawer's cash; the supervisor receiving it confirms the amount, which becomes the shift's count",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}",
+                    "description": "Makes a retry harmless; a fresh one per call."
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/till-sessions/{{tillSessionId}}/handover",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "till-sessions",
+                    "{{tillSessionId}}",
+                    "handover"
+                  ],
+                  "query": []
+                },
+                "description": "The cashier returns the drawer's cash; the supervisor receiving it confirms the amount, which becomes the shift's count",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"countedCash\": 100,\n  \"countedNotes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ],\n  \"notes\": \"Recorded from Postman\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Change for a till from the branch's intraday cash; approved by whoever holds it, never the cashier on the shift",
               "request": {
                 "method": "POST",
                 "header": [
@@ -5683,7 +5728,7 @@
                   ],
                   "query": []
                 },
-                "description": "Change for a till from the branch's intraday cash; approved by whoever holds it",
+                "description": "Change for a till from the branch's intraday cash; approved by whoever holds it, never the cashier on the shift",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"notes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ],\n  \"reason\": \"Recorded from Postman\"\n}",

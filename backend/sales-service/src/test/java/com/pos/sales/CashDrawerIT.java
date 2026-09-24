@@ -270,6 +270,24 @@ class CashDrawerIT extends SalesTestBase {
         UUID branch = UUID.randomUUID();
         TillSession till = trackedShift(branch, 1000, 2, 20, 1);
 
+        // The cashier cannot vouch for their own deposit or replenishment, whatever they hold.
+        actingAs(CASHIER, "cash:intraday");
+        assertThatThrownBy(
+                        () ->
+                                tills.recordDrop(
+                                        till.getId(),
+                                        new BigDecimal("1000"),
+                                        "Mine",
+                                        null,
+                                        notes(1000, 1)))
+                .satisfies(
+                        failure -> assertThat(code(failure)).isEqualTo("till.approver_is_cashier"));
+        assertThatThrownBy(() -> tills.replenish(till.getId(), notes(20, 1), null))
+                .satisfies(
+                        failure -> assertThat(code(failure)).isEqualTo("till.approver_is_cashier"));
+        assertThat(intraday.holdings(branch).isEmpty()).isTrue();
+
+        actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
         tills.recordDrop(
                 till.getId(), new BigDecimal("1000"), "Over the limit", null, notes(1000, 1));
         assertThat(drawer.holdings(till.getId())).isEqualTo(cash(1000, 1, 20, 1));
@@ -359,12 +377,48 @@ class CashDrawerIT extends SalesTestBase {
     // --- close ---------------------------------------------------------------------------
 
     @Test
-    @DisplayName("the close is counted note by note beside what the drawer should hold")
-    void theCloseIsCountedByDenomination() {
-        TillSession till = trackedShift(BRANCH, 100, 2);
-        tills.beginClose(till.getId());
-        TillSession closed = tills.close(till.getId(), null, "End of day", notes(100, 1, 50, 1));
+    @DisplayName(
+            "the close: the till stops, a supervisor receives the cash counted note by note, then the"
+                    + " cashier closes")
+    void theCloseIsAHandoverCountedByDenomination() {
+        UUID branch = UUID.randomUUID();
+        TillSession till = trackedShift(branch, 100, 2);
 
+        // Not while the till can still sell, and not closed before anyone has the cash.
+        actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
+        assertThatThrownBy(() -> tills.handOver(till.getId(), null, notes(100, 2), null))
+                .satisfies(failure -> assertThat(code(failure)).isEqualTo("till.not_closing"));
+        actingAs(CASHIER, CASHIER_PERMISSIONS);
+        tills.beginClose(till.getId());
+        assertThatThrownBy(() -> tills.close(till.getId(), null, "End of day"))
+                .satisfies(failure -> assertThat(code(failure)).isEqualTo("till.not_handed_over"));
+
+        // The cashier cannot receive their own cash; a tracked drawer is counted by note.
+        actingAs(CASHIER, "cash:intraday");
+        assertThatThrownBy(() -> tills.handOver(till.getId(), null, notes(100, 1, 50, 1), null))
+                .satisfies(
+                        failure -> assertThat(code(failure)).isEqualTo("till.approver_is_cashier"));
+        actingAs(SUPERVISOR, SUPERVISOR_PERMISSIONS);
+        assertThatThrownBy(() -> tills.handOver(till.getId(), new BigDecimal("150"), null, null))
+                .satisfies(
+                        failure ->
+                                assertThat(code(failure)).isEqualTo("till.count_by_note_required"));
+
+        TillSession handed = tills.handOver(till.getId(), null, notes(100, 1, 50, 1), null);
+        assertThat(handed.getHandedOverCash()).isEqualByComparingTo("150");
+        assertThat(handed.getHandedOverTo()).isEqualTo(SUPERVISOR);
+        assertThat(intraday.holdings(branch)).isEqualTo(cash(100, 1, 50, 1));
+        assertThatThrownBy(() -> tills.handOver(till.getId(), null, notes(100, 1), null))
+                .satisfies(
+                        failure -> assertThat(code(failure)).isEqualTo("till.already_handed_over"));
+
+        // The close takes what the supervisor received; a different figure is refused.
+        actingAs(CASHIER, CASHIER_PERMISSIONS);
+        assertThatThrownBy(() -> tills.close(till.getId(), new BigDecimal("200"), null))
+                .satisfies(failure -> assertThat(code(failure)).isEqualTo("till.count_mismatch"));
+        TillSession closed = tills.close(till.getId(), null, "End of day");
+
+        assertThat(closed.getClosedBy()).isEqualTo(CASHIER);
         assertThat(closed.getCountedCash()).isEqualByComparingTo("150");
         assertThat(closed.getVariance()).isEqualByComparingTo("-50");
         Map<BigDecimal, int[]> lines = new java.util.HashMap<>();
@@ -471,5 +525,100 @@ class CashDrawerIT extends SalesTestBase {
                                 .param("branchId", BRANCH.toString())
                                 .with(at(SUPERVISOR, "till:manage")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName(
+            "over HTTP: deposits, replenishments and the closing handover need a supervisor's"
+                    + " approval, and never the cashier's own")
+    void cashToAndFromIntradayIsApprovedOverHttp() throws Exception {
+        UUID register = UUID.randomUUID();
+        String opened =
+                mockMvc.perform(
+                                post("/api/v1/till-sessions")
+                                        .with(at(CASHIER, CASHIER_PERMISSIONS))
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"branchId\":\"%s\",\"registerId\":\"%s\",\"openingFloat\":2000,\"floatCount\":[{\"denomination\":1000,\"count\":2}]}"
+                                                        .formatted(BRANCH, register)))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        String session = EventJson.mapper().readTree(opened).get("id").asString();
+        String deposit =
+                "{\"amount\":1000,\"reason\":\"Limit\",\"notes\":[{\"denomination\":1000,\"count\":1}]}";
+        String handover = "{\"countedNotes\":[{\"denomination\":1000,\"count\":1}]}";
+
+        // A cashier holds neither deposits nor handovers, and cannot close with cash undelivered.
+        mockMvc.perform(
+                        post("/api/v1/till-sessions/" + session + "/drops")
+                                .with(at(CASHIER, CASHIER_PERMISSIONS))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(deposit))
+                .andExpect(status().isForbidden());
+        // A supervisor's own shift is no exception: the approver is someone else.
+        mockMvc.perform(
+                        post("/api/v1/till-sessions/" + session + "/drops")
+                                .with(at(CASHIER, "cash:intraday"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(deposit))
+                .andExpect(status().isForbidden())
+                .andExpect(
+                        jsonPath("$.type", org.hamcrest.Matchers.endsWith("approver_is_cashier")));
+
+        // What the lane sends after a supervisor's PIN: a token carrying cash:intraday alone.
+        mockMvc.perform(
+                        post("/api/v1/till-sessions/" + session + "/drops")
+                                .with(at(SUPERVISOR, "cash:intraday"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(deposit))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cashDrops").value(1000.0));
+
+        mockMvc.perform(
+                        post("/api/v1/till-sessions/" + session + "/begin-close")
+                                .with(at(CASHIER, CASHIER_PERMISSIONS)))
+                .andExpect(status().isOk());
+        mockMvc.perform(
+                        post("/api/v1/till-sessions/" + session + "/close")
+                                .with(at(CASHIER, CASHIER_PERMISSIONS))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isConflict());
+        // A lane reloaded now comes back to the close, not to a shift it thinks is selling.
+        mockMvc.perform(
+                        get("/api/v1/till-sessions/registers/" + register + "/current")
+                                .with(at(CASHIER, CASHIER_PERMISSIONS)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("CLOSING")));
+        mockMvc.perform(
+                        get("/api/v1/till-sessions/registers/" + UUID.randomUUID() + "/current")
+                                .with(at(CASHIER, CASHIER_PERMISSIONS)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(
+                        post("/api/v1/till-sessions/" + session + "/handover")
+                                .with(at(CASHIER, CASHIER_PERMISSIONS))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(handover))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(
+                        post("/api/v1/till-sessions/" + session + "/handover")
+                                .with(at(SUPERVISOR, "cash:intraday"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(handover))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.handedOverCash").value(1000.0))
+                .andExpect(jsonPath("$.handedOverTo", is(SUPERVISOR.toString())));
+        mockMvc.perform(
+                        post("/api/v1/till-sessions/" + session + "/close")
+                                .with(at(CASHIER, CASHIER_PERMISSIONS))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("CLOSED")))
+                .andExpect(jsonPath("$.countedCash").value(1000.0))
+                .andExpect(jsonPath("$.variance", is(0.0)));
+        assertThat(intraday.holdings(BRANCH)).isEqualTo(cash(1000, 2));
     }
 }

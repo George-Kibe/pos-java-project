@@ -27,7 +27,7 @@ const RegisterSchema = z.object({ id: z.uuid(), branchId: z.uuid(), number: z.nu
 const LimitSchema = z.object({ id: z.uuid(), branchId: z.uuid(), userId: z.uuid().nullable(), limitAmount: z.number(), ceilingAmount: z.number() });
 const StaffSchema = z.object({ id: z.uuid(), fullName: z.string(), roles: z.array(z.string()) });
 
-const KINDS: Record<string, string> = { TOP_UP: "Brought in", BANKED: "Banked", FROM_TILL: "Deposit from a till", TO_TILL: "Replenished a till" };
+const KINDS: Record<string, string> = { TOP_UP: "Brought in", BANKED: "Banked", FROM_TILL: "Deposit from a till", TO_TILL: "Replenished a till", TILL_CLOSE: "Returned at a till's close" };
 
 function failure(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;

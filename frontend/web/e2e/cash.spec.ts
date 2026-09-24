@@ -18,7 +18,7 @@ import {
 /**
  * Stock added by delivery and taken off by sales; the till's number; the drawer note by note,
  * change made from it; deposits and replenishments through the supervisor's intraday cash; the cash
- * limit that stops cash; and the counted close.
+ * limit that stops cash; and the close, counted and handed to the supervisor.
  */
 const RUN = String(Date.now()).slice(-6);
 const PIN = "5937";
@@ -203,6 +203,14 @@ test("the till shows its number and its drawer note by note, gives change from i
   for (const [denomination, count] of [[1000, 3], [100, 2], [20, 7], [10, 2], [5, 3]] as const) {
     await page.getByLabel(`Count of ${denomination}`, { exact: true }).fill(String(count));
   }
+  // The cash goes back to the supervisor, who confirms what they received; only then the close.
+  await page.getByRole("button", { name: "Hand the cash to a supervisor" }).click();
+  const ours = page.getByRole("option", { name: supervisorName });
+  await expect(page.getByLabel("PIN").or(ours)).toBeVisible();
+  if (await ours.isVisible()) await ours.click();
+  await page.getByLabel("PIN").fill(PIN);
+  await page.getByRole("button", { name: "Confirm cash received" }).click();
+  await expect(page.getByTestId("close-final")).toContainText(`3,375.00 received by ${supervisorName}`);
   await page.getByRole("button", { name: "Close shift" }).click();
   const closed = page.getByTestId("shift-closed");
   await expect(closed).toContainText("Short");

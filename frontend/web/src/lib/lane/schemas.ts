@@ -28,6 +28,10 @@ export const TillSessionSchema = z.object({
   tillNumber: z.number().int().nullable().optional(),
   tillLabel: z.string().nullable().optional(),
   tracksDenominations: z.boolean().optional(),
+  /** The cash returned to a supervisor at the close; the shift can close only after it. */
+  handedOverCash: Money.nullable().optional(),
+  handedOverAt: z.string().nullable().optional(),
+  handedOverTo: Id.nullable().optional(),
 });
 export type TillSession = z.infer<typeof TillSessionSchema>;
 

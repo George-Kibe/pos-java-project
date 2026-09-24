@@ -1100,7 +1100,8 @@ Delivered:
   holding one permission at one branch, with `act` naming the cashier (ADR-013). Five wrong PINs
   lock the PIN for 15 minutes, counted in their own transaction, and never lock the sign-in. The BFF
   spends the token on the single call that permission is allowed (`price:override`, `sale:void`,
-  `sale:refund`, `cash:drop`) and never sends it to the browser
+  `sale:refund`, and - since the closing handover - `cash:intraday` for deposits, replenishments and
+  the handover) and never sends it to the browser
 - **Email receipt**: `POST /sales/{id}/receipts/email` publishes `receipt-email-requested`, carrying
   the receipt as issued; notification-service renders it (HTML and text, shop time zone, cents
   rounded HALF_UP at display) and a redelivery sends nothing twice. A voided sale's receipt is not
@@ -1258,6 +1259,43 @@ times in a row:**
 | A branch manager adding stock at another branch | ✅ 403 |
 | The cashier's own change | ✅ 35 as three 10s and a 5 instead of the suggested 20+10+5; "15 of 35" keeps the sale from going on; the server refuses a count that does not tally or is not in the drawer |
 | Exchange | ✅ 100 in, two 50s out, total unchanged; unbalanced or not-in-drawer refused; a shift kept by total cannot; only the cashier on the shift or a supervisor |
+
+---
+
+## Approved cash movements and the closing handover (after Phase 14) ✅
+
+Asked for between phases: every deposit to and replenishment from the intraday is approved by a
+supervisor or branch manager, and closing a shift is a process - the cashier returns the cash, the
+supervisor confirms what they received, then the cashier closes (ADR-014).
+
+- **Deposits and replenishments** need `cash:intraday` (deposits used to need `cash:drop`) from
+  someone other than the cashier on the shift. The lane always asks for the PIN - a supervisor on
+  a till included - and `cash:drop` is no longer a PIN-approvable permission.
+- **The close** (Alt+X), in three steps: the till stops selling and the drawer is counted blind;
+  the cash is handed to a supervisor, who confirms with their PIN what they received (`POST
+  /till-sessions/{id}/handover`, `cash:intraday`) - the notes go into the intraday cash as
+  `TILL_CLOSE` and the note-by-note count is kept; then the cashier closes, and the amount received
+  is the counted cash. A close before the handover is refused (`till.not_handed_over`), a second
+  handover too (`till.already_handed_over`). The money arithmetic and `shift-closed` are unchanged.
+- A lane reloaded mid-close comes back to the close: `GET /till-sessions/registers/{id}/current`
+  now answers a CLOSING shift as well, and 404 when there is none (it answered 422, which the lane
+  took for an outage and fell back to its cached, still-OPEN shift).
+- The web app's typeface is **Poppins** (400-700); monospace stays Geist Mono. The old
+  `--font-sans` pointed at itself, so no web font had been applied at all.
+
+**Verified - sales-service 114 tests and auth-service's suite (coverage gates met), 82 web unit
+tests, 10 browser runs three times in a row:**
+
+| Check | Result |
+|---|---|
+| The cashier approving their own deposit, replenishment or handover | ✅ 403 `till.approver_is_cashier`, even holding `cash:intraday`; nothing reaches the intraday |
+| A cashier depositing or handing over without a PIN | ✅ 403 |
+| A supervisor's approval token (`cash:intraday` alone) | ✅ deposit and handover accepted |
+| Close before the handover | ✅ 409 `till.not_handed_over` |
+| Handover while the till still sells, twice, or a tracked drawer counted by total | ✅ refused (`till.not_closing`, `till.already_handed_over`, `till.count_by_note_required`) |
+| Handover | ✅ notes into the intraday as `TILL_CLOSE`, the count kept by note, the approver recorded; the close takes it as counted cash; another figure refused |
+| A lane reloaded mid-close | ✅ `/current` answers the CLOSING shift; 404 for a register with none |
+| In the browser | ✅ deposit and replenish by PIN; the close counted, handed to the supervisor by PIN ("3,375.00 received by ..."), then closed, short 5 shown against the 5s; Poppins loaded |
 
 ---
 

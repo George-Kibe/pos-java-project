@@ -114,8 +114,9 @@ five wrong entries - separately from the login lockout). At a lane, the cashier'
 `POST /auth/approvals` with the supervisor's id and PIN, and gets a JWT for **the supervisor**,
 carrying one permission and one branch, living two minutes, with `act` naming the cashier. The BFF
 spends it on the one call it was requested for - an allow-list maps each approvable permission
-(`price:override`, `sale:void`, `sale:refund`, `cash:drop`) to exactly one method and path - and
-never returns it to the browser.
+(`price:override`, `sale:void`, `sale:refund`, `cash:intraday`) to its method and paths
+(`cash:intraday`: a deposit, a replenishment or the closing handover) - and never returns it to the
+browser.
 **Why:** no service changes. The approved call arrives as an ordinary request from the supervisor,
 so every existing `@PreAuthorize`, branch check and audit record names the person who approved.
 A password typed at a shared till would be seen; signing the cashier out and back in wastes the
@@ -139,6 +140,13 @@ at close points at the note it is in. Handovers are where cash goes missing, so 
 are recorded, and a supervisor's PIN confirms them. The money totals and the shift-closed arithmetic
 are unchanged - replenishments are float in, deposits are drops - so reporting's mirror of the till
 needs no change.
+Every movement between a till and the intraday - deposit, replenishment, and the **closing
+handover** - needs `cash:intraday` from someone other than the cashier on the shift
+(`till.approver_is_cashier`), so the lane asks for a PIN even when a supervisor is selling. The
+close is a process: the till stops (CLOSING), the drawer is counted blind, the supervisor confirms
+with their PIN what they received (`POST /till-sessions/{id}/handover`, which puts the notes into
+the intraday as `TILL_CLOSE`), and only then can the cashier close; what was received is the
+shift's counted cash.
 The cashier may count out the change their own way; the server accepts it only when it tallies with
 the change due and is in the drawer. An **exchange** (notes for notes of the same total) writes an
 in and an out that balance, changing the drawer's make-up and never its money.
