@@ -30,7 +30,7 @@ export function NavLinks({ items }: { items: NavItem[] }) {
   }, [items, router]);
 
   return (
-    <nav aria-label="Main" className="flex items-center gap-1 overflow-x-auto">
+    <nav aria-label="Main" className="flex flex-wrap items-center gap-1">
       {items.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
@@ -39,8 +39,10 @@ export function NavLinks({ items }: { items: NavItem[] }) {
             href={item.href}
             aria-current={active ? "page" : undefined}
             aria-keyshortcuts={`Alt+${item.shortcut.toUpperCase()}`}
+            // With a menu this long, the shortcut is a tooltip rather than a label beside each entry.
+            title={`${item.label} (Alt+${item.shortcut.toUpperCase()})`}
             className={cn(
-              "inline-flex h-11 items-center gap-2 rounded-lg px-4 text-base font-medium transition-colors",
+              "inline-flex h-11 items-center rounded-lg px-3 text-base font-medium transition-colors",
               "focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
               active
                 ? "bg-primary text-primary-foreground"
@@ -48,9 +50,6 @@ export function NavLinks({ items }: { items: NavItem[] }) {
             )}
           >
             {item.label}
-            <kbd className="hidden rounded border border-current/30 px-1 text-xs opacity-70 md:inline">
-              Alt+{item.shortcut.toUpperCase()}
-            </kbd>
           </Link>
         );
       })}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { homeFor, visibleNav } from "./nav";
+import { homeFor, NAV, visibleNav } from "./nav";
 
 // The permissions auth-service seeds for these roles (V2__seed_roles_and_permissions.sql).
 const CASHIER = ["product:view", "shift:open", "shift:close", "cart:manage", "sale:create", "payment:take", "customer:view"];
@@ -15,7 +15,7 @@ describe("navigation by permission", () => {
   });
 
   it("shows a branch manager the till and the dashboard", () => {
-    expect(labels(BRANCH_MANAGER)).toEqual(["Till", "Dashboard", "Account"]);
+    expect(labels(BRANCH_MANAGER)).toEqual(["Till", "Dashboard", "Reports", "Users", "Account"]);
   });
 
   it("shows someone with no role only their account", () => {
@@ -29,8 +29,15 @@ describe("navigation by permission", () => {
     expect(homeFor([])).toBe("/account");
   });
 
-  it("gives every item a distinct shortcut", () => {
-    const shortcuts = visibleNav(BRANCH_MANAGER).map((item) => item.shortcut);
+  it("shows an administrator an entry for every right it holds", () => {
+    const everything = NAV.flatMap((item) => item.permissions);
+    expect(labels(everything)).toEqual(NAV.map((item) => item.label));
+  });
+
+  it("gives every item a distinct shortcut, clear of the lane's own", () => {
+    const shortcuts = NAV.map((item) => item.shortcut);
     expect(new Set(shortcuts).size).toBe(shortcuts.length);
+    // Alt+C, L, V, R, X, P and Y belong to the checkout.
+    expect(shortcuts.filter((key) => "clvrxpy".includes(key))).toEqual([]);
   });
 });

@@ -121,7 +121,11 @@ test("a cashier and a manager see different navigation", async ({ page }) => {
   await signIn(page, manager.email, PASSWORD);
   await expect(page).toHaveURL(/\/dashboard$/);
   const managerNav = page.getByRole("navigation", { name: "Main" });
-  await expect(managerNav.getByRole("link")).toHaveText([/Till/, /Dashboard/, /Account/]);
+  // Everything BRANCH_MANAGER grants, and nothing it does not: no permission for roles to be
+  // changed is needed to view them, so Roles shows; there is no report:view, only :branch.
+  await expect(managerNav.getByRole("link")).toHaveText([
+    /Till/, /Dashboard/, /Reports/, /Stock/, /Purchasing/, /Customers/, /Cash/, /Users/, /Roles/, /Branches/, /Audit/, /Account/,
+  ]);
   await expect(page.getByTestId("dashboard-figures")).toBeVisible();
 });
 
