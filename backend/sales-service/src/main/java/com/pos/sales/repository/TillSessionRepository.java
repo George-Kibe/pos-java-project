@@ -18,4 +18,13 @@ public interface TillSessionRepository extends JpaRepository<TillSession, UUID> 
     Page<TillSession> findByBranchIdOrderByOpenedAtDesc(UUID branchId, Pageable pageable);
 
     Optional<TillSession> findByCashierIdAndStatus(UUID cashierId, TillSessionStatus status);
+
+    /** A branch's shifts still holding a drawer: open, or closing. */
+    java.util.List<TillSession> findByBranchIdAndStatusNotOrderByOpenedAt(
+            UUID branchId, TillSessionStatus status);
+
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT DISTINCT s.branchId FROM TillSession s WHERE s.status <> :closed")
+    java.util.List<UUID> branchesWithShiftsNot(
+            @org.springframework.data.repository.query.Param("closed") TillSessionStatus closed);
 }

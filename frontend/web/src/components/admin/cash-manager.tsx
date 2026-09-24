@@ -5,6 +5,7 @@ import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { CashPosition } from "@/components/admin/cash-position";
 import { CashCounter } from "@/components/lane/cash-counter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,6 +37,7 @@ function failure(error: unknown, fallback: string) {
 export function CashManager({ branchId, canHold, canManage }: { branchId: string; canHold: boolean; canManage: boolean }) {
   return (
     <div className="grid gap-8">
+      {canHold ? <CashPosition branchId={branchId} /> : null}
       {canHold ? <Intraday branchId={branchId} /> : null}
       <Tills branchId={branchId} canManage={canManage} />
       {canManage ? <Limits branchId={branchId} /> : null}

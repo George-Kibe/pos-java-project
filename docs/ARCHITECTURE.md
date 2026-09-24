@@ -147,6 +147,10 @@ close is a process: the till stops (CLOSING), the drawer is counted blind, the s
 with their PIN what they received (`POST /till-sessions/{id}/handover`, which puts the notes into
 the intraday as `TILL_CLOSE`), and only then can the cashier close; what was received is the
 shift's counted cash.
+The **cash position** (`/cash-positions`) adds the two ledgers up for whoever holds the intraday:
+each till still on a shift at its expected cash (nothing once handed over), the intraday, and the
+branch total; the administrator sees every branch. The intraday is one pot per branch, not per
+supervisor - decided with the user.
 The cashier may count out the change their own way; the server accepts it only when it tallies with
 the change due and is in the drawer. An **exchange** (notes for notes of the same total) writes an
 in and an out that balance, changing the drawer's make-up and never its money.

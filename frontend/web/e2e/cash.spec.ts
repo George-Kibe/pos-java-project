@@ -27,6 +27,7 @@ let milk: TestProduct;
 let supervisorName: string;
 let cashier: { email: string; temporaryPassword: string };
 let administrator: { email: string; temporaryPassword: string };
+let supervisor: { email: string; temporaryPassword: string };
 let branchId: string;
 
 test.describe.configure({ mode: "serial" });
@@ -36,7 +37,7 @@ test.beforeAll(async ({ browser }) => {
   branchId = await firstBranchId();
   milk = await createProduct({ name: `E2E Cash Milk ${RUN}`, sku: `E2E-CMILK-${RUN}`, price: 65, weighed: false });
   supervisorName = `E2E Cash Supervisor ${RUN}`;
-  const supervisor = await staffMember(["SUPERVISOR"], "cash-supervisor", supervisorName);
+  supervisor = await staffMember(["SUPERVISOR"], "cash-supervisor", supervisorName);
   cashier = await staffMember(["CASHIER"], "cash-cashier", `E2E Cash Cashier ${RUN}`);
   administrator = await staffMember(["SUPER_ADMIN"], "cash-admin", `E2E Cash Admin ${RUN}`);
 
@@ -196,6 +197,27 @@ test("the till shows its number and its drawer note by note, gives change from i
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Paid" })).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Next sale" }).click();
+
+  // The supervisor sees where the branch's cash is: this cashier's till, the intraday they hold,
+  // and the branch's total - the same figures the service holds.
+  const position = (await admin(`/cash-positions/${branchId}`)) as { tillsTotal: number; intradayTotal: number; total: number };
+  expect(position.total).toBeCloseTo(position.tillsTotal + position.intradayTotal, 4);
+  const figure = (value: number) => value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const floor = await signedIn(browser, supervisor);
+  await floor.goto(`/cash?branch=${branchId}`);
+  await expect(floor.getByTestId("position-till").filter({ hasText: `E2E Cash Cashier ${RUN}` })).toContainText("3,380.00");
+  await expect(floor.getByTestId("position-intraday")).toContainText(figure(position.intradayTotal));
+  await expect(floor.getByTestId("position-total")).toContainText(figure(position.total));
+  await expect(floor.getByRole("heading", { name: "Every branch" })).toHaveCount(0);
+  await floor.context().close();
+
+  // The administrator sees every branch side by side, and this one among them.
+  const office = await signedIn(browser, administrator);
+  await office.goto("/cash");
+  const branchName = ((await admin("/branches")) as { id: string; name: string }[]).find((b) => b.id === branchId)!.name;
+  await expect(office.getByTestId("branch-cash").filter({ hasText: branchName })).toContainText(figure(position.total));
+  await expect(office.getByTestId("every-branch-total")).toBeVisible();
+  await office.context().close();
 
   // The close, counted note by note: a 5 missing shows against the 5s.
   await page.keyboard.press("Alt+x");

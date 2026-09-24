@@ -22,4 +22,7 @@ public interface IntradayMovementRepository extends JpaRepository<IntradayMoveme
     List<DrawerMovementRepository.Holding> holdings(@Param("branchId") UUID branchId);
 
     Page<IntradayMovement> findByBranchIdOrderByOccurredAtDesc(UUID branchId, Pageable pageable);
+
+    @Query("SELECT DISTINCT m.branchId FROM IntradayMovement m")
+    List<UUID> branches();
 }

@@ -1321,6 +1321,33 @@ Asked for between phases: adding a supplier is the super administrator's alone.
 
 ---
 
+## Where the cash is (after Phase 14) ✅
+
+Asked for between phases: supervisors and branch managers see all the money their cashiers hold,
+what they hold themselves, and the branch's total; the administrator sees every branch's. Decided
+with the user: the intraday stays one pot per branch, held by the supervisors, rather than a
+holding per person.
+
+- `GET /cash-positions/{branchId}` (sales, `cash:intraday`, branch-checked): each shift still
+  holding a drawer - cashier, till, since, limit state, and what it holds (its expected cash;
+  nothing once its cash has been handed over, which is then in the intraday) - the intraday cash
+  note by note, and the branch total. `GET /cash-positions`: one line per branch the caller may
+  see; with `branch:access:all`, every branch holding any cash.
+- The **Cash** page opens with "Where the cash is" for the chosen branch, refreshed every 30
+  seconds; the administrator also gets "Every branch" side by side with a grand total, and a branch
+  picker listing every branch rather than only those they are assigned to.
+
+**Verified:**
+
+| Check | Result |
+|---|---|
+| Tills and intraday | ✅ each counted once; a till handed over holds nothing; a closed shift drops out, the total unchanged |
+| Who sees which branches | ✅ a supervisor their own; the administrator every branch with cash |
+| Over HTTP | ✅ a cashier 403; another branch's supervisor 403; the administrator 200 |
+| In the browser | ✅ the supervisor sees the cashier's till at 3,380.00, the intraday and the total the service holds; the administrator sees the branch in "Every branch" |
+
+---
+
 ## Phase 15 — Frontend back office
 
 **Goal:** the business can be run without touching the database.

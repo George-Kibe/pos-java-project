@@ -4528,6 +4528,62 @@
           ]
         },
         {
+          "name": "Cash position",
+          "item": [
+            {
+              "name": "Cash per branch - in its tills, in its intraday, in total - for every branch the caller may see",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/cash-positions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cash-positions"
+                  ],
+                  "query": []
+                },
+                "description": "Cash per branch - in its tills, in its intraday, in total - for every branch the caller may see"
+              }
+            },
+            {
+              "name": "A branch's cash, till by till and note by note in the intraday",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/cash-positions/{{branchId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cash-positions",
+                    "{{branchId}}"
+                  ],
+                  "query": []
+                },
+                "description": "A branch's cash, till by till and note by note in the intraday"
+              }
+            }
+          ]
+        },
+        {
           "name": "Intraday cash",
           "item": [
             {
