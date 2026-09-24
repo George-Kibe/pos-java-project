@@ -16,7 +16,7 @@ INFRA_SERVICES := postgres kafka redis
 .DEFAULT_GOAL := help
 .PHONY: help env env-sync doctor infra-up infra-down infra-restart infra-logs topics ps logs \
         up down images service-logs \
-        build fmt test it verify web-check web-e2e demo-seed demo-clear postman api-smoke psql redis-cli kafka-topics kafka-topics-sync clean nuke \
+        build fmt test it verify web-check web-e2e admin admin-check demo-seed demo-clear postman api-smoke psql redis-cli kafka-topics kafka-topics-sync clean nuke \
 		check-env
 
 ## ---------------------------------------------------------------------------
@@ -158,6 +158,16 @@ api-smoke: check-env ## Send every GET in the collection to the stack; fails on 
 ## ---------------------------------------------------------------------------
 ## Demo data
 ## ---------------------------------------------------------------------------
+admin: check-env ## Create an administrator (every permission, every branch): make admin email=... name="..."
+	@# Signs in as the bootstrap administrator from .env. The password is temporary (changed at first
+	@# sign-in): from ADMIN_PASSWORD, asked for at a terminal, or generated and shown once. No email is sent.
+	@test -n "$(email)" && test -n "$(name)" || { echo 'Usage: make admin email=jane@example.com name="Jane Wambui"'; exit 2; }
+	@python3 scripts/admin/create_admin.py --email "$(email)" --name "$(name)"
+
+admin-check: check-env ## Prove an administrator's rights across every service and branch: make admin-check email=...
+	@test -n "$(email)" || { echo 'Usage: make admin-check email=jane@example.com'; exit 2; }
+	@python3 scripts/admin/check_admin.py --email "$(email)"
+
 demo-seed: check-env ## Seed demo data through the APIs (repeatable after demo-clear; no mail is sent)
 	@# Seeding creates staff and customers, whose welcome emails must not go out through Gmail, and
 	@# signs in dozens of times from one address: the same overlay as web-e2e covers both. Both

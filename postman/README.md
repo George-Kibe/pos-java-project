@@ -1,6 +1,6 @@
 # API collection
 
-`pos-api.postman_collection.json` - every endpoint of the POS through the gateway (184 requests plus
+`pos-api.postman_collection.json` - every endpoint of the POS through the gateway (186 requests plus
 a *Start here* folder), generated from the services' own OpenAPI specs. Postman and Insomnia both
 import it.
 

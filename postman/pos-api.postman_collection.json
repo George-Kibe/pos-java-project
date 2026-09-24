@@ -108,6 +108,64 @@
       "description": "auth-service: OpenAPI definition",
       "item": [
         {
+          "name": "Audit",
+          "item": [
+            {
+              "name": "The audit trail, newest first; filter by action and by who did it",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/audit?page=0&size=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "audit"
+                  ],
+                  "query": [
+                    {
+                      "key": "action",
+                      "value": "",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "actorId",
+                      "value": "{{actorId}}",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "page",
+                      "value": "0",
+                      "disabled": false
+                    },
+                    {
+                      "key": "size",
+                      "value": "20",
+                      "disabled": false
+                    },
+                    {
+                      "key": "sort",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "The audit trail, newest first; filter by action and by who did it"
+              }
+            }
+          ]
+        },
+        {
           "name": "Authentication",
           "item": [
             {
@@ -6729,6 +6787,64 @@
                   ]
                 },
                 "description": "Sales per cashier over the range"
+              }
+            },
+            {
+              "name": "Sales per week, month, quarter or year - per branch, or across every branch with acrossBranches=true (report:view)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/reports/sales/by-period?period=WEEK&from={{day}}&to={{day}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "reports",
+                    "sales",
+                    "by-period"
+                  ],
+                  "query": [
+                    {
+                      "key": "period",
+                      "value": "WEEK",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "from",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "acrossBranches",
+                      "value": "False",
+                      "disabled": true,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "Sales per week, month, quarter or year - per branch, or across every branch with acrossBranches=true (report:view)"
               }
             },
             {
