@@ -64,6 +64,21 @@ public class ReportController {
         return reports.salesDaily(filter(from, to, branchId, null));
     }
 
+    @GetMapping("/sales/by-period")
+    @PreAuthorize(VIEW)
+    @Operation(
+            summary =
+                    "Sales per week, month, quarter or year - per branch, or across every branch"
+                            + " with acrossBranches=true (report:view)")
+    public List<ReportQueries.SalesRow> salesByPeriod(
+            @RequestParam ReportQueries.Period period,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(defaultValue = "false") boolean acrossBranches) {
+        return reports.salesByPeriod(filter(from, to, branchId, null), period, acrossBranches);
+    }
+
     @GetMapping("/sales/by-branch")
     @PreAuthorize(VIEW)
     @Operation(summary = "Sales per branch over the range")

@@ -72,6 +72,62 @@ class ReportApiIT extends ReportingTestBase {
     }
 
     @Test
+    @DisplayName("sales roll up by week, month, quarter and year, per branch or across all of them")
+    void salesRollUpByPeriod() throws Exception {
+        java.time.LocalDate day = today();
+        java.time.LocalDate monday = day.with(java.time.DayOfWeek.MONDAY);
+        for (String period : java.util.List.of("WEEK", "MONTH", "QUARTER", "YEAR")) {
+            mockMvc.perform(
+                            get("/api/v1/reports/sales/by-period")
+                                    .param("period", period)
+                                    .param("from", day.withDayOfYear(1).toString())
+                                    .param("to", day.toString())
+                                    .param("acrossBranches", "true")
+                                    .with(headOffice()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].baskets", is(2)))
+                    .andExpect(jsonPath("$[0].grossSales", is(558.0)))
+                    // Rolled together: no branch on the row.
+                    .andExpect(jsonPath("$[0].branchId").doesNotExist());
+        }
+        mockMvc.perform(
+                        get("/api/v1/reports/sales/by-period")
+                                .param("period", "WEEK")
+                                .param("from", day.toString())
+                                .param("to", day.toString())
+                                .param("branchId", BRANCH.toString())
+                                .with(headOffice()))
+                .andExpect(jsonPath("$[0].businessDate", is(monday.toString())))
+                .andExpect(jsonPath("$[0].branchId", is(BRANCH.toString())));
+        mockMvc.perform(
+                        get("/api/v1/reports/sales/by-period")
+                                .param("period", "MONTH")
+                                .param("from", day.toString())
+                                .param("to", day.toString())
+                                .param("branchId", BRANCH.toString())
+                                .with(headOffice()))
+                .andExpect(jsonPath("$[0].businessDate", is(day.withDayOfMonth(1).toString())));
+
+        // A branch manager sees their own branch by period, never the whole business.
+        mockMvc.perform(
+                        get("/api/v1/reports/sales/by-period")
+                                .param("period", "YEAR")
+                                .param("from", day.toString())
+                                .param("to", day.toString())
+                                .param("acrossBranches", "true")
+                                .with(branchManager()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(
+                        get("/api/v1/reports/sales/by-period")
+                                .param("period", "FORTNIGHT")
+                                .param("from", day.toString())
+                                .param("to", day.toString())
+                                .with(headOffice()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void theShiftAndStockReportsAnswer() throws Exception {
         mockMvc.perform(get("/api/v1/reports/shifts/" + shift).with(headOffice()))
                 .andExpect(status().isOk())

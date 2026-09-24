@@ -86,6 +86,34 @@ public class ReportQueries {
         return sales(filter, "s.business_date", "s.branch_id", "NULL::uuid");
     }
 
+    /** A calendar period to roll business days up to. Weeks start on Monday (ISO). */
+    public enum Period {
+        WEEK("week"),
+        MONTH("month"),
+        QUARTER("quarter"),
+        YEAR("year");
+
+        private final String unit;
+
+        Period(String unit) {
+            this.unit = unit;
+        }
+    }
+
+    /**
+     * One row per period - and per branch, unless {@code acrossBranches} rolls them together - with
+     * the period's first day as its date. The unit comes from the enum, never from the caller, so
+     * it is safe in the SQL text.
+     */
+    public List<SalesRow> salesByPeriod(
+            ReportFilter filter, Period period, boolean acrossBranches) {
+        return sales(
+                filter,
+                "date_trunc('%s', s.business_date)::date".formatted(period.unit),
+                acrossBranches ? "NULL::uuid" : "s.branch_id",
+                "NULL::uuid");
+    }
+
     /** One row per branch over the range. */
     public List<SalesRow> salesByBranch(ReportFilter filter) {
         return sales(filter, "NULL::date", "s.branch_id", "NULL::uuid");
