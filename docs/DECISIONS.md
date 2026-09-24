@@ -11,4 +11,6 @@
 ## Emails Testing
 - For development, I will test with GMail SMTP 
 - For production, AWS sees will be added in future
-- 
+
+## UI design
+- Use minimalist design

@@ -108,6 +108,22 @@ because auth-service revokes a whole session when a refresh token is used twice.
 or a shared store; and every credential call must forward the browser's address, or the gateway's
 per-address login limit would count the BFF instead of people.
 
+### ADR-013 — Supervisor approval is a PIN that mints a one-action token
+**Decision:** a supervisor sets a 4-6 digit PIN (auth-service, hashed, locked for 15 minutes after
+five wrong entries - separately from the login lockout). At a lane, the cashier's session asks
+`POST /auth/approvals` with the supervisor's id and PIN, and gets a JWT for **the supervisor**,
+carrying one permission and one branch, living two minutes, with `act` naming the cashier. The BFF
+spends it on the one call it was requested for - an allow-list maps each approvable permission
+(`price:override`, `sale:void`, `sale:refund`, `cash:drop`) to exactly one method and path - and
+never returns it to the browser.
+**Why:** no service changes. The approved call arrives as an ordinary request from the supervisor,
+so every existing `@PreAuthorize`, branch check and audit record names the person who approved.
+A password typed at a shared till would be seen; signing the cashier out and back in wastes the
+queue's time.
+**Cost:** a cashier can lock a supervisor's PIN by guessing (each failure is audited, and the lock
+never touches the supervisor's sign-in); an approval token may be spent more than once in its two
+minutes, which is why the BFF, not the browser, holds it.
+
 ---
 
 ## 2. Event catalogue
@@ -129,11 +145,12 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.payments.payment-authorized.v1` | payment, customer (loyalty) | sales, reporting | paymentIntentId, saleId, method, amountAuthorized (the intent amount when the whole-shilling M-Pesa charge was paid), providerReference, approvalCode |
 | `pos.payments.payment-failed.v1` | payment, customer (loyalty) | sales, notification | paymentIntentId, saleId, method, reasonCode (e.g. CANCELLED_BY_USER, TIMEOUT, PROVIDER_UNAVAILABLE), providerMessage |
 | `pos.payments.payment-refunded.v1` | payment | reporting | refundId, paymentIntentId, saleId, returnId, method, amount, providerReference — emitted only once the provider (or a person) confirms it |
-| `pos.sales.sale-completed.v1` | sales | inventory, customer, reporting, notification | saleId, receiptNumber, branchId, registerId, shiftId, cashierId, customerId?, lines[] (as charged, with tax class), net/tax/grand totals, payments[{method, amount}] (authorised tenders, cash before change), cartId? (the reservation reference inventory consumes) |
+| `pos.sales.sale-completed.v1` | sales | inventory, customer, reporting | saleId, receiptNumber, branchId, registerId, shiftId, cashierId, customerId?, lines[] (as charged, with tax class), net/tax/grand totals, payments[{method, amount}] (authorised tenders, cash before change), cartId? (the reservation reference inventory consumes) |
 | `pos.sales.sale-voided.v1` | sales | inventory, customer, reporting | saleId, reason, actorId |
 | `pos.sales.sale-cancelled.v1` | sales | inventory, customer | saleId, branchId, cartId? (whose stock holds inventory releases), reason |
 | `pos.sales.return-processed.v1` | sales | inventory, payment, customer, reporting | returnId, saleId, lines[{productId, qty, resaleable, batchNo?}], refundTotal, refundMethod (non-cash is refunded by payment), tillSessionId (the open shift that paid it; required for cash) |
 | `pos.sales.shift-closed.v1` | sales | reporting, notification | shiftId, branchId, registerId, expected, declared, variance |
+| `pos.sales.receipt-email-requested.v1` | sales | notification | saleId, receiptId, receiptNumber, email, recipientName?, lines[] as charged, taxBreakdown[] as stored on the receipt, payments[], totals, amountTendered?, changeGiven? - the address travels on the event only; sales keeps none |
 | `pos.customers.loyalty-accrued.v1` | customer | reporting, notification | customerId, saleId, points, balanceAfter, eligibleSpend, tierCode, expiresAt |
 | `pos.customers.tier-changed.v1` | customer | reporting, notification | customerId, previousTierCode, tierCode, rollingSpend, upgrade (it falls as well as rises) |
 | `pos.inventory.stock-deducted.v1` | inventory | reporting | saleId, branchId, lines[{productId, qty, batchAllocations[]}] |
@@ -219,6 +236,28 @@ Terminal offline            Terminal reconnects            sales-service
 ```
 Duplicate submission of the same batch is a no-op. Nothing is ever dropped silently: a sale that
 cannot be accepted surfaces in the terminal UI for supervisor action.
+
+On the lane (Phase 14): the catalogue, this branch's prices and the scale-label formats
+(`GET /scale-barcode-rules`) are cached in IndexedDB while online. Connectivity is a ping through
+the BFF to the gateway, not `navigator.onLine`. A basket in progress when the network drops carries
+on offline with the same goods; the server cart is abandoned on reconnection. An offline sale takes
+one tender, cash or card. A batch's `Idempotency-Key` is written to its sales **before** the first
+send, so a batch whose answer was lost is resent as the same batch with the same key. A service
+worker (Serwist) precaches the app and keeps the last good copy of the lane's pages; it never
+caches an API call, which would make an offline till look online.
+
+### 3.3c Supervisor approval at a lane
+
+```
+cashier F4 → price, reason ─▶ BFF /api/lane/approved {approverId, pin, permission, action}
+                               │ action on the allow-list for that permission? else 400
+                               ├─▶ auth  POST /auth/approvals (cashier's token)
+                               │         PIN checked; wrong → counted in its own transaction
+                               │   ◀──── 2-minute JWT: sub=supervisor, perms=[one], branches=[one], act=cashier
+                               ├─▶ sales POST /carts/{id}/lines/{line}/price-override (approval JWT)
+                               │         audited as the supervisor
+                               ◀── {approverName, result}  (the token stays on the server)
+```
 
 ### 3.3b Paying with loyalty points
 

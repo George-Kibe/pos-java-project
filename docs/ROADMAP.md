@@ -22,7 +22,7 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 | 11 | customer-service | Customers, loyalty, member pricing | ✅ done |
 | 12 | reporting-service | CQRS projections, Z-report, dashboards | ✅ done |
 | 13 | Frontend: foundation & auth | Next.js app, BFF auth, shell, RBAC routing | ✅ done |
-| 14 | Frontend: cashier lane | Checkout, scanner, printer, offline | 5–7 d |
+| 14 | Frontend: cashier lane | Checkout, scanner, printer, offline | ✅ done |
 | 15 | Frontend: back office | Catalog, stock, purchasing, users, reports | 5–7 d |
 | 16 | Hardening & production | Observability, load test, security review, deploy | 4–5 d |
 
@@ -1067,7 +1067,7 @@ phase closed; this is what changed afterwards.
 
 ---
 
-## Phase 14 — Frontend cashier lane
+## Phase 14 — Frontend cashier lane ✅
 
 **Goal:** a cashier can work a full shift, including through a network outage.
 
@@ -1088,6 +1088,78 @@ phase closed; this is what changed afterwards.
 **Done when:** a Playwright run completes a mixed-basket sale with split payment; pulling the network
 mid-shift still allows selling, and restoring it syncs every queued sale exactly once with no
 duplicates and a readable variance report.
+
+Agreed at the start: supervisor approval by **PIN** (new in auth-service), receipt printers on
+**USB driven from the browser** (WebUSB/WebSerial, no print agent), and offline sales take **one
+tender, cash or card**.
+
+Delivered:
+- **Supervisor PIN** (auth-service V4): a supervisor sets a 4-6 digit PIN under Account, confirmed
+  with their password; obvious PINs (1111, 1234, runs) are refused. At a lane the cashier picks the
+  supervisor and they type it; auth-service answers with a two-minute token for the supervisor,
+  holding one permission at one branch, with `act` naming the cashier (ADR-013). Five wrong PINs
+  lock the PIN for 15 minutes, counted in their own transaction, and never lock the sign-in. The BFF
+  spends the token on the single call that permission is allowed (`price:override`, `sale:void`,
+  `sale:refund`, `cash:drop`) and never sends it to the browser
+- **Email receipt**: `POST /sales/{id}/receipts/email` publishes `receipt-email-requested`, carrying
+  the receipt as issued; notification-service renders it (HTML and text, shop time zone, cents
+  rounded HALF_UP at display) and a redelivery sends nothing twice. A voided sale's receipt is not
+  sent
+- `GET /scale-barcode-rules` (catalog), so the lane decodes weight and price labels offline exactly
+  as the server does
+- **The lane** (`/lane`): the register is this device, kept in IndexedDB; open a shift with its float;
+  a scan line that takes a keyboard-wedge scanner wherever the focus is; barcode, SKU and name
+  search; weighed items by kilogram; quantity, remove, price override and discount (a percentage
+  becoming an approved price); park and recall; member attach; cash drop, reprint, void of the last
+  sale, blind shift close with its variance. Every action has a key (F1 lists them)
+- **Payment**: cash with quick-tender notes and the change, card with the terminal's approval code
+  keyed from the slip (never card data), M-Pesa with live status, and any split of them; a retried
+  payment carries the same Idempotency-Key, so a lost answer never charges twice. A payment that
+  fails cancels the sale and rebuilds the basket
+- **Receipts**: ESC/POS over WebUSB or WebSerial with the drawer kicked for cash, the browser's
+  print dialog when no printer is connected, reprints marked COPY, email
+- **Returns** (`/lane/returns`): the original sale by receipt number, per-line quantities, an
+  explicit resaleable answer per line, cash refunds from the shift open on this till, and a
+  supervisor's PIN when the cashier cannot refund - including the reason for a return outside the
+  window
+- **Offline**: the catalogue, this branch's prices and the label formats are cached in IndexedDB
+  (Dexie) and refreshed every 15 minutes; connectivity is a ping to the gateway through the BFF, shown
+  at all times; a basket in progress carries on offline; offline sales queue with client ids and
+  provisional receipt numbers; on reconnection they replay in batches whose key is stored before the
+  first send, and the sync report lists each sale's receipt number, outcome and any price variance.
+  A refused sale is kept and shown, never dropped. A Serwist service worker precaches the app and the
+  lane's last good pages so a till can be reloaded offline; it never caches an API call
+- A PIN page for supervisors (`/account/pin`)
+
+**Verified — 6 browser runs against the built images, three consecutive passes; 76 web unit tests;
+all 758 backend tests with every coverage gate met:**
+
+| Check | Result |
+|---|---|
+| Mixed basket: scanned, searched by name and weighed, quantity changed | ✅ 2 × milk + 0.75 kg bananas |
+| Price override by a cashier | ✅ supervisor chosen, a wrong PIN refused, the right one approved; audited as the supervisor |
+| Split payment | ✅ 100 on card (approval code keyed), 200 in cash, change 90.00 |
+| Emailed receipt | ✅ captured with the receipt number, both tenders, change and tax |
+| Network pulled mid-shift | ✅ indicator Offline; a counted sale and a weight label decoded on the lane, sold and receipted |
+| Price raised at head office while offline | ✅ reported: 2 recorded, 1 priced differently, −5.00 |
+| Exactly once | ✅ one server sale per client id; forcing the lane to resend both as unanswered leaves still one each |
+| PIN lockout counted despite the refusal | ✅ `ApprovalIT`: two wrong entries leave two, five lock, sign-in unaffected |
+| An approval outside its limits | ✅ another branch, oneself, or `user:manage` refused |
+| A PIN spent on another action | ✅ the BFF allow-list refuses it (unit tested) |
+| Redelivered receipt request | ✅ one email |
+
+**Bugs found by running it rather than by a person:**
+- **Every demo barcode was unscannable.** The seed gave them prefix 20, which catalog reads as a
+  weight label first; each scan answered 404. The seed now uses 29.
+- **The first scan after a sale could lose keystrokes**: a key pressed before React had re-rendered
+  saw the receipt still open. A digit now dismisses the receipt and starts the next basket.
+- **A payment method key could be lost** when pressed before the dialog took focus; the payment and
+  receipt keys now listen on the window while open.
+- **Serwist's default rules cache `/api/*`**, which would have answered the connectivity ping from
+  cache. The worker's rules are our own.
+
+**Deferred with reason:** M-Pesa's lane path is built but, like Phase 10, not run against Daraja's
+sandbox. A real scale on a serial port and a customer display are not in scope; weights are typed.
 
 ---
 

@@ -4,17 +4,19 @@ A production-grade Point of Sale platform for multi-branch supermarket retail, b
 Spring Boot microservices behind an API gateway, with a Next.js cashier + back-office frontend,
 Kafka for event-driven communication, and PostgreSQL for persistence.
 
-> **Status:** phases 0-9 and 11-13 of 16 complete - infrastructure, shared libraries, every
+> **Status:** phases 0-9 and 11-14 of 16 complete - infrastructure, shared libraries, every
 > backend service (`auth`, `api-gateway`, `notification`, `catalog`, `inventory`, `purchasing`,
-> `sales`, `customer`, `reporting`) and the web app's foundation are built, tested and running under
-> Docker Compose: stock arrives at its landed cost, leaves through a till whose totals and receipts
-> are the server's, members earn and spend points on a ledger that balances, reports reconcile with
-> the till to the cent, and people register, verify and sign in through a browser that never holds a
-> token. Phase 10's `payment-service` is built and running - card and cash settle end to end, M-Pesa
-> is verified against a fake of Daraja - and waits only on a real sandbox STK Push, which needs a
-> Daraja app subscribed to M-Pesa Express. 741 backend tests, 47 frontend tests and a browser
-> end-to-end run. Code is built phase by phase per [docs/ROADMAP.md](docs/ROADMAP.md), which records
-> what each phase delivered and how it was verified.
+> `sales`, `customer`, `reporting`), the web app's foundation and the cashier lane are built, tested
+> and running under Docker Compose: stock arrives at its landed cost, leaves through a till whose
+> totals and receipts are the server's, members earn and spend points on a ledger that balances,
+> reports reconcile with the till to the cent, and a cashier works a whole shift from the keyboard -
+> split payments, supervisor approvals by PIN, thermal receipts from the browser - and keeps selling
+> when the network goes, every offline sale syncing exactly once. Phase 10's `payment-service` is
+> built and running - card and cash settle end to end, M-Pesa is verified against a fake of Daraja -
+> and waits only on a real sandbox STK Push, which needs a Daraja app subscribed to M-Pesa Express.
+> 758 backend tests, 76 frontend tests and 6 browser end-to-end runs. Code is built phase by phase
+> per [docs/ROADMAP.md](docs/ROADMAP.md), which records what each phase delivered and how it was
+> verified.
 
 ---
 
@@ -323,7 +325,7 @@ SMTP_USERNAME=
 SMTP_PASSWORD=
 SMTP_AUTH=true
 SMTP_STARTTLS=true
-MAIL_FROM="Supermarket POS <no-reply@example.com>"
+MAIL_FROM="Realhive Group of Supermarkets POS <no-reply@example.com>"
 
 # --- OTP policy ---
 OTP_LENGTH=6

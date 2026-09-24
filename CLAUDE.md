@@ -4,7 +4,7 @@ Working agreement for this repository. Read this before writing code here.
 
 ## Project
 
-Multi-branch supermarket POS. Spring Boot microservices (Java 21, Maven multi-module) behind a
+Multi-branch supermarket POS("Realhive Group of Supermarkets"). Spring Boot microservices (Java 21, Maven multi-module) behind a
 Spring Cloud Gateway, Kafka for inter-service events, PostgreSQL with a schema per service, Redis,
 and a Next.js 16 frontend serving both the cashier lane and the back office. Docker Compose for dev
 and production.
@@ -467,6 +467,16 @@ rollback-only, so the commit fails anyway and takes the batch with it.
 - **`localhost` in an Alpine container is `::1` first**, and Next listens on IPv4 `0.0.0.0`. Health
   checks use `127.0.0.1`.
 - **shadcn now builds on Base UI**, not Radix: compose with the `render` prop, not `asChild`.
+- **Serwist's `defaultCache` caches `/api/*` (NetworkFirst).** On the lane that would answer the
+  connectivity ping from cache - an offline till that believes it is online - and keep people's
+  data in the Cache Storage. `src/app/sw.ts` lists its own rules: API calls are `NetworkOnly`,
+  only the lane's pages and static chunks are cached. Do not swap in `defaultCache`.
+- **An approval token never reaches the browser.** `/api/lane/approved` obtains it and spends it on
+  the one call its permission's allow-list names (`lib/lane/approvals.ts`). A new approvable action
+  goes on that list and on auth-service's `pos.auth.approval.permissions`, or it cannot be approved.
+- **The lane adds money in bigint, not `number`** (`lib/lane/decimal.ts`): four places for amounts,
+  three for quantities, HALF_UP like the server. That needs `target` ES2020 or later in
+  `tsconfig.json`; after changing it, delete `tsconfig.tsbuildinfo` or `tsc` keeps the old errors.
 
 ## Testing traps
 
@@ -494,7 +504,10 @@ rollback-only, so the commit fails anyway and takes the batch with it.
 - Tax-inclusive pricing means the line total is the source of truth and tax is extracted from it;
   do not add tax on top of an inclusive price.
 - Weight-embedded scale barcodes encode price or weight in the digits — parse by configured prefix
-  rule, never assume a single format.
+  rule, never assume a single format. **A product barcode must not start with a scale prefix**
+  (20 and 21 here): catalog tries the scale rules first, so such a barcode is read as a label and
+  the scan answers 404. The demo seed did exactly that; it now uses 29, also in GS1's in-store
+  range. The lane decodes labels offline from the same rules (`GET /scale-barcode-rules`).
 - The price on a purchase order is not what the goods cost. Freight and duty arrive with the
   delivery, so the **landed** cost is computed at receipt and it is that figure - not the invoice
   price - that inventory values stock at. An allocation must sum to the charge exactly; the
