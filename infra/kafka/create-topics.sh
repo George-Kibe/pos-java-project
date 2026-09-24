@@ -34,6 +34,7 @@ pos.sales.sale-voided.v1|${RETENTION_SALES}|delete
 pos.sales.sale-cancelled.v1|${RETENTION_DEFAULT}|delete
 pos.sales.return-processed.v1|${RETENTION_SALES}|delete
 pos.sales.shift-closed.v1|${RETENTION_SALES}|delete
+pos.sales.receipt-email-requested.v1|${RETENTION_DEFAULT}|delete
 pos.inventory.stock-deducted.v1|${RETENTION_SALES}|delete
 pos.inventory.low-stock.v1|${RETENTION_DEFAULT}|delete
 pos.inventory.stock-valued.v1|${RETENTION_SALES}|delete

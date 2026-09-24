@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.pos.common.error.Errors;
@@ -157,6 +159,17 @@ public class SaleController {
     public List<SalesDtos.ReceiptResponse> receipts(@PathVariable UUID id) {
         branchAccess.requireAccess(checkout.require(id).getBranchId());
         return receipts.forSale(id).stream().map(SalesDtos.ReceiptResponse::from).toList();
+    }
+
+    @PostMapping("/{id}/receipts/email")
+    @PreAuthorize("hasAuthority('sale:create')")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(summary = "Email a copy of a paid sale's receipt; sent asynchronously")
+    public SalesDtos.ReceiptResponse emailReceipt(
+            @PathVariable UUID id, @Valid @RequestBody SalesDtos.EmailReceiptRequest request) {
+        branchAccess.requireAccess(checkout.require(id).getBranchId());
+        return SalesDtos.ReceiptResponse.from(
+                receipts.emailReceipt(id, request.email(), request.recipientName()));
     }
 
     @PostMapping("/receipts/{receiptId}/reprint")

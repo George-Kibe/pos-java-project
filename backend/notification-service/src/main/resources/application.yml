@@ -104,7 +104,8 @@ pos:
     brand-name: ${BRAND_NAME:Supermarket POS}
     support-email: ${SUPPORT_EMAIL:support@example.com}
     app-base-url: ${APP_BASE_URL:http://localhost:3000}
-    mail-from: ${MAIL_FROM:Supermarket POS <no-reply@example.com>}
+    display-time-zone: ${DISPLAY_TIME_ZONE:Africa/Nairobi}
+    mail-from: ${MAIL_FROM:Realhive Group of Supermarkets POS <no-reply@example.com>}
     # smtp, or capture: write mail to files in the container instead of sending it. Only the
     # browser e2e overlay sets capture; nobody receives anything while it is on.
     mail-transport: ${MAIL_TRANSPORT:smtp}

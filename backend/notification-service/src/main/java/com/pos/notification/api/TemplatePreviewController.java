@@ -83,6 +83,10 @@ public class TemplatePreviewController {
                             properties.getAppBaseUrl() + "/reset-password?token=sample-token",
                             "expiresInMinutes",
                             30L);
+            case RECEIPT ->
+                    com.pos.notification.service.ReceiptEmailModel.from(
+                            com.pos.notification.service.ReceiptEmailModel.sample(),
+                            properties.getDisplayTimeZone());
         };
     }
 }

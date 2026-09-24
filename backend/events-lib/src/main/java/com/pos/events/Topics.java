@@ -44,6 +44,8 @@ public final class Topics {
     public static final String SALES_SALE_CANCELLED = "pos.sales.sale-cancelled.v1";
     public static final String SALES_RETURN_PROCESSED = "pos.sales.return-processed.v1";
     public static final String SALES_SHIFT_CLOSED = "pos.sales.shift-closed.v1";
+    public static final String SALES_RECEIPT_EMAIL_REQUESTED =
+            "pos.sales.receipt-email-requested.v1";
 
     // --- inventory ------------------------------------------------------------
     public static final String INVENTORY_STOCK_DEDUCTED = "pos.inventory.stock-deducted.v1";

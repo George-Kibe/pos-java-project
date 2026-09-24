@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title th:text="${brandName}">POS</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+                 style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;padding:32px;">
+            <tr>
+              <td style="font-size:20px;font-weight:bold;color:#111827;padding-bottom:4px;"
+                  th:text="${brandName}">Supermarket POS</td>
+            </tr>
+            <tr>
+              <td style="font-size:14px;color:#6b7280;padding-bottom:24px;">
+                Receipt <span th:text="${receiptNumber}">R-000001</span>
+                &middot; <span th:text="${issuedAt}">2 Jan 2026, 12:15</span>
+              </td>
+            </tr>
+            <tr th:if="${recipientName != null}">
+              <td style="font-size:16px;color:#374151;padding-bottom:16px;">
+                Hello <span th:text="${recipientName}">there</span>, here is your receipt.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <!-- Numbers right-aligned in their own column, so the eye can run down them. -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                       style="font-size:14px;color:#374151;">
+                  <tr th:each="line : ${lines}">
+                    <td style="padding:6px 0;border-bottom:1px solid #f3f4f6;">
+                      <span th:text="${line.name}">Milk 500ml</span><br />
+                      <span style="color:#6b7280;font-size:12px;">
+                        <span th:text="${line.quantity}">2</span> &times;
+                        <span th:text="${line.unitPrice}">65.00</span>
+                        <span th:if="${line.discount != null}">
+                          &middot; less <span th:text="${line.discount}">5.00</span>
+                        </span>
+                      </span>
+                    </td>
+                    <td align="right" valign="top" style="padding:6px 0;border-bottom:1px solid #f3f4f6;"
+                        th:text="${line.total}">130.00</td>
+                  </tr>
+                  <tr th:if="${discountTotal != null}">
+                    <td style="padding-top:12px;color:#6b7280;">Discounts</td>
+                    <td align="right" style="padding-top:12px;color:#6b7280;"
+                        th:text="'-' + ${discountTotal}">-5.00</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-top:12px;font-size:16px;font-weight:bold;color:#111827;">
+                      Total <span th:text="${currency}">KES</span>
+                    </td>
+                    <td align="right" style="padding-top:12px;font-size:16px;font-weight:bold;color:#111827;"
+                        th:text="${grandTotal}">218.20</td>
+                  </tr>
+                  <tr th:each="tender : ${tenders}">
+                    <td style="padding-top:4px;color:#6b7280;" th:text="${tender.method}">Cash</td>
+                    <td align="right" style="padding-top:4px;color:#6b7280;" th:text="${tender.amount}">218.20</td>
+                  </tr>
+                  <tr th:if="${changeGiven != null}">
+                    <td style="padding-top:4px;color:#6b7280;">
+                      Change from <span th:text="${amountTendered}">300.00</span>
+                    </td>
+                    <td align="right" style="padding-top:4px;color:#6b7280;" th:text="${changeGiven}">81.80</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding-top:24px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                       style="font-size:12px;color:#6b7280;">
+                  <tr>
+                    <td style="padding-bottom:4px;">Tax</td>
+                    <td align="right" style="padding-bottom:4px;">Taxable</td>
+                    <td align="right" style="padding-bottom:4px;">Tax</td>
+                  </tr>
+                  <tr th:each="tax : ${taxLines}">
+                    <td><span th:text="${tax.taxClass}">VAT</span> <span th:text="${tax.rate}">16%</span></td>
+                    <td align="right" th:text="${tax.taxable}">112.07</td>
+                    <td align="right" th:text="${tax.tax}">17.93</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-top:4px;">Prices include tax</td>
+                    <td></td>
+                    <td align="right" style="padding-top:4px;" th:text="${taxTotal}">17.93</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px;margin-top:24px;">
+                Keep this email for returns. Questions?
+                <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}"
+                   style="color:#6b7280;">support@example.com</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

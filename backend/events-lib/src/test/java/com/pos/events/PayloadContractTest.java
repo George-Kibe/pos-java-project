@@ -26,6 +26,7 @@ import com.pos.events.payments.PaymentMethod;
 import com.pos.events.payments.PaymentRefundedPayload;
 import com.pos.events.payments.PaymentRequestedPayload;
 import com.pos.events.purchasing.GoodsReceivedPayload;
+import com.pos.events.sales.ReceiptEmailRequestedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
 import com.pos.events.sales.SaleCancelledPayload;
 import com.pos.events.sales.SaleCompletedPayload;
@@ -191,6 +192,48 @@ class PayloadContractTest {
                     .contains("\"cancelledAt\"");
 
             assertThat(EventJson.read(json, SaleCancelledPayload.class)).isEqualTo(payload);
+        }
+
+        @Test
+        void aReceiptEmailCarriesTheReceiptAsIssued() {
+            ReceiptEmailRequestedPayload payload =
+                    new ReceiptEmailRequestedPayload(
+                            ID,
+                            ID,
+                            "R-000042",
+                            ID,
+                            "someone@example.com",
+                            null,
+                            Instant.parse("2026-01-02T03:04:05Z"),
+                            "KES",
+                            List.of(
+                                    new ReceiptEmailRequestedPayload.Line(
+                                            "Bananas (kg)",
+                                            new BigDecimal("0.735"),
+                                            new BigDecimal("120.0000"),
+                                            BigDecimal.ZERO,
+                                            new BigDecimal("88.2000"))),
+                            List.of(
+                                    new ReceiptEmailRequestedPayload.TaxLine(
+                                            "ZERO_RATED",
+                                            BigDecimal.ZERO,
+                                            new BigDecimal("88.2000"),
+                                            BigDecimal.ZERO)),
+                            List.of(
+                                    new ReceiptEmailRequestedPayload.Tender(
+                                            PaymentMethod.MPESA, new BigDecimal("88.2000"))),
+                            BigDecimal.ZERO,
+                            BigDecimal.ZERO,
+                            new BigDecimal("88.2000"),
+                            null,
+                            null);
+
+            String json = EventJson.write(payload);
+            assertThat(json)
+                    .contains("\"receiptNumber\":\"R-000042\"")
+                    .contains("\"quantity\":0.735")
+                    .contains("\"method\":\"MPESA\"");
+            assertThat(EventJson.read(json, ReceiptEmailRequestedPayload.class)).isEqualTo(payload);
         }
 
         @Test

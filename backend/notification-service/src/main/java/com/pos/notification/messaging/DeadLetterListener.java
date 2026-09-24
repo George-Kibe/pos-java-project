@@ -42,7 +42,8 @@ public class DeadLetterListener {
             topics = {
                 Topics.AUTH_OTP_REQUESTED + Topics.DLT_SUFFIX,
                 Topics.AUTH_USER_REGISTERED + Topics.DLT_SUFFIX,
-                Topics.AUTH_PASSWORD_RESET_REQUESTED + Topics.DLT_SUFFIX
+                Topics.AUTH_PASSWORD_RESET_REQUESTED + Topics.DLT_SUFFIX,
+                Topics.SALES_RECEIPT_EMAIL_REQUESTED + Topics.DLT_SUFFIX
             },
             groupId = "${spring.kafka.consumer.group-id}-dlt")
     public void onDeadLetter(ConsumerRecord<String, String> record) {
@@ -80,6 +81,9 @@ public class DeadLetterListener {
         }
         if (topic.startsWith(Topics.AUTH_PASSWORD_RESET_REQUESTED)) {
             return NotificationType.PASSWORD_RESET;
+        }
+        if (topic.startsWith(Topics.SALES_RECEIPT_EMAIL_REQUESTED)) {
+            return NotificationType.RECEIPT;
         }
         return NotificationType.OTP_CODE;
     }

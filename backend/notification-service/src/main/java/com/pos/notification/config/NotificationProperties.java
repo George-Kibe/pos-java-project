@@ -12,7 +12,7 @@ import lombok.Setter;
 public class NotificationProperties {
 
     /** Appears in subjects and in the body. */
-    private String brandName = "Supermarket POS";
+    private String brandName = "Realhive Group of Supermarkets POS";
 
     /** Where "contact us" points. */
     private String supportEmail = "support@example.com";
@@ -25,6 +25,9 @@ public class NotificationProperties {
      * renders arbitrary templates with supplied values and belongs only on a developer's machine.
      */
     private boolean templatePreviewEnabled = false;
+
+    /** The zone times are printed in, such as a receipt's date. Stored times are UTC. */
+    private java.time.ZoneId displayTimeZone = java.time.ZoneId.of("Africa/Nairobi");
 
     /** How mail leaves this service. SMTP unless a test run says otherwise. */
     private MailTransport mailTransport = MailTransport.SMTP;

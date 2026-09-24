@@ -11,9 +11,11 @@ import com.pos.common.error.Errors;
 import com.pos.events.EventJson;
 import com.pos.sales.domain.Receipt;
 import com.pos.sales.domain.Sale;
+import com.pos.sales.domain.SaleStatus;
 import com.pos.sales.domain.totals.SaleTotals;
 import com.pos.sales.domain.totals.SaleTotalsCalculator;
 import com.pos.sales.domain.totals.TaxClassTotal;
+import com.pos.sales.messaging.SalesEventPublisher;
 import com.pos.sales.repository.ReceiptRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 public class ReceiptService {
 
     private final ReceiptRepository receipts;
+    private final SalesEventPublisher events;
 
     public Receipt require(UUID id) {
         return receipts.findById(id).orElseThrow(() -> Errors.NotFoundException.of("Receipt", id));
@@ -64,6 +67,39 @@ public class ReceiptService {
         Receipt receipt = require(receiptId);
         receipt.recordPrint();
         return receipts.save(receipt);
+    }
+
+    /**
+     * Sends a copy of a paid sale's receipt by email.
+     *
+     * <p>Only the sale receipt of a sale that still stands: a voided sale's receipt is no longer a
+     * record of anything the customer owes or owns.
+     */
+    @Transactional
+    public Receipt emailReceipt(UUID saleId, String email, String recipientName) {
+        Receipt receipt =
+                receipts.findBySaleId(saleId).stream()
+                        .filter(candidate -> candidate.getType() == Receipt.Type.SALE)
+                        .findFirst()
+                        .orElseThrow(
+                                () ->
+                                        new Errors.ConflictException(
+                                                "receipt.not_issued",
+                                                "This sale has no receipt yet: it is not paid."));
+        if (receipt.getSale().getStatus() != SaleStatus.PAID) {
+            throw new Errors.ConflictException(
+                    "receipt.sale_not_standing",
+                    "This sale is %s; its receipt cannot be sent."
+                            .formatted(receipt.getSale().getStatus()));
+        }
+        List<TaxClassTotal> breakdown =
+                List.of(EventJson.read(receipt.getTaxBreakdown(), TaxClassTotal[].class));
+        events.receiptEmailRequested(receipt, breakdown, email.trim(), blankToNull(recipientName));
+        return receipt;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     /** The breakdown as it will be printed, for a caller that wants it without the document. */

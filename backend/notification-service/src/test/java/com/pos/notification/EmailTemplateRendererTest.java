@@ -104,4 +104,64 @@ class EmailTemplateRendererTest {
             assertThat(renderer.subjectFor(type)).isNotBlank().contains("Test Supermarket");
         }
     }
+
+    @Test
+    @DisplayName("a receipt prints money to cents, weighed quantities in full, and no empty rows")
+    void receiptRendersWhatWasCharged() {
+        var model =
+                com.pos.notification.service.ReceiptEmailModel.from(
+                        com.pos.notification.service.ReceiptEmailModel.sample(),
+                        java.time.ZoneId.of("Africa/Nairobi"));
+        EmailMessage message =
+                renderer.render(NotificationType.RECEIPT, "someone@example.com", null, model);
+
+        assertThat(message.subject()).isEqualTo("Your receipt from Test Supermarket");
+        for (String body : List.of(message.html(), message.text())) {
+            assertThat(body)
+                    .contains("R-000000")
+                    // 09:15 UTC is 12:15 in Nairobi.
+                    .contains("2 Jan 2026, 12:15")
+                    .contains("0.735")
+                    .contains("218.20")
+                    .contains("16%")
+                    .contains("17.93")
+                    .contains("Change from")
+                    .contains("300.00")
+                    .contains("81.80")
+                    // No discount was given, so none is shown; no name, so no greeting.
+                    .doesNotContain("Discounts")
+                    .doesNotContain("Hello");
+        }
+        assertThat(message.text()).doesNotContain("<td");
+    }
+
+    @Test
+    @DisplayName("receipt figures round half up at the display step")
+    void receiptFiguresRoundHalfUp() {
+        var model =
+                com.pos.notification.service.ReceiptEmailModel.from(
+                        new com.pos.events.sales.ReceiptEmailRequestedPayload(
+                                java.util.UUID.randomUUID(),
+                                java.util.UUID.randomUUID(),
+                                "R-000009",
+                                java.util.UUID.randomUUID(),
+                                "someone@example.com",
+                                "Ada",
+                                java.time.Instant.parse("2026-01-02T09:15:00Z"),
+                                "KES",
+                                List.of(),
+                                List.of(),
+                                List.of(),
+                                new java.math.BigDecimal("0.0000"),
+                                new java.math.BigDecimal("1.0050"),
+                                new java.math.BigDecimal("1234.5650"),
+                                null,
+                                null),
+                        java.time.ZoneOffset.UTC);
+
+        assertThat(model.get("grandTotal")).isEqualTo("1,234.57");
+        assertThat(model.get("taxTotal")).isEqualTo("1.01");
+        assertThat(model.get("changeGiven")).isNull();
+        assertThat(model.get("discountTotal")).isNull();
+    }
 }

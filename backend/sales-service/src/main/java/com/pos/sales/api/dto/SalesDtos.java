@@ -134,6 +134,11 @@ public final class SalesDtos {
 
     public record ReasonRequest(@NotBlank @Size(max = 500) String reason) {}
 
+    /** Where to send a copy of the receipt. Nothing here is stored; it goes on the event. */
+    public record EmailReceiptRequest(
+            @NotBlank @jakarta.validation.constraints.Email @Size(max = 255) String email,
+            @Size(max = 150) String recipientName) {}
+
     public record PriceOverrideRequest(
             @NotNull @DecimalMin("0.0") @Digits(integer = 15, fraction = 4) BigDecimal unitPrice,
             @NotBlank @Size(max = 500) String reason) {}

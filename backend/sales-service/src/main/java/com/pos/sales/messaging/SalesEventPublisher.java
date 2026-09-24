@@ -9,6 +9,7 @@ import com.pos.common.correlation.CorrelationId;
 import com.pos.events.EventEnvelope;
 import com.pos.events.Topics;
 import com.pos.events.payments.PaymentRequestedPayload;
+import com.pos.events.sales.ReceiptEmailRequestedPayload;
 import com.pos.events.sales.ReturnProcessedPayload;
 import com.pos.events.sales.SaleCancelledPayload;
 import com.pos.events.sales.SaleCompletedPayload;
@@ -16,6 +17,7 @@ import com.pos.events.sales.SaleVoidedPayload;
 import com.pos.events.sales.ShiftClosedPayload;
 import com.pos.messaging.outbox.OutboxRecorder;
 import com.pos.sales.domain.PaymentStatus;
+import com.pos.sales.domain.Receipt;
 import com.pos.sales.domain.Sale;
 import com.pos.sales.domain.SalePayment;
 import com.pos.sales.domain.SaleReturn;
@@ -260,6 +262,75 @@ public class SalesEventPublisher {
      * How the sale was paid, as the drawer keeps it: authorised tenders only, cash net of change.
      * The same figures the shift's counters were moved by, so a report built from them reconciles.
      */
+    /**
+     * A copy of a receipt, to be emailed. The breakdown is the one stored on the receipt at issue,
+     * so the email shows what was charged even if a tax rate has changed since.
+     */
+    public void receiptEmailRequested(
+            Receipt receipt,
+            List<com.pos.sales.domain.totals.TaxClassTotal> taxBreakdown,
+            String email,
+            String recipientName) {
+        Sale sale = receipt.getSale();
+        outbox.record(
+                Topics.SALES_RECEIPT_EMAIL_REQUESTED,
+                "Sale",
+                sale.getId(),
+                EventEnvelope.<ReceiptEmailRequestedPayload>builder()
+                        .topic(Topics.SALES_RECEIPT_EMAIL_REQUESTED)
+                        .correlationId(CorrelationId.get())
+                        .branchId(sale.getBranchId())
+                        .actorId(
+                                com.pos.common.security.AuthenticatedUser.current()
+                                        .map(com.pos.common.security.AuthenticatedUser::userId)
+                                        .orElse(sale.getCashierId()))
+                        .payload(
+                                new ReceiptEmailRequestedPayload(
+                                        sale.getId(),
+                                        receipt.getId(),
+                                        receipt.getReceiptNumber(),
+                                        sale.getBranchId(),
+                                        email,
+                                        recipientName,
+                                        sale.getCompletedAt(),
+                                        sale.getCurrency(),
+                                        sale.getLines().stream()
+                                                .map(
+                                                        line ->
+                                                                new ReceiptEmailRequestedPayload
+                                                                        .Line(
+                                                                        line.getProductName(),
+                                                                        line.getQuantity(),
+                                                                        line.getUnitPrice(),
+                                                                        line.getDiscountTotal(),
+                                                                        line.getLineTotal()))
+                                                .toList(),
+                                        taxBreakdown.stream()
+                                                .map(
+                                                        tax ->
+                                                                new ReceiptEmailRequestedPayload
+                                                                        .TaxLine(
+                                                                        tax.taxClassCode(),
+                                                                        tax.taxRate(),
+                                                                        tax.net(),
+                                                                        tax.tax()))
+                                                .toList(),
+                                        tenders(sale).stream()
+                                                .map(
+                                                        tender ->
+                                                                new ReceiptEmailRequestedPayload
+                                                                        .Tender(
+                                                                        tender.method(),
+                                                                        tender.amount()))
+                                                .toList(),
+                                        sale.getDiscountTotal(),
+                                        sale.getTaxTotal(),
+                                        sale.getGrandTotal(),
+                                        sale.getAmountTendered(),
+                                        sale.getChangeGiven()))
+                        .build());
+    }
+
     private static List<SaleCompletedPayload.Tender> tenders(Sale sale) {
         return sale.getPayments().stream()
                 .filter(payment -> payment.getStatus() == PaymentStatus.AUTHORIZED)

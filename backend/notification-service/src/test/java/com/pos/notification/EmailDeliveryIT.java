@@ -25,6 +25,8 @@ import com.pos.events.auth.OtpPurpose;
 import com.pos.events.auth.OtpRequestedPayload;
 import com.pos.events.auth.PasswordResetRequestedPayload;
 import com.pos.events.auth.UserRegisteredPayload;
+import com.pos.events.sales.ReceiptEmailRequestedPayload;
+import com.pos.notification.service.ReceiptEmailModel;
 
 /** Events in, email out, against a real SMTP server. */
 class EmailDeliveryIT extends NotificationTestBase {
@@ -163,6 +165,41 @@ class EmailDeliveryIT extends NotificationTestBase {
         // Two codes in an inbox, only one of which works, is worse than none.
         assertThat(SMTP.getReceivedMessages()).hasSize(1);
         assertThat(logCount()).isEqualTo(1);
+    }
+
+    // --- receipts -------------------------------------------------------------
+
+    @Test
+    @DisplayName("a receipt request emails the receipt once, however often it is delivered")
+    void aReceiptIsEmailedOnce() throws Exception {
+        EventEnvelope<ReceiptEmailRequestedPayload> event = receiptEvent();
+        UUID saleId = event.payload().saleId();
+
+        publish(Topics.SALES_RECEIPT_EMAIL_REQUESTED, event, saleId);
+        assertThat(SMTP.waitForIncomingEmail(20_000, 1)).isTrue();
+        MimeMessage message = SMTP.getReceivedMessages()[0];
+        assertThat(message.getAllRecipients()[0].toString()).contains("someone@example.com");
+        assertThat(message.getSubject()).isEqualTo("Your receipt from Test Supermarket");
+        assertThat(GreenMailUtil.getBody(message))
+                .contains("R-000000")
+                .contains("218.20")
+                .contains("0.735");
+
+        // The same event again, then a second request from the lane on the same key. The key keeps
+        // them in order, so once the second request's email arrives the duplicate has been seen.
+        publish(Topics.SALES_RECEIPT_EMAIL_REQUESTED, event, saleId);
+        publish(Topics.SALES_RECEIPT_EMAIL_REQUESTED, receiptEvent(), saleId);
+        assertThat(SMTP.waitForIncomingEmail(20_000, 2)).isTrue();
+        eventually(Duration.ofSeconds(15), "both deliveries to be logged", () -> logCount() == 2);
+        assertThat(SMTP.getReceivedMessages()).hasSize(2);
+    }
+
+    private static EventEnvelope<ReceiptEmailRequestedPayload> receiptEvent() {
+        return EventEnvelope.<ReceiptEmailRequestedPayload>builder()
+                .topic(Topics.SALES_RECEIPT_EMAIL_REQUESTED)
+                .correlationId("receipt-correlation")
+                .payload(ReceiptEmailModel.sample())
+                .build();
     }
 
     // --- the other two messages -----------------------------------------------

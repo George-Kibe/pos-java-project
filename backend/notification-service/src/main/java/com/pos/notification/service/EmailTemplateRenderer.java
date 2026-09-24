@@ -58,6 +58,7 @@ public class EmailTemplateRenderer {
             case OTP_CODE -> "Your %s verification code".formatted(properties.getBrandName());
             case WELCOME -> "Welcome to %s".formatted(properties.getBrandName());
             case PASSWORD_RESET -> "Reset your %s password".formatted(properties.getBrandName());
+            case RECEIPT -> "Your receipt from %s".formatted(properties.getBrandName());
         };
     }
 
@@ -66,6 +67,7 @@ public class EmailTemplateRenderer {
             case OTP_CODE -> "otp-code";
             case WELCOME -> "welcome";
             case PASSWORD_RESET -> "password-reset";
+            case RECEIPT -> "receipt";
         };
     }
 }

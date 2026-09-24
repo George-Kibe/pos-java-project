@@ -3,12 +3,13 @@ package com.pos.notification.domain;
 /**
  * What a message is for. Determines the template and the subject.
  *
- * <p>Templates for sales receipts and stock alerts arrive with the services that produce those
- * events. Writing them now would mean guessing at payloads that have not been designed yet, and a
- * template that cannot be rendered from a real event is a template that has never been tested.
+ * <p>A template arrives with the event that feeds it. Writing one ahead of its payload would mean
+ * guessing, and a template that cannot be rendered from a real event has never been tested.
  */
 public enum NotificationType {
     OTP_CODE,
     WELCOME,
-    PASSWORD_RESET
+    PASSWORD_RESET,
+    /** A copy of a sale's receipt, asked for at the lane. */
+    RECEIPT
 }

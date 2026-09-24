@@ -133,6 +133,68 @@ class SalesApiIT extends SalesTestBase {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    @DisplayName(
+            "a receipt is emailed by event, carrying what was charged, and only while it stands")
+    void aReceiptIsEmailedByEvent() throws Exception {
+        UUID branch = UUID.randomUUID();
+        actingAs(CASHIER, CASHIER_PERMISSIONS);
+        Sale sale = paidSaleAt(branch);
+        long before = outboxCount(com.pos.events.Topics.SALES_RECEIPT_EMAIL_REQUESTED);
+
+        mockMvc.perform(
+                        post("/api/v1/sales/" + sale.getId() + "/receipts/email")
+                                .with(atBranches(List.of(branch), "sale:create"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        json(
+                                                Map.of(
+                                                        "email", "wanjiru@example.com",
+                                                        "recipientName", "Wanjiru"))))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.receiptNumber", is(sale.getReceiptNumber())));
+
+        assertThat(outboxCount(com.pos.events.Topics.SALES_RECEIPT_EMAIL_REQUESTED))
+                .isEqualTo(before + 1);
+        var payload =
+                EventJson.readEnvelope(
+                                latestOutboxPayload(
+                                        com.pos.events.Topics.SALES_RECEIPT_EMAIL_REQUESTED),
+                                com.pos.events.sales.ReceiptEmailRequestedPayload.class)
+                        .payload();
+        assertThat(payload.saleId()).isEqualTo(sale.getId());
+        assertThat(payload.email()).isEqualTo("wanjiru@example.com");
+        assertThat(payload.lines()).hasSize(1);
+        assertThat(payload.lines().getFirst().productName()).isEqualTo(JUICE.name());
+        assertThat(payload.grandTotal()).isEqualByComparingTo(sale.getGrandTotal());
+        assertThat(payload.taxBreakdown()).isNotEmpty();
+        assertThat(payload.payments()).extracting("method").containsExactly(PaymentMethod.CASH);
+
+        // Someone at another branch cannot have this branch's receipts sent anywhere.
+        mockMvc.perform(
+                        post("/api/v1/sales/" + sale.getId() + "/receipts/email")
+                                .with(atBranches(List.of(OTHER_BRANCH), "sale:create"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json(Map.of("email", "someone@example.com"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(
+                        post("/api/v1/sales/" + sale.getId() + "/receipts/email")
+                                .with(atBranches(List.of(branch), "sale:create"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json(Map.of("email", "not an address"))))
+                .andExpect(status().isBadRequest());
+
+        // A voided sale's receipt is no longer a record of anything.
+        checkout.voidSale(sale.getId(), "Customer changed their mind", CASHIER);
+        mockMvc.perform(
+                        post("/api/v1/sales/" + sale.getId() + "/receipts/email")
+                                .with(atBranches(List.of(branch), "sale:create"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json(Map.of("email", "wanjiru@example.com"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code", is("receipt.sale_not_standing")));
+    }
+
     private static RequestPostProcessor at(UUID branch, UUID user, String... permissions) {
         GrantedAuthority[] authorities =
                 Arrays.stream(permissions)
