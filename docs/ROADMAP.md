@@ -1163,6 +1163,39 @@ sandbox. A real scale on a serial port and a customer display are not in scope; 
 
 ---
 
+## Branding and administrators (after Phase 14) ✅
+
+Not a phase: asked for between two.
+
+- **The Realhive mark everywhere**, all drawn from the supplied logo by `scripts/brand/generate.py`
+  (the six hexagons measured and redrawn as vectors, so every size has clean edges): the favicon
+  (replacing Next's default), the app and Apple icons, a web manifest, the header and the sign-in
+  pages, on-screen and browser-printed receipts, a 1-bit version printed on thermal receipts with
+  ESC/POS `GS v 0`, every email (attached inline by Content-ID, so no client has to fetch it), and
+  the letterhead of every PDF export. The source image is kept in `frontend/web/branding/`.
+- **`make admin email=... name="..."`** creates an administrator: the SUPER_ADMIN role, which holds
+  every permission (branches, users, roles, stock, buying, sales, payments, customers, every report)
+  and every branch; the password is temporary, replaced at first sign-in. **`make admin-check`**
+  signs in as that administrator and reads through every service, per branch and business-wide.
+- **Reports by period**: `GET /reports/sales/by-period?period=WEEK|MONTH|QUARTER|YEAR`, per branch or
+  across the whole business (`acrossBranches=true`, which needs `report:view`).
+- **The audit trail can be read**: `GET /audit` (`audit:view`), newest first, by action and by who.
+
+**Verified:**
+
+| Check | Result |
+|---|---|
+| An administrator made as `make admin` makes one | ✅ `AdministratorRightsIT`: every permission in the catalogue, all branches |
+| Runs the business | ✅ opens and renames a branch, creates a supervisor, assigns their branch, promotes them, suspends them, builds a role, reads the audit trail including its own actions |
+| A cashier | ✅ refused the audit trail, branches and users |
+| Period reports | ✅ week, month, quarter and year, per branch and across branches; a branch manager refused the whole business |
+| `make admin` + `make admin-check` against the stack | ✅ 42 of 42 permissions; 86 of 86 reads allowed across 6 branches. The same check as a cashier fails: 24 refused. A duplicate address is refused; a generated password is shown once |
+| The browser | ✅ favicon, icon and manifest served before sign-in; the logo on sign-in, in the header and on the lane receipt |
+| Email and PDF | ✅ a delivered message carries the logo inline; an exported PDF carries the image |
+| Thermal receipt | ✅ the raster precedes the heading; `logo: false` leaves it out |
+
+---
+
 ## Phase 15 — Frontend back office
 
 **Goal:** the business can be run without touching the database.

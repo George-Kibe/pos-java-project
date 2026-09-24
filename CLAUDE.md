@@ -474,6 +474,10 @@ rollback-only, so the commit fails anyway and takes the batch with it.
 - **An approval token never reaches the browser.** `/api/lane/approved` obtains it and spends it on
   the one call its permission's allow-list names (`lib/lane/approvals.ts`). A new approvable action
   goes on that list and on auth-service's `pos.auth.approval.permissions`, or it cannot be approved.
+- **Every brand image comes from `scripts/brand/generate.py`**: the favicon, app icons, the header
+  mark, the receipt raster (`lib/lane/receipt-logo.ts`) and the email and PDF logos in the
+  notification and reporting resources. Change the mark or a colour there and re-run it; do not
+  edit a generated file. Names live in `lib/brand.ts` and the services' `BRAND_NAME`.
 - **The lane adds money in bigint, not `number`** (`lib/lane/decimal.ts`): four places for amounts,
   three for quantities, HALF_UP like the server. That needs `target` ES2020 or later in
   `tsconfig.json`; after changing it, delete `tsconfig.tsbuildinfo` or `tsc` keeps the old errors.

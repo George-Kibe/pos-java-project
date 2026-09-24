@@ -255,6 +255,8 @@ make env-sync                   # an existing .env: add secrets a later phase in
 make up                         # infrastructure + services; gateway on :8080
 make ps                         # container status
 make verify                     # full build: format, tests, integration tests, coverage
+make admin email=… name="…"     # an administrator: every permission, every branch (temporary password)
+make admin-check email=…        # sign in as that administrator and read through every service and branch
 make demo-seed                  # demo data through the APIs: 5 branches, 20 staff, products, suppliers, sales...
 make demo-clear                 # remove the demo data again, and nothing else (repeatable)
 make postman                    # regenerate the Postman/Insomnia collection in postman/
