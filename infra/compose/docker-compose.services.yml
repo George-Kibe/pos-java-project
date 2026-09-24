@@ -333,8 +333,8 @@ services:
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       # smtp, or capture (browser e2e runs only - see docker-compose.e2e.yml).
       MAIL_TRANSPORT: ${MAIL_TRANSPORT:-smtp}
-      MAIL_FROM: ${MAIL_FROM:-Supermarket POS <no-reply@example.com>}
-      BRAND_NAME: ${BRAND_NAME:-Supermarket POS}
+      MAIL_FROM: ${MAIL_FROM:-Realhive Group of Supermarkets POS <no-reply@example.com>}
+      BRAND_NAME: ${BRAND_NAME:-Realhive Group of Supermarkets POS}
       SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@example.com}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
     # No published port: reachable only through the gateway.

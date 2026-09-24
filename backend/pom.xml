@@ -14,7 +14,7 @@
   <version>0.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>POS Platform</name>
-  <description>Multi-branch supermarket POS platform</description>
+  <description>Multi-branch supermarket POS platform(Realhive Group of Supermarkets)</description>
 
   <!--
     Modules are added as each roadmap phase lands (docs/ROADMAP.md).

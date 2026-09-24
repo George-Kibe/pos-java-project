@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { type ClientSession, SessionProvider } from "@/components/session-provider";
 import type { Me } from "@/lib/api/schemas";
 import { getActiveBranch } from "@/lib/auth/dal";
+import { BRAND_NAME } from "@/lib/brand";
 import { visibleNav } from "@/lib/nav";
 
 import { BranchSwitcher } from "./branch-switcher";
@@ -27,7 +28,7 @@ export async function AppShell({ user, children }: { user: Me; children: ReactNo
     <SessionProvider session={session}>
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-2">
-          <span className="mr-2 text-lg font-semibold tracking-tight">Supermarket POS</span>
+          <span className="mr-2 text-lg font-semibold tracking-tight">{BRAND_NAME}</span>
           <NavLinks items={visibleNav(user.permissions)} />
           <div className="ml-auto flex items-center gap-2">
             <BranchSwitcher />

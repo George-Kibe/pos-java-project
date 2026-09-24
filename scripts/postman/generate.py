@@ -275,7 +275,7 @@ def build(base: str) -> tuple[dict, int]:
     collection = {
         "info": {
             "_postman_id": str(uuid.uuid5(uuid.NAMESPACE_URL, "pos-java-project/api")),
-            "name": "Supermarket POS API",
+            "name": "Realhive Group of Supermarkets POS API",
             "description": (
                 "Every endpoint of the POS, through the API gateway. Generated from the services' "
                 "OpenAPI specs by `make postman`.\n\n"

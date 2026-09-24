@@ -9,7 +9,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "Supermarket POS", template: "%s · Supermarket POS" },
+  title: { default: "Realhive Group of Supermarkets POS", template: "%s · Realhive Group of Supermarkets POS" },
   description: "Point of sale and back office",
 };
 
