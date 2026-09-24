@@ -11,6 +11,8 @@ describe("what a supervisor's PIN can be spent on", () => {
     expect(isAllowedAction("sale:void", "POST", `sales/${CART}/void`)).toBe(true);
     expect(isAllowedAction("sale:refund", "POST", "returns")).toBe(true);
     expect(isAllowedAction("cash:drop", "POST", `till-sessions/${CART}/drops`)).toBe(true);
+    expect(isAllowedAction("cash:intraday", "POST", `till-sessions/${CART}/replenishments`)).toBe(true);
+    expect(isAllowedAction("cash:intraday", "POST", `till-sessions/${CART}/drops`)).toBe(false);
   });
 
   it("refuses the same PIN for another action, another method or a crafted path", () => {

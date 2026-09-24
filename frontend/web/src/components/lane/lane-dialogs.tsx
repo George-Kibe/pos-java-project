@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api/errors";
 import { amount, amountString, money, quantity, quantityString } from "@/lib/lane/decimal";
 import { laneApi } from "@/lib/lane/lane-api";
-import type { Cart, Customer, TillSession } from "@/lib/lane/schemas";
+import { type CashCount, lines as cashLines, total as cashTotal } from "@/lib/lane/cash";
+import type { Cart, Customer, Drawer, TillSession } from "@/lib/lane/schemas";
+
+import { CashCounter } from "./cash-counter";
 import { cn } from "@/lib/utils";
 
 /** The frame every lane dialog shares: a title, a line of help, Esc to leave. */
@@ -394,47 +397,10 @@ export function CustomerDialog({
   );
 }
 
-/** Cash out of the drawer into the safe, mid-shift. */
-export function CashDropDialog({
-  open,
-  onSubmit,
-  onCancel,
-}: {
-  open: boolean;
-  onSubmit: (drop: { amount: string; reason: string }) => void;
-  onCancel: () => void;
-}) {
-  const [value, setValue] = useState("");
-  const [reason, setReason] = useState("Safe drop");
-  const [error, setError] = useState<string | undefined>();
-  return (
-    <LaneDialog open={open} title="Cash drop" description="Count the notes going to the safe." onCancel={onCancel}>
-      <form
-        className="grid gap-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          try {
-            const parsed = amount(value);
-            if (parsed <= 0n) throw new Error();
-            onSubmit({ amount: amountString(parsed), reason: reason.trim() || "Safe drop" });
-          } catch {
-            setError("Enter the amount dropped.");
-          }
-        }}
-      >
-        <Field id="drop-amount" label="Amount" inputMode="decimal" autoFocus value={value} onChange={(event) => setValue(event.target.value)} error={error} />
-        <Field id="drop-reason" label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} />
-        <Button type="submit" size="lg">
-          Record drop
-        </Button>
-      </form>
-    </LaneDialog>
-  );
-}
-
 /**
  * Closing the shift: the drawer is counted blind - the expected figure is shown only after the
- * count is entered, so the count is a count and not a copy.
+ * count is entered, so the count is a count and not a copy. A tracked drawer is counted note by
+ * note, and any difference is shown per denomination.
  */
 export function CloseShiftDialog({
   open,
@@ -447,9 +413,12 @@ export function CloseShiftDialog({
   onClosed: () => void;
   onCancel: () => void;
 }) {
+  const tracked = Boolean(shift.tracksDenominations);
   const [counted, setCounted] = useState("");
+  const [countedNotes, setCountedNotes] = useState<CashCount>({});
   const [notes, setNotes] = useState("");
   const [closed, setClosed] = useState<TillSession | null>(null);
+  const [lines, setLines] = useState<Drawer["closingCount"]>([]);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
@@ -457,7 +426,7 @@ export function CloseShiftDialog({
     event.preventDefault();
     let value: string;
     try {
-      value = amountString(amount(counted));
+      value = amountString(tracked ? amount(cashTotal(countedNotes)) : amount(counted));
     } catch {
       setError("Enter the cash counted in the drawer.");
       return;
@@ -466,7 +435,9 @@ export function CloseShiftDialog({
     setError(undefined);
     try {
       if (shift.status === "OPEN") await laneApi.beginClose(shift.id);
-      setClosed(await laneApi.closeShift(shift.id, value, notes.trim() || undefined));
+      const result = await laneApi.closeShift(shift.id, value, notes.trim() || undefined, tracked ? cashLines(countedNotes) : undefined);
+      if (tracked) setLines((await laneApi.drawer(shift.id)).closingCount);
+      setClosed(result);
     } catch (failure) {
       setError(message(failure, "The shift could not be closed."));
     } finally {
@@ -475,6 +446,7 @@ export function CloseShiftDialog({
   }
 
   const variance = closed?.variance ?? 0;
+  const differences = lines.filter((line) => line.difference !== 0);
   return (
     <LaneDialog open={open} title={closed ? "Shift closed" : "Close the shift"} onCancel={closed ? onClosed : onCancel}>
       {closed ? (
@@ -489,14 +461,47 @@ export function CloseShiftDialog({
             <dt>Sales</dt>
             <dd className="text-right">{closed.saleCount}</dd>
           </dl>
+          {differences.length > 0 ? (
+            <table className="text-sm" aria-label="Differences by note and coin">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="text-left font-normal">Note or coin</th>
+                  <th className="text-right font-normal">Expected</th>
+                  <th className="text-right font-normal">Counted</th>
+                  <th className="text-right font-normal">Difference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {differences.map((line) => (
+                  <tr key={line.denomination}>
+                    <td>{line.denomination}</td>
+                    <td className="text-right">{line.expected}</td>
+                    <td className="text-right">{line.counted}</td>
+                    <td className={cn("text-right font-medium", line.difference < 0 && "text-destructive")}>
+                      {line.difference > 0 ? `+${line.difference}` : line.difference}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
           <Button size="lg" autoFocus onClick={onClosed}>
             Done
           </Button>
         </div>
       ) : (
         <form onSubmit={close} className="grid gap-4">
-          <Field id="counted-cash" label="Cash counted in the drawer" inputMode="decimal" autoFocus value={counted} onChange={(event) => setCounted(event.target.value)} error={error} />
+          {tracked ? (
+            <CashCounter idPrefix="close" value={countedNotes} onChange={setCountedNotes} compact />
+          ) : (
+            <Field id="counted-cash" label="Cash counted in the drawer" inputMode="decimal" autoFocus value={counted} onChange={(event) => setCounted(event.target.value)} />
+          )}
           <Field id="close-notes" label="Notes (optional)" value={notes} onChange={(event) => setNotes(event.target.value)} />
+          {error ? (
+            <p role="alert" className="text-sm font-medium text-destructive">
+              {error}
+            </p>
+          ) : null}
           <Button type="submit" size="lg" disabled={busy}>
             Close shift
           </Button>

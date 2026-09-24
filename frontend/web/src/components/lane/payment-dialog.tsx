@@ -12,7 +12,10 @@ import { amount, amountString, cents, money, sum } from "@/lib/lane/decimal";
 import { laneApi } from "@/lib/lane/lane-api";
 import { TENDER_LABELS } from "@/lib/lane/receipt";
 import type { PaymentIntent, Sale } from "@/lib/lane/schemas";
+import { asHandedOver, type CashCount, covers as coversCash, describe as describeCash, exactChange, lines as cashLines, payableShillings, plus as plusCash, total as cashTotal } from "@/lib/lane/cash";
 import { cn } from "@/lib/utils";
+
+import { CashCounter } from "./cash-counter";
 
 type Method = "CASH" | "CARD" | "MPESA";
 
@@ -22,6 +25,8 @@ interface Tender {
   amount: string;
   terminalReference?: string;
   phoneNumber?: string;
+  /** For cash: which notes and coins were handed over. */
+  received?: CashCount;
 }
 
 const METHOD_KEYS: Record<string, Method> = { F1: "CASH", F2: "CARD", F3: "MPESA" };
@@ -41,7 +46,13 @@ function validPhone(value: string): boolean {
   return /^(?:\+?254|0)[17]\d{8}$/.test(value.replace(/\s/g, ""));
 }
 
-export type OfflinePayment = { method: "CASH" | "CARD"; amountTendered?: string; terminalReference?: string };
+export type OfflinePayment = {
+  method: "CASH" | "CARD";
+  amountTendered?: string;
+  terminalReference?: string;
+  received?: CashCount;
+  change?: CashCount;
+};
 
 export function PaymentDialog({
   open,
@@ -49,6 +60,9 @@ export function PaymentDialog({
   due,
   currency,
   cartId,
+  holdings,
+  tracked,
+  cashBlocked,
   onPaid,
   onPaidOffline,
   onSaleCancelled,
@@ -56,6 +70,11 @@ export function PaymentDialog({
 }: {
   open: boolean;
   offline: boolean;
+  /** What the drawer holds now, for previewing change from it. */
+  holdings: CashCount;
+  tracked: boolean;
+  /** The till is at its cash ceiling: no cash until a deposit. */
+  cashBlocked: boolean;
   /** Four places. */
   due: string;
   currency: string;
@@ -77,6 +96,11 @@ export function PaymentDialog({
   const [awaiting, setAwaiting] = useState<Sale | null>(null);
   const [cardIntents, setCardIntents] = useState<PaymentIntent[]>([]);
   const [approvalCode, setApprovalCode] = useState("");
+  const [counting, setCounting] = useState(false);
+  const [counted, setCounted] = useState<CashCount>({});
+  /** Tenders waiting for the cashier to count out the change. */
+  const [changeStep, setChangeStep] = useState<{ tenders: Tender[]; due: number; available: CashCount } | null>(null);
+  const [chosenChange, setChosenChange] = useState<CashCount>({});
   const tenderKey = useRef<string | null>(null);
   // The parent's callbacks change every render; the poll below must not restart with them.
   const settled = useRef({ onPaid, onSaleCancelled });
@@ -102,6 +126,10 @@ export function PaymentDialog({
       setAwaiting(null);
       setCardIntents([]);
       setApprovalCode("");
+      setCounting(false);
+      setCounted({});
+      setChangeStep(null);
+      setChosenChange({});
       tenderKey.current = null;
     };
   }, [open]);
@@ -164,10 +192,45 @@ export function PaymentDialog({
     setValue("");
     setReference("");
     setPhone("");
+    setCounted({});
+    setCounting(false);
     return next;
   }
 
-  async function complete(all: Tender[]) {
+  /** The cash notes in, and the change the drawer can give for them - or why it cannot. */
+  function cashPlan(all: Tender[]): { received: CashCount; change: CashCount | null; shillings: number } {
+    const received = all
+      .filter((tender) => tender.method === "CASH")
+      .reduce<CashCount>((sum, tender) => plusCash(sum, tender.received ?? asHandedOver(Number(tender.amount))), {});
+    const paidAll = sum(all.map((tender) => amount(tender.amount)));
+    const changeDue = paidAll > dueAmount ? paidAll - dueAmount : 0n;
+    const shillings = payableShillings(Number(amountString(changeDue)));
+    return { received, change: exactChange(shillings, plusCash(holdings, received)), shillings };
+  }
+
+  /**
+   * Cash that needs change goes through the change step first: the till suggests the fewest pieces,
+   * the cashier gives it their way, and it must tally before the sale goes on.
+   */
+  function complete(all: Tender[]) {
+    const plan = cashPlan(all);
+    if (tracked && plan.shillings > 0 && plan.received && Object.keys(plan.received).length > 0) {
+      setChangeStep({ tenders: all, due: plan.shillings, available: plusCash(holdings, plan.received) });
+      setChosenChange(plan.change ?? {});
+      setError(undefined);
+      return;
+    }
+    void finish(all, plan.change);
+  }
+
+  async function finish(all: Tender[], chosen: CashCount | null) {
+    const plan = cashPlan(all);
+    if (tracked && chosen === null) {
+      // Refused here before anything is sent: the server would refuse it too.
+      setTenders(all.filter((tender) => tender.method !== "CASH"));
+      setError(`The drawer cannot make ${plan.shillings} in change from what it holds. Ask for other notes, or replenish from intraday (Alt+F).`);
+      return;
+    }
     setBusy(true);
     setError(undefined);
     try {
@@ -175,7 +238,7 @@ export function PaymentDialog({
         const only = all[0];
         await onPaidOffline(
           only.method === "CASH"
-            ? { method: "CASH", amountTendered: only.amount }
+            ? { method: "CASH", amountTendered: only.amount, received: plan.received, change: chosen ?? {} }
             : { method: "CARD", terminalReference: only.terminalReference },
         );
         return;
@@ -196,6 +259,8 @@ export function PaymentDialog({
         })),
         cash > 0n ? amountString(cash) : undefined,
         tenderKey.current,
+        cash > 0n ? cashLines(plan.received) : undefined,
+        cash > 0n && tracked && chosen ? cashLines(chosen) : undefined,
       );
       if (result.status === "PAID") onPaid(result);
       else setAwaiting(result);
@@ -216,10 +281,20 @@ export function PaymentDialog({
     event.preventDefault();
     if (busy) return;
     if (error && tenders.length > 0 && remaining <= 0n) {
-      void complete(tenders);
+      void finish(tenders, changeStep ? chosenChange : cashPlan(tenders).change);
       return;
     }
-    const entered = value.trim() === "" ? remaining : parseAmount(value);
+    if (method === "CASH" && cashBlocked) {
+      setError("Cash is paused: this till is at its cash ceiling. Deposit to intraday first, or take card or M-Pesa.");
+      return;
+    }
+    const countedTotal = cashTotal(counted);
+    const entered =
+      method === "CASH" && counting && countedTotal > 0
+        ? amount(countedTotal)
+        : value.trim() === ""
+          ? remaining
+          : parseAmount(value);
     if (entered === null || entered <= 0n) {
       setError("Enter an amount.");
       return;
@@ -246,12 +321,17 @@ export function PaymentDialog({
       amount: amountString(entered),
       terminalReference: method === "CARD" ? reference.trim() : undefined,
       phoneNumber: method === "MPESA" ? phone.replace(/\s/g, "") : undefined,
+      received: method === "CASH" ? (counting && countedTotal > 0 ? counted : asHandedOver(Number(amountString(entered)))) : undefined,
     });
     if (sum(next.map((tender) => amount(tender.amount))) >= dueAmount) void complete(next);
   }
 
   function quickCash(value: string) {
-    const next = addTender({ method: "CASH", amount: value });
+    if (cashBlocked) {
+      setError("Cash is paused: this till is at its cash ceiling. Deposit to intraday first, or take card or M-Pesa.");
+      return;
+    }
+    const next = addTender({ method: "CASH", amount: value, received: asHandedOver(Number(value)) });
     if (sum(next.map((tender) => amount(tender.amount))) >= dueAmount) void complete(next);
   }
 
@@ -286,6 +366,8 @@ export function PaymentDialog({
 
 
   const change = remaining < 0n ? cents(-remaining) : null;
+  const changeTallies = changeStep !== null && cashTotal(chosenChange) === changeStep.due && coversCash(changeStep.available, chosenChange);
+  const changeNotes = change && tracked ? cashPlan(tenders).change : null;
 
   return (
     <Dialog open={open} onOpenChange={(next) => (!next ? close() : undefined)}>
@@ -321,10 +403,58 @@ export function PaymentDialog({
                 {change ?? remainingText}
               </span>
             </li>
+            {changeNotes ? (
+              <li className="text-sm text-muted-foreground" data-testid="change-notes">
+                Give back {describeCash(changeNotes)}
+              </li>
+            ) : null}
           </ul>
         ) : null}
 
-        {awaiting ? (
+        {changeStep && !awaiting ? (
+          <form
+            className="grid gap-3"
+            data-testid="change-step"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!changeTallies) return;
+              const step = changeStep;
+              setChangeStep(null);
+              void finish(step.tenders, chosenChange);
+            }}
+          >
+            <p className="text-base">
+              Give <span className="font-semibold tabular-nums">{money(amount(changeStep.due))}</span> in change, your way. The
+              till suggests the fewest pieces.
+            </p>
+            <CashCounter idPrefix="change" value={chosenChange} onChange={setChosenChange} max={changeStep.available} compact />
+            <p
+              role="status"
+              data-testid="change-tally"
+              className={cn("text-sm font-medium", changeTallies ? "text-emerald-700 dark:text-emerald-400" : "text-destructive")}
+            >
+              {changeTallies
+                ? `Tallies: ${describeCash(chosenChange)}`
+                : `Counted ${money(amount(cashTotal(chosenChange)))} of ${money(amount(changeStep.due))} due. It must tally before the sale can go on.`}
+            </p>
+            <div className="flex gap-2">
+              <Button type="submit" size="lg" className="flex-1" disabled={!changeTallies || busy}>
+                Give change
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                onClick={() => {
+                  setChangeStep(null);
+                  setTenders([]);
+                }}
+              >
+                Back
+              </Button>
+            </div>
+          </form>
+        ) : awaiting ? (
           <div className="grid gap-3" aria-live="polite">
             {cardIntents.length > 0 ? (
               cardIntents.map((intent) => (
@@ -379,6 +509,14 @@ export function PaymentDialog({
                 </Button>
               ))}
             </div>
+            {method === "CASH" && cashBlocked ? (
+              <p role="status" className="rounded-md bg-destructive/10 px-2 py-1 text-sm font-medium text-destructive">
+                Cash is paused at this till&apos;s ceiling. Deposit to intraday (Alt+C), or take card or M-Pesa.
+              </p>
+            ) : null}
+            {method === "CASH" && counting ? (
+              <CashCounter idPrefix="received" value={counted} onChange={setCounted} compact />
+            ) : null}
             <Field
               id="tender-amount"
               label={method === "CASH" ? "Cash handed over" : `${TENDER_LABELS[method]} amount`}
@@ -389,6 +527,11 @@ export function PaymentDialog({
               onChange={(event) => setValue(event.target.value)}
               hint="Enter for the amount shown."
             />
+            {method === "CASH" ? (
+              <Button type="button" variant="link" className="justify-self-start px-0" onClick={() => setCounting((now) => !now)}>
+                {counting ? "Type the amount instead" : "Count the notes handed over"}
+              </Button>
+            ) : null}
             {method === "CASH" && remaining > 0n ? (
               <div className="flex flex-wrap gap-2" aria-label="Quick cash">
                 {quickTenders(amountString(remaining)).map((option) => (

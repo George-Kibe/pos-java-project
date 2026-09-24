@@ -12,6 +12,7 @@ export const APPROVABLE_ACTIONS = {
   "sale:void": { method: "POST", path: new RegExp(`^sales/${ID}/void$`) },
   "sale:refund": { method: "POST", path: /^returns$/ },
   "cash:drop": { method: "POST", path: new RegExp(`^till-sessions/${ID}/drops$`) },
+  "cash:intraday": { method: "POST", path: new RegExp(`^till-sessions/${ID}/replenishments$`) },
 } as const;
 
 export type ApprovablePermission = keyof typeof APPROVABLE_ACTIONS;

@@ -57,6 +57,9 @@ export interface QueuedSale {
   amountTendered?: string;
   /** Kept on the device for the receipt only; the server has no field for it offline. */
   terminalReference?: string;
+  /** The notes counted in and handed back, for a drawer tracked by denomination. */
+  cashReceived?: { denomination: number; count: number }[];
+  changeGiven?: { denomination: number; count: number }[];
   claimedGrandTotal: string;
   lines: QueuedSaleLine[];
   status: QueuedStatus;
@@ -146,6 +149,8 @@ export const META = {
   /** A server cart left open when the network dropped mid-basket; abandoned once back. */
   orphanCartIds: "orphanCartIds",
   printerWidth: "printerWidth",
+  /** The drawer as last known, kept up to date by offline cash sales. */
+  drawer: "drawer",
 } as const;
 
 export type ScaleRules = ScaleRule[];

@@ -25,6 +25,9 @@ export const TillSessionSchema = z.object({
   variance: Money.nullable(),
   saleCount: z.number().int(),
   currency: z.string(),
+  tillNumber: z.number().int().nullable().optional(),
+  tillLabel: z.string().nullable().optional(),
+  tracksDenominations: z.boolean().optional(),
 });
 export type TillSession = z.infer<typeof TillSessionSchema>;
 
@@ -109,6 +112,14 @@ export const SaleSchema = z.object({
   outstanding: Money,
   amountTendered: Money.nullable(),
   changeGiven: Money.nullable(),
+  change: z
+    .object({
+      amount: Money,
+      denominations: z.array(z.object({ denomination: Money, count: z.number().int() })),
+      unpayableRemainder: Money,
+    })
+    .nullable()
+    .optional(),
   currency: z.string(),
   cancellationReason: z.string().nullable(),
   occurredAt: z.string(),
@@ -228,3 +239,25 @@ export const ReturnResponseSchema = z.object({
   status: z.string(),
   refundTotal: Money.optional(),
 });
+
+export const CashLineSchema = z.object({
+  denomination: z.number(),
+  note: z.boolean(),
+  count: z.number().int(),
+  amount: z.number(),
+});
+
+/** What the drawer holds note by note, and where it stands against its cash limit. */
+export const DrawerSchema = z.object({
+  tillSessionId: z.uuid(),
+  tracked: z.boolean(),
+  holdings: z.array(CashLineSchema),
+  countedTotal: z.number().nullable(),
+  expectedCash: z.number(),
+  unaccounted: z.number().nullable(),
+  limitState: z.enum(["OK", "WARN", "BLOCK"]),
+  limit: z.number().nullable(),
+  ceiling: z.number().nullable(),
+  closingCount: z.array(z.object({ denomination: z.number(), expected: z.number().int(), counted: z.number().int(), difference: z.number().int() })),
+});
+export type Drawer = z.infer<typeof DrawerSchema>;

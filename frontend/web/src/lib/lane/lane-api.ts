@@ -4,7 +4,11 @@ import { api } from "@/lib/api/client";
 import { ApiError, parseBody, problemFrom } from "@/lib/api/errors";
 
 import { type ApprovablePermission, ApprovedResultSchema } from "./approvals";
+/** So many of one note or coin, as the services take it. */
+export type CashLine = { denomination: number; count: number };
+
 import {
+  DrawerSchema,
   type Approver,
   ApproverSchema,
   CartSchema,
@@ -32,25 +36,32 @@ export const laneApi = {
       throw error;
     }
   },
-  openShift: (branchId: string, registerId: string, openingFloat: string) =>
+  openShift: (branchId: string, registerId: string, floatCount: CashLine[]) =>
     api("till-sessions", TillSessionSchema, {
       method: "POST",
-      json: { branchId, registerId, openingFloat },
+      json: { branchId, registerId, openingFloat: floatCount.reduce((sum, line) => sum + line.denomination * line.count, 0), floatCount },
       idempotencyKey: idempotent(),
     }),
+  drawer: (sessionId: string) => api(`till-sessions/${sessionId}/drawer`, DrawerSchema),
   shift: (id: string) => api(`till-sessions/${id}`, TillSessionSchema),
   beginClose: (id: string) =>
     api(`till-sessions/${id}/begin-close`, TillSessionSchema, { method: "POST", idempotencyKey: idempotent() }),
-  closeShift: (id: string, countedCash: string, notes?: string) =>
+  closeShift: (id: string, countedCash: string, notes?: string, countedNotes?: CashLine[]) =>
     api(`till-sessions/${id}/close`, TillSessionSchema, {
       method: "POST",
-      json: { countedCash, notes },
+      json: { countedCash, notes, countedNotes },
       idempotencyKey: idempotent(),
     }),
-  cashDrop: (id: string, amount: string, reason: string) =>
+  cashDrop: (id: string, amount: string, reason: string, notes?: CashLine[]) =>
     api(`till-sessions/${id}/drops`, TillSessionSchema, {
       method: "POST",
-      json: { amount, reason },
+      json: { amount, reason, notes },
+      idempotencyKey: idempotent(),
+    }),
+  replenish: (id: string, notes: CashLine[], reason?: string) =>
+    api(`till-sessions/${id}/replenishments`, TillSessionSchema, {
+      method: "POST",
+      json: { notes, reason },
       idempotencyKey: idempotent(),
     }),
 
@@ -113,11 +124,19 @@ export const laneApi = {
     tenders: { method: string; amount: string; phoneNumber?: string; terminalReference?: string }[],
     amountTendered: string | undefined,
     idempotencyKey: string,
+    cashReceived?: CashLine[],
+    changeGiven?: CashLine[],
   ) =>
     api(`sales/${saleId}/tender`, SaleSchema, {
       method: "POST",
-      json: { tenders, amountTendered },
+      json: { tenders, amountTendered, cashReceived, changeGiven },
       idempotencyKey,
+    }),
+  exchange: (sessionId: string, received: CashLine[], given: CashLine[]) =>
+    api(`till-sessions/${sessionId}/exchanges`, TillSessionSchema, {
+      method: "POST",
+      json: { received, given },
+      idempotencyKey: idempotent(),
     }),
   sale: (id: string) => api(`sales/${id}`, SaleSchema),
   saleByReceipt: (receiptNumber: string, branchId: string) =>

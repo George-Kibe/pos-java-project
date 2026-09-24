@@ -16,7 +16,9 @@ export function ReceiptView({ receipt }: { receipt: ReceiptDocument }) {
         {receipt.notice ? <p className="my-1 font-bold">{receipt.notice}</p> : null}
         <p>Receipt {receipt.receiptNumber}</p>
         <p>{receipt.issuedAt}</p>
-        <p>Served by {receipt.cashier}</p>
+        <p>
+          {receipt.till ? `${receipt.till} · ` : ""}Served by {receipt.cashier}
+        </p>
       </div>
       <hr className="my-2 border-dashed border-foreground/40" />
       {receipt.lines.map((line, index) => (

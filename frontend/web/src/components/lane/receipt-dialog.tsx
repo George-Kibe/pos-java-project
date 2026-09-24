@@ -18,6 +18,7 @@ export function ReceiptDialog({
   open,
   receipt,
   change,
+  changeNotes,
   canEmail,
   onPrint,
   onEmail,
@@ -26,6 +27,8 @@ export function ReceiptDialog({
   open: boolean;
   receipt: ReceiptDocument | null;
   change: string | null;
+  /** How the change is made up, e.g. "1 x 20, 1 x 5". */
+  changeNotes?: string;
   canEmail: boolean;
   onPrint: () => void;
   onEmail: (email: string) => Promise<void>;
@@ -79,6 +82,11 @@ export function ReceiptDialog({
         <DialogHeader>
           <DialogTitle>{change ? `Change: ${change}` : "Paid"}</DialogTitle>
         </DialogHeader>
+        {changeNotes ? (
+          <p className="text-base" data-testid="change-breakdown">
+            Give back: <span className="font-medium">{changeNotes}</span>
+          </p>
+        ) : null}
         {receipt ? <ReceiptView receipt={receipt} /> : null}
         {emailing ? (
           <form onSubmit={send} className="grid gap-2">

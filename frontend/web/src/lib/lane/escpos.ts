@@ -134,7 +134,7 @@ export function encodeReceipt(
   if (options.logo !== false) out.raster(receiptLogo());
   out.bold(true).line(receipt.brand).bold(false).line(receipt.branchName);
   if (receipt.notice) out.bold(true).line(receipt.notice).bold(false);
-  out.line(`Receipt ${receipt.receiptNumber}`).line(receipt.issuedAt).line(`Served by ${receipt.cashier}`);
+  out.line(`Receipt ${receipt.receiptNumber}`).line(receipt.issuedAt).line(`${receipt.till ? `${receipt.till} - ` : ""}Served by ${receipt.cashier}`);
   out.align("left").rule();
   for (const line of receipt.lines) {
     out.columns(line.name, line.total);

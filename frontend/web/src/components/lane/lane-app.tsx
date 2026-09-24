@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { refreshCatalog } from "@/lib/lane/catalog";
 import { reportFailure, startConnectivity } from "@/lib/lane/connectivity";
-import { getMeta, META, setMeta } from "@/lib/lane/db";
+import { deleteMeta, getMeta, META, setMeta } from "@/lib/lane/db";
 import { encodeReceipt } from "@/lib/lane/escpos";
 import { laneApi } from "@/lib/lane/lane-api";
 import { choosePrinter, printerSupport, rememberedPrinter } from "@/lib/lane/printer";
@@ -46,16 +46,21 @@ export function LaneApp({ branch, cashier, brand }: { branch: { id: string; name
   // This device's register: made once, kept for good. Sales and shifts are recorded against it.
   useEffect(() => {
     void (async () => {
-      let id = await getMeta<string>(META.registerId);
+      // One till per branch: a till's number belongs to its branch. A device from before keeps its
+      // identity (and number) for the first branch it opens at.
+      const key = `${META.registerId}:${branch.id}`;
+      let id = await getMeta<string>(key);
       if (!id) {
-        id = crypto.randomUUID();
-        await setMeta(META.registerId, id);
+        const earlier = await getMeta<string>(META.registerId);
+        id = earlier ?? crypto.randomUUID();
+        await setMeta(key, id);
+        if (earlier) await deleteMeta(META.registerId);
       }
       setRegisterId(id);
       const remembered = await rememberedPrinter();
       if (remembered) setPrinter(remembered);
     })();
-  }, [setPrinter]);
+  }, [setPrinter, branch.id]);
 
   const keepShift = useCallback((next: TillSession | null) => {
     setShift(next);
@@ -178,7 +183,7 @@ export function LaneApp({ branch, cashier, brand }: { branch: { id: string; name
   }, []);
 
   const support = typeof navigator === "undefined" ? { usb: false, serial: false } : printerSupport();
-  const shiftLabel = shift ? `Shift since ${receiptTime(shift.openedAt)}` : null;
+  const shiftLabel = shift ? `${shift.tillLabel ? `${shift.tillLabel} · ` : ""}Shift since ${receiptTime(shift.openedAt)}` : null;
 
   return (
     <div className="grid gap-3">

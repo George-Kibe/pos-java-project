@@ -2,17 +2,21 @@
 
 import { type FormEvent, useState } from "react";
 
-import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError } from "@/lib/api/errors";
+import { type CashCount, lines } from "@/lib/lane/cash";
 import { reportFailure } from "@/lib/lane/connectivity";
-import { amount, amountString } from "@/lib/lane/decimal";
 import { laneApi } from "@/lib/lane/lane-api";
 import type { TillSession } from "@/lib/lane/schemas";
 import { useLaneStore } from "@/lib/lane/store";
 
-/** Opening a shift: the float counted into the drawer before the first sale. */
+import { CashCounter } from "./cash-counter";
+
+/**
+ * Opening a shift: the float counted into the drawer note by note. From then on the drawer is
+ * tracked by denomination, so the calculator always knows what it holds.
+ */
 export function ShiftOpen({
   branchId,
   registerId,
@@ -23,23 +27,16 @@ export function ShiftOpen({
   onOpened: (shift: TillSession) => void;
 }) {
   const connectivity = useLaneStore((state) => state.connectivity);
-  const [openingFloat, setOpeningFloat] = useState("");
+  const [float, setFloat] = useState<CashCount>({});
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
   async function open(event: FormEvent) {
     event.preventDefault();
-    let value: string;
-    try {
-      value = amountString(amount(openingFloat || "0"));
-    } catch {
-      setError("Enter the float as a number, e.g. 5000");
-      return;
-    }
     setBusy(true);
     setError(undefined);
     try {
-      onOpened(await laneApi.openShift(branchId, registerId, value));
+      onOpened(await laneApi.openShift(branchId, registerId, lines(float)));
     } catch (failure) {
       if (!reportFailure(failure)) {
         setError(failure instanceof ApiError ? failure.message : "The shift could not be opened.");
@@ -50,26 +47,22 @@ export function ShiftOpen({
   }
 
   return (
-    <Card className="mx-auto w-full max-w-md">
+    <Card className="mx-auto w-full max-w-2xl">
       <CardHeader>
         <CardTitle>Open a shift</CardTitle>
         <CardDescription>
-          Count the float into the drawer and enter it. The drawer is reconciled against it when
-          the shift closes.
+          Count the float into the drawer, note by note. The till keeps track of every note and coin
+          from here, and the close is checked against it.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={open} className="grid gap-4">
-          <Field
-            id="opening-float"
-            label="Opening float"
-            inputMode="decimal"
-            autoFocus
-            value={openingFloat}
-            onChange={(event) => setOpeningFloat(event.target.value)}
-            error={error}
-            placeholder="0.00"
-          />
+          <CashCounter idPrefix="float" value={float} onChange={setFloat} />
+          {error ? (
+            <p role="alert" className="text-sm font-medium text-destructive">
+              {error}
+            </p>
+          ) : null}
           <Button type="submit" size="lg" disabled={busy || connectivity !== "online"}>
             Open shift
           </Button>

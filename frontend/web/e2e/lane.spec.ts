@@ -1,6 +1,7 @@
 import { type Browser, expect, type Page, test } from "@playwright/test";
 
 import {
+  countFloat,
   createProduct,
   ean13,
   firstBranchId,
@@ -65,8 +66,8 @@ async function atTheTill(browser: Browser): Promise<Page> {
   const page = await (await browser.newContext()).newPage();
   await signIn(page, cashier.email, PASSWORD);
   await expect(page).toHaveURL(/\/lane$/);
-  await page.getByLabel("Opening float").fill("5000");
-  await page.keyboard.press("Enter");
+  await countFloat(page);
+  await page.getByRole("button", { name: "Open shift" }).click();
   await expect(page.getByTestId("scan-input")).toBeFocused();
   return page;
 }
@@ -122,8 +123,12 @@ test("a mixed basket with a supervisor-approved price, paid part card and part c
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("left-to-pay")).toHaveText("110.00");
   await page.keyboard.press("F1");
+  await expect(page.getByRole("radio", { name: /^Cash/ })).toHaveAttribute("aria-checked", "true");
   await page.getByLabel("Cash handed over").fill("200");
   await page.keyboard.press("Enter");
+  // Change due: the till suggests the fewest pieces from the drawer; the cashier confirms.
+  await expect(page.getByTestId("change-tally")).toContainText("Tallies");
+  await page.getByRole("button", { name: "Give change" }).click();
 
   // The card waits at the terminal; its approval code is keyed in from the slip.
   await page.getByLabel(/Card approval code/).fill("A12345");
@@ -167,6 +172,7 @@ test("selling with the network pulled, then every sale synced exactly once with 
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("receipt")).toContainText("OFFLINE SALE");
   await page.getByRole("button", { name: "Next sale" }).click();
+  await expect(page.getByTestId("scan-input")).toBeFocused();
 
   // A weighed item from its scale label - decoded on the lane - with change.
   await scan(page, ean13(`20${itemCode}00500`));
@@ -174,6 +180,7 @@ test("selling with the network pulled, then every sale synced exactly once with 
   await page.keyboard.press("F10");
   await page.getByLabel("Cash handed over").fill("100");
   await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Give change" }).click();
   await expect(page.getByRole("heading", { name: "Change: 40.00" })).toBeVisible();
   await page.getByRole("button", { name: "Next sale" }).click();
   await expect(page.getByTestId("queue")).toHaveText("2 waiting");

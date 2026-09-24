@@ -20,14 +20,15 @@ import { approved, laneApi } from "@/lib/lane/lane-api";
 import { enqueueSale } from "@/lib/lane/queue";
 import type { ReceiptDocument } from "@/lib/lane/receipt";
 import { offlineReceipt, type ReceiptContext, saleReceipt } from "@/lib/lane/receipt-builders";
-import { type Cart, CartSchema, type Receipt, type Sale, SaleSchema, type TillSession, TillSessionSchema } from "@/lib/lane/schemas";
+import { type CashCount, describe as describeCash, fromLines, lines as cashLines, minus as minusCash, plus as plusCash, total as cashTotal } from "@/lib/lane/cash";
+import { type Cart, CartSchema, type Drawer, type Receipt, type Sale, SaleSchema, type TillSession, TillSessionSchema } from "@/lib/lane/schemas";
 import { useLaneStore } from "@/lib/lane/store";
 import { cn } from "@/lib/utils";
 
 import { ApprovalDialog } from "./approval-dialog";
+import { CashMoveDialog, DrawerPanel, ExchangeDialog } from "./drawer-panel";
 import {
   type AttachedCustomer,
-  CashDropDialog,
   CloseShiftDialog,
   CustomerDialog,
   PriceDialog,
@@ -58,10 +59,11 @@ type LaneDialogState =
   | { kind: "recall" }
   | { kind: "customer" }
   | { kind: "payment" }
-  | { kind: "drop" }
+  | { kind: "cash"; mode: "deposit" | "replenish" }
+  | { kind: "exchange" }
   | { kind: "close" }
   | { kind: "help" }
-  | { kind: "receipt"; receipt: ReceiptDocument; change: string | null; saleId?: string };
+  | { kind: "receipt"; receipt: ReceiptDocument; change: string | null; changeNotes?: string; saleId?: string };
 
 const EMPTY: BasketView = { lines: [], grandTotal: "0.0000", currency: "KES", itemCount: 0 };
 
@@ -77,7 +79,9 @@ export const SHORTCUTS: [string, string][] = [
   ["F8", "Recall a basket"],
   ["F9 / Delete", "Remove the line"],
   ["F10", "Pay"],
-  ["Alt+C", "Cash drop"],
+  ["Alt+C", "Deposit cash to intraday"],
+  ["Alt+F", "Replenish change from intraday"],
+  ["Alt+E", "Exchange notes for notes of the same total"],
   ["Alt+L", "Reprint the last receipt"],
   ["Alt+V", "Void the last sale"],
   ["Alt+R", "Returns"],
@@ -137,12 +141,43 @@ export function Checkout({
   const [dialog, setDialog] = useState<LaneDialogState | null>(null);
   const [busy, setBusy] = useState(false);
   const [lastSale, setLastSale] = useState<{ sale: Sale; receipt?: Receipt } | null>(null);
+  const [drawer, setDrawer] = useState<Drawer | null>(null);
+  const [holdings, setHoldings] = useState<CashCount>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
   const offline = connectivity === "offline" || offlineLines.length > 0;
   const view = offline ? offlineView(offlineLines) : cart ? cartView(cart) : EMPTY;
   const selectedLine = view.lines[Math.min(selected, view.lines.length - 1)];
-  const context: ReceiptContext = { brand, branchName: branch.name, cashier };
+  const context: ReceiptContext = { brand, branchName: branch.name, cashier, till: shift.tillLabel ?? undefined };
+
+  /** The drawer from the server, kept on the device for when the network goes. */
+  const reloadDrawer = useCallback(async () => {
+    try {
+      const fresh = await laneApi.drawer(shift.id);
+      const held = fromLines(fresh.holdings);
+      setDrawer(fresh);
+      setHoldings(held);
+      await setMeta(META.drawer, { drawer: fresh, holdings: held });
+    } catch (failure) {
+      reportFailure(failure);
+      const saved = await getMeta<{ drawer: Drawer; holdings: CashCount }>(META.drawer);
+      if (saved && saved.drawer.tillSessionId === shift.id) {
+        setDrawer(saved.drawer);
+        setHoldings(saved.holdings);
+      }
+    }
+  }, [shift.id]);
+
+  /** An offline cash sale moves the drawer on the device until the server can count it. */
+  async function adjustDrawer(received: CashCount, change: CashCount) {
+    const held = minusCash(plusCash(holdings, received), change);
+    setHoldings(held);
+    if (drawer) await setMeta(META.drawer, { drawer, holdings: held });
+  }
+
+  useEffect(() => {
+    if (connectivity === "online") queueMicrotask(() => void reloadDrawer());
+  }, [connectivity, reloadDrawer]);
 
   const focusInput = useCallback(() => requestAnimationFrame(() => inputRef.current?.focus()), []);
   const closeDialog = useCallback(() => {
@@ -444,6 +479,8 @@ export function Checkout({
       toast.error("The basket is empty.");
       return;
     }
+    // The change the till suggests, and checks, comes from the drawer as it is now.
+    if (!offline) void reloadDrawer();
     setDialog({ kind: "payment" });
   }
 
@@ -467,7 +504,12 @@ export function Checkout({
     setLastSale({ sale, receipt });
     resetBasket();
     const change = sale.changeGiven !== null && sale.changeGiven > 0 ? money(sale.changeGiven) : null;
-    setDialog({ kind: "receipt", receipt: document, change, saleId: sale.id });
+    const changeNotes =
+      change && sale.change && sale.change.denominations.length > 0
+        ? describeCash(fromLines(sale.change.denominations.map((line) => ({ denomination: line.denomination, count: line.count }))))
+        : undefined;
+    setDialog({ kind: "receipt", receipt: document, change, changeNotes, saleId: sale.id });
+    void reloadDrawer();
     const cash = sale.payments.some((payment) => payment.method === "CASH");
     void print(document, { kickDrawer: cash, browserFallback: false });
     void refreshShift();
@@ -485,6 +527,8 @@ export function Checkout({
       paymentMethod: payment.method,
       amountTendered: payment.amountTendered,
       terminalReference: payment.terminalReference,
+      cashReceived: payment.received ? cashLines(payment.received) : undefined,
+      changeGiven: payment.change ? cashLines(payment.change) : undefined,
       claimedGrandTotal: view.grandTotal,
       lines: offlineLines.map((line) => ({
         productId: line.productId,
@@ -500,7 +544,13 @@ export function Checkout({
     const document = offlineReceipt(queued, context);
     resetBasket();
     const change = payment.amountTendered !== undefined ? amount(payment.amountTendered) - amount(queued.claimedGrandTotal) : 0n;
-    setDialog({ kind: "receipt", receipt: document, change: change > 0n ? cents(change) : null });
+    if (payment.received) await adjustDrawer(payment.received, payment.change ?? {});
+    setDialog({
+      kind: "receipt",
+      receipt: document,
+      change: change > 0n ? cents(change) : null,
+      changeNotes: payment.change && cashTotal(payment.change) > 0 ? describeCash(payment.change) : undefined,
+    });
     void print(document, { kickDrawer: payment.method === "CASH", browserFallback: false });
   }
 
@@ -599,21 +649,62 @@ export function Checkout({
     setCustomer(chosen);
   }
 
-  function cashDrop(drop: { amount: string; reason: string }) {
+  /** Notes from the drawer to the branch's intraday cash; a supervisor confirms. */
+  function deposit(move: { cash: CashCount; reason: string }) {
     closeDialog();
+    const total = amountString(amount(cashTotal(move.cash)));
+    const body = { amount: total, reason: move.reason, notes: cashLines(move.cash) };
     withApproval(
       "cash:drop",
-      `Cash drop of ${money(amount(drop.amount))}`,
+      `Deposit of ${money(amount(total))} to intraday: ${describeCash(move.cash)}`,
       async () => {
-        onShiftChanged(await laneApi.cashDrop(shift.id, drop.amount, drop.reason));
-        toast.success("Cash drop recorded.");
+        onShiftChanged(await laneApi.cashDrop(shift.id, total, move.reason, body.notes));
+        toast.success("Deposit recorded.");
+        await reloadDrawer();
       },
       async (approverId, pin) => {
         const { approverName, result } = await approved(
-          { approverId, pin, permission: "cash:drop", branchId: branch.id, path: `till-sessions/${shift.id}/drops`, body: drop },
+          { approverId, pin, permission: "cash:drop", branchId: branch.id, path: `till-sessions/${shift.id}/drops`, body },
           TillSessionSchema,
         );
         onShiftChanged(result);
+        await reloadDrawer();
+        return approverName;
+      },
+    );
+  }
+
+  /** Notes for notes at the till: the drawer's make-up changes, its total does not. */
+  async function swap(exchange: { received: CashCount; given: CashCount }) {
+    closeDialog();
+    try {
+      await laneApi.exchange(shift.id, cashLines(exchange.received), cashLines(exchange.given));
+      toast.success(`Exchanged ${describeCash(exchange.received)} for ${describeCash(exchange.given)}.`);
+      await reloadDrawer();
+    } catch (failure) {
+      fail(failure, "The exchange was not recorded.");
+    }
+  }
+
+  /** Change from the branch's intraday cash, handed over by the supervisor holding it. */
+  function replenish(move: { cash: CashCount; reason: string }) {
+    closeDialog();
+    const body = { notes: cashLines(move.cash), reason: move.reason };
+    withApproval(
+      "cash:intraday",
+      `Replenish ${money(amount(cashTotal(move.cash)))} from intraday: ${describeCash(move.cash)}`,
+      async () => {
+        onShiftChanged(await laneApi.replenish(shift.id, body.notes, move.reason));
+        toast.success("Replenishment recorded.");
+        await reloadDrawer();
+      },
+      async (approverId, pin) => {
+        const { approverName, result } = await approved(
+          { approverId, pin, permission: "cash:intraday", branchId: branch.id, path: `till-sessions/${shift.id}/replenishments`, body },
+          TillSessionSchema,
+        );
+        onShiftChanged(result);
+        await reloadDrawer();
         return approverName;
       },
     );
@@ -641,6 +732,7 @@ export function Checkout({
         );
         setLastSale(null);
         toast.success(`Sale ${result.receiptNumber} voided.`);
+        void reloadDrawer();
         return approverName;
       },
     );
@@ -691,7 +783,9 @@ export function Checkout({
       const shortcut = (() => {
         if (event.altKey && !event.ctrlKey && !event.metaKey) {
           switch (event.code) {
-            case "KeyC": return () => setDialog({ kind: "drop" });
+            case "KeyC": return () => setDialog({ kind: "cash", mode: "deposit" });
+            case "KeyF": return () => setDialog({ kind: "cash", mode: "replenish" });
+            case "KeyE": return () => (offline ? toast.error("Exchanges need the server.") : setDialog({ kind: "exchange" }));
             case "KeyL": return () => void reprintLast();
             case "KeyV": return () => voidLastSale();
             case "KeyR": return () => router.push("/lane/returns");
@@ -854,6 +948,14 @@ export function Checkout({
           {view.discountTotal ? <div className="text-sm text-muted-foreground">Discounts {view.discountTotal}</div> : null}
           {customer ? <div className="mt-2 text-sm">Member: {customer.name}</div> : null}
         </div>
+        <DrawerPanel
+          drawer={drawer}
+          holdings={holdings}
+          offline={offline}
+          onDeposit={() => setDialog({ kind: "cash", mode: "deposit" })}
+          onReplenish={() => setDialog({ kind: "cash", mode: "replenish" })}
+          onExchange={() => setDialog({ kind: "exchange" })}
+        />
         <Button size="lg" className="h-16 text-lg" onClick={openPayment} aria-keyshortcuts="F10">
           Pay <kbd className="text-xs opacity-70">F10</kbd>
         </Button>
@@ -868,7 +970,6 @@ export function Checkout({
           <ActionButton label="Shortcuts" keys="F1" onClick={() => setDialog({ kind: "help" })} />
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <ActionButton label="Cash drop" keys="Alt+C" onClick={() => setDialog({ kind: "drop" })} disabled={offline} />
           <ActionButton label="Reprint" keys="Alt+L" onClick={() => void reprintLast()} disabled={!lastSale} />
           <ActionButton label="Void sale" keys="Alt+V" onClick={voidLastSale} disabled={!lastSale || offline} />
           <ActionButton label="Returns" keys="Alt+R" onClick={() => router.push("/lane/returns")} />
@@ -923,7 +1024,23 @@ export function Checkout({
       ) : null}
       <RecallDialog open={dialog?.kind === "recall"} branchId={branch.id} onRecalled={(recalledCart) => void recalled(recalledCart)} onCancel={closeDialog} />
       <CustomerDialog open={dialog?.kind === "customer"} attached={customer} onChoose={(chosen) => void chooseCustomer(chosen)} onCancel={closeDialog} />
-      <CashDropDialog key={dialog?.kind === "drop" ? "drop-open" : "drop"} open={dialog?.kind === "drop"} onSubmit={cashDrop} onCancel={closeDialog} />
+      {dialog?.kind === "exchange" ? (
+        <ExchangeDialog
+          open
+          holdings={holdings}
+          onSubmit={(exchange) => void swap(exchange)}
+          onCancel={closeDialog}
+        />
+      ) : null}
+      {dialog?.kind === "cash" ? (
+        <CashMoveDialog
+          open
+          mode={dialog.mode}
+          holdings={drawer?.tracked ? holdings : undefined}
+          onSubmit={(move) => (dialog.mode === "deposit" ? deposit(move) : replenish(move))}
+          onCancel={closeDialog}
+        />
+      ) : null}
       <CloseShiftDialog
         open={dialog?.kind === "close"}
         shift={shift}
@@ -939,6 +1056,9 @@ export function Checkout({
         due={view.grandTotal}
         currency={view.currency}
         cartId={cart?.id ?? null}
+        holdings={holdings}
+        tracked={Boolean(shift.tracksDenominations)}
+        cashBlocked={drawer?.limitState === "BLOCK"}
         onPaid={(sale) => void paid(sale)}
         onPaidOffline={paidOffline}
         onSaleCancelled={(sale, reason) => void saleCancelled(sale, reason)}
@@ -949,6 +1069,7 @@ export function Checkout({
         open={dialog?.kind === "receipt"}
         receipt={dialog?.kind === "receipt" ? dialog.receipt : null}
         change={dialog?.kind === "receipt" ? dialog.change : null}
+        changeNotes={dialog?.kind === "receipt" ? dialog.changeNotes : undefined}
         canEmail={dialog?.kind === "receipt" && Boolean(dialog.saleId)}
         onPrint={() => dialog?.kind === "receipt" && void print(dialog.receipt, { kickDrawer: false, browserFallback: true })}
         onEmail={async (email) => {

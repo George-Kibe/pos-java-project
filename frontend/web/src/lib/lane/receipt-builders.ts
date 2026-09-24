@@ -7,6 +7,8 @@ export interface ReceiptContext {
   brand: string;
   branchName: string;
   cashier: string;
+  /** "Till 3" */
+  till?: string;
 }
 
 /** A receipt the server issued, as it is printed. */
@@ -17,6 +19,7 @@ export function saleReceipt(sale: Sale, receipt: Receipt | undefined, context: R
     receiptNumber: receipt?.receiptNumber ?? sale.receiptNumber ?? "",
     issuedAt: receiptTime(receipt?.issuedAt ?? sale.completedAt ?? sale.occurredAt),
     cashier: context.cashier,
+    till: context.till,
     lines: sale.lines.map((line) => ({
       name: line.productName ?? line.sku ?? "Item",
       detail: `${quantityLabel(quantity(line.quantity))} x ${money(line.unitPrice)}${line.discountTotal > 0 ? `, less ${money(line.discountTotal)}` : ""}`,
@@ -47,6 +50,7 @@ export function offlineReceipt(sale: QueuedSale, context: ReceiptContext): Recei
     receiptNumber: sale.provisionalNumber,
     issuedAt: receiptTime(sale.occurredAt),
     cashier: context.cashier,
+    till: context.till,
     lines: sale.lines.map((line) => ({
       name: line.name,
       detail: `${quantityLabel(quantity(line.quantity))} x ${money(line.unitPrice)}`,

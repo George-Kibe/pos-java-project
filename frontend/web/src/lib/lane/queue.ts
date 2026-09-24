@@ -87,6 +87,8 @@ async function send(batchKey: string, batch: QueuedSale[]): Promise<SyncReport |
           paymentMethod: sale.paymentMethod,
           amountTendered: sale.amountTendered,
           claimedGrandTotal: sale.claimedGrandTotal,
+          cashReceived: sale.cashReceived,
+          changeGiven: sale.changeGiven,
           lines: sale.lines.map((line) => ({
             productId: line.productId,
             sku: line.sku,

@@ -9,6 +9,7 @@ export interface ReceiptDocument {
   receiptNumber: string;
   issuedAt: string;
   cashier: string;
+  till?: string;
   lines: { name: string; detail: string; total: string }[];
   discountTotal?: string;
   taxLines: { label: string; tax: string }[];

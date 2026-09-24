@@ -195,3 +195,35 @@ export async function recentSales(branchId: string): Promise<{ id: string; clien
   };
   return page.content;
 }
+
+/** The account id for an email, as the administrator sees it. */
+export async function userId(email: string): Promise<string> {
+  const users = (await admin(`/users?query=${encodeURIComponent(email)}`)) as { content: { id: string; email: string }[] };
+  return users.content.find((user) => user.email === email)!.id;
+}
+
+/** A supplier of this run's own, for deliveries. */
+export async function createSupplier(label: string): Promise<{ id: string; name: string }> {
+  const code = `E2E-${label}-${String(Date.now()).slice(-6)}`;
+  const supplier = (await admin("/suppliers", { method: "POST", body: JSON.stringify({ code, name: `E2E Supplier ${code}` }) })) as { id: string; name: string };
+  return supplier;
+}
+
+/** On hand at a branch for a product, as inventory reports it. */
+export async function onHand(branchId: string, productId: string): Promise<number | null> {
+  try {
+    const item = (await admin(`/stock/${productId}?branchId=${branchId}`)) as { quantityOnHand: number };
+    return item.quantityOnHand;
+  } catch {
+    return null;
+  }
+}
+
+/** A float with change in it: 4 x 1000, 2 x 50, 5 x 20, 5 x 10, 5 x 5 = 4275. */
+export async function countFloat(page: Page) {
+  for (const [denomination, count] of [[1000, 4], [50, 2], [20, 5], [10, 5], [5, 5]] as const) {
+    await page.getByLabel(`Count of ${denomination}`, { exact: true }).fill(String(count));
+  }
+  await expect(page.getByTestId("float-total")).toHaveText("Total 4,275.00");
+}
+

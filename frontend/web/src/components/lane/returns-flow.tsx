@@ -53,7 +53,7 @@ export function ReturnsFlow({ branch }: { branch: { id: string; name: string } }
 
   useEffect(() => {
     void (async () => {
-      const registerId = await getMeta<string>(META.registerId);
+      const registerId = await getMeta<string>(`${META.registerId}:${branch.id}`);
       if (!registerId) return;
       try {
         setShift(await laneApi.currentShift(registerId));
@@ -61,7 +61,7 @@ export function ReturnsFlow({ branch }: { branch: { id: string; name: string } }
         // Offline: a cash refund cannot be paid without the server anyway.
       }
     })();
-  }, []);
+  }, [branch.id]);
 
   async function find(event: FormEvent) {
     event.preventDefault();
