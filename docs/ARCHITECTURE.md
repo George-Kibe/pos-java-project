@@ -124,6 +124,28 @@ queue's time.
 never touches the supervisor's sign-in); an approval token may be spent more than once in its two
 minutes, which is why the BFF, not the browser, holds it.
 
+### ADR-014 — The drawer is a ledger of notes and coins
+**Decision:** a shift opened with its float counted note by note is tracked by denomination: every
+movement is a row in `drawer_movements` (float, notes received and change given per cash sale,
+voids, refunds, deposits, replenishments), and what the drawer holds is their sum. Change is made by
+a bounded search over what the drawer actually holds, customer's notes included - never greedy -
+and a tender the drawer cannot change is refused before any money moves. The branch's **intraday
+cash**, held by the supervisor, is a second ledger of the same kind: deposits go into it,
+replenishments come out of it (only notes it holds), and it is topped up from and banked to the
+bank. **Cash limits** per branch with per-person overrides warn past the limit and refuse cash at the
+ceiling (default 120%). Tills are numbered per branch in order of first use.
+**Why:** a cashier balancing by total cannot tell a miscount from a shortage; by note, a shortfall
+at close points at the note it is in. Handovers are where cash goes missing, so both sides of each
+are recorded, and a supervisor's PIN confirms them. The money totals and the shift-closed arithmetic
+are unchanged - replenishments are float in, deposits are drops - so reporting's mirror of the till
+needs no change.
+The cashier may count out the change their own way; the server accepts it only when it tallies with
+the change due and is in the drawer. An **exchange** (notes for notes of the same total) writes an
+in and an out that balance, changing the drawer's make-up and never its money.
+**Cost:** a shift opened without a note count (older clients, the seed) stays on totals, and the
+calculator says so. An offline sale is never refused for want of change: its notes are entered as the
+lane counted them.
+
 ---
 
 ## 2. Event catalogue

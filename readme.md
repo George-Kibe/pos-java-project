@@ -14,7 +14,7 @@ Kafka for event-driven communication, and PostgreSQL for persistence.
 > when the network goes, every offline sale syncing exactly once. Phase 10's `payment-service` is
 > built and running - card and cash settle end to end, M-Pesa is verified against a fake of Daraja -
 > and waits only on a real sandbox STK Push, which needs a Daraja app subscribed to M-Pesa Express.
-> 758 backend tests, 76 frontend tests and 6 browser end-to-end runs. Code is built phase by phase
+> 785 backend tests, 82 frontend tests and 10 browser end-to-end runs. Code is built phase by phase
 > per [docs/ROADMAP.md](docs/ROADMAP.md), which records what each phase delivered and how it was
 > verified.
 

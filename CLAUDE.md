@@ -138,6 +138,11 @@ Rules:
 - Never store card data. Card payments record a terminal reference and approval code only.
 - Privileged actions (price override, void, refund, stock adjustment, role change, till drop) write
   an audit record with actor, branch, before/after and reason.
+- **No one grants or manages beyond their own rights.** Creating a user or changing their roles
+  needs every permission the granted roles carry; changing an account at all needs every permission
+  that account holds. So only an administrator makes or touches an administrator, and a branch
+  manager with `user:manage` cannot hand out SUPER_ADMIN - to anyone, themselves included
+  (`UserAdminService.requireMayGrant` / `requireMayManage`).
 
 ## API conventions
 
@@ -474,6 +479,9 @@ rollback-only, so the commit fails anyway and takes the batch with it.
 - **An approval token never reaches the browser.** `/api/lane/approved` obtains it and spends it on
   the one call its permission's allow-list names (`lib/lane/approvals.ts`). A new approvable action
   goes on that list and on auth-service's `pos.auth.approval.permissions`, or it cannot be approved.
+- **The UI knows permissions by name, never the wildcard.** `/me` answers the expanded list, as the
+  token carries it; before that, an administrator (whose role holds only `*`) got an empty menu,
+  because `hasAny` compares names. Keep `/me` expanded rather than teaching the UI about `*`.
 - **Every brand image comes from `scripts/brand/generate.py`**: the favicon, app icons, the header
   mark, the receipt raster (`lib/lane/receipt-logo.ts`) and the email and PDF logos in the
   notification and reporting resources. Change the mark or a colour there and re-run it; do not
@@ -563,3 +571,16 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   row breaks that the first time events arrive out of order.
 - A cash sale's grand total carries four decimals; the change handed back is rounded to cents
   (`HALF_UP`) and that is the only rounding the drawer sees. The payments keep the 4dp figure.
+- **A tracked drawer is a ledger of notes and coins** (`drawer_movements`), and change comes from
+  what it holds via `ChangeMaker.exact` - a bounded search, because greedy fails a real drawer (60
+  from one 50 and three 20s). Every new way cash enters or leaves a till must write its rows, or the
+  calculator and the closing count drift from the money. Only whole shillings move; the cents of a
+  four-decimal total are the drawer's `unaccounted`. The lane mirrors the same search
+  (`lib/lane/cash.ts`) to preview change; the server's answer stands.
+- **Change the cashier chooses is checked, never trusted**: it must equal the payable change and be
+  covered by the drawer plus the customer's notes (`CashDrawerService.checkedChange`). An exchange
+  (`EXCHANGE_IN` / `EXCHANGE_OUT`) must balance and touches no money counter.
+- **Replenishments are float in and deposits are drops** in the money arithmetic, on purpose: the
+  shift-closed figures, and reporting's `ShiftArithmetic`, are unchanged by the intraday ledger.
+- **A device has one till identity per branch** (lane meta `registerId:<branchId>`), because a till's
+  number belongs to its branch; the server refuses a device's id at a second branch.

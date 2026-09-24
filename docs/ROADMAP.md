@@ -1180,6 +1180,18 @@ Not a phase: asked for between two.
 - **Reports by period**: `GET /reports/sales/by-period?period=WEEK|MONTH|QUARTER|YEAR`, per branch or
   across the whole business (`acrossBranches=true`, which needs `report:view`).
 - **The audit trail can be read**: `GET /audit` (`audit:view`), newest first, by action and by who.
+- **An administrator's navigation covers every right it holds** - Till, Dashboard, Reports, Stock,
+  Purchasing, Customers, Users, Roles, Branches, Audit - each with an Alt shortcut, and each a page:
+  the start of Phase 15's back office. **Users** lists everyone but administrators, 20 to a page,
+  searchable, with roles, branches and status managed in place and new accounts created there;
+  roles a person could not grant are shown but disabled. The other pages read their service
+  (sales by week, month, quarter or year for one branch or the group; stock and purchase orders per
+  branch; members; the audit trail; roles; branches, with a form to open one).
+- **Fixed**: an administrator's menu was empty. `/me` returned the role's wildcard, which the UI's
+  name checks never match; it now returns the expanded list the token carries.
+- **Closed a privilege escalation**: anyone with `user:manage` - a branch manager - could grant
+  SUPER_ADMIN, themselves included, or suspend an administrator. Now no one grants a role carrying
+  permissions they lack, or changes an account holding permissions they lack.
 
 **Verified:**
 
@@ -1193,6 +1205,59 @@ Not a phase: asked for between two.
 | The browser | ✅ favicon, icon and manifest served before sign-in; the logo on sign-in, in the header and on the lane receipt |
 | Email and PDF | ✅ a delivered message carries the logo inline; an exported PDF carries the image |
 | Thermal receipt | ✅ the raster precedes the heading; `logo: false` leaves it out |
+
+---
+
+## Stock, tills and cash by denomination (after Phase 14) ✅
+
+Asked for between phases; decided with the user: stock is added as a delivery, tills are numbered
+automatically per branch, every cash movement is tracked by note and coin, and a till past its
+cash ceiling stops taking cash (ADR-014).
+
+- **Add stock** on the Stock page: a delivery (supplier, quantity, unit cost, batch, expiry) posted
+  through the goods-receipt flow without a purchase order, so it is valued at cost and sold
+  soonest-expiring first. An administrator adds at any branch, a branch manager at their own
+  (`purchase:receive` and the branch check). Sales take stock off as they complete.
+- **Till numbers**: a device becomes the branch's next till (Till 1, 2...) the first time it opens a
+  shift there; shown on the lane and every receipt; renamed or renumbered on the Cash page.
+- **The drawer calculator**: the float is counted note by note; every note and coin in the drawer,
+  its count and value, and the total are on screen at every moment. The customer's notes can be
+  counted, the change is made from what the drawer holds and shown note by note ("Give back 1 x 20,
+  1 x 10, 1 x 5"), and a sale the drawer cannot change is refused before any money moves. The close
+  is counted note by note and any difference shown per denomination.
+- **The cashier gives change their way**: the till suggests the fewest pieces from the drawer, the
+  cashier may count it out differently, and the sale goes ahead only when it tallies with the change
+  due and every note is in the drawer - checked on the lane and again by the server
+  (`till.change_mismatch`, `till.change_not_in_drawer`).
+- **Exchange notes** (Alt+E): for anyone - a customer not buying, a colleague - a 1000 in for two 500s
+  out, coins for a note, or back. In and out must balance and what goes out must be in the drawer;
+  the calculator's notes change, the till's money total does not.
+- **Intraday cash**: the supervisor holds the branch's intraday cash. A till deposits into it (Alt+C)
+  and is replenished from it (Alt+F), each confirmed by the supervisor's PIN; the Cash page shows it
+  note by note, brings cash in from the bank and banks it.
+- **Cash limits** per branch with per-person overrides, set by supervisors, managers and
+  administrators (`till:manage`): past the limit the lane asks for a deposit; at the ceiling it takes
+  no cash - card and M-Pesa still work - until the deposit is made.
+- New permissions `till:manage` and `cash:intraday` (supervisors, branch managers; administrators
+  hold everything); a branch's staff list for setting limits.
+
+**Verified - 785 backend tests (coverage gates met), 82 web unit tests, 10 browser runs three
+times in a row:**
+
+| Check | Result |
+|---|---|
+| Change greedy would miss | ✅ 60 from one 50 and three 20s is three 20s; fewest pieces |
+| A drawer that cannot make the change | ✅ refused before any money moves; exact money still accepted |
+| Notes in and out of a cash sale | ✅ the drawer's notes always add up to the money it should hold |
+| Void and refund | ✅ paid out of the drawer in notes it holds |
+| Deposit and replenishment | ✅ only notes the drawer (or intraday) holds; intraday balance moves note by note; banked |
+| Cash limit | ✅ warned past the limit; cash refused at the ceiling, card taken; a person's limit wins |
+| Closing count | ✅ counted note by note; the difference shown per denomination |
+| Till numbers | ✅ 1, 2 per branch, again 1 at another; a device refused at a second branch; renamed, renumbered |
+| In the browser | ✅ admin adds 12 by delivery, a sale leaves 11; Till N on the lane; 100 for 65 gives "1 x 20, 1 x 10, 1 x 5"; deposit and replenish approved by PIN; cash paused over the ceiling, card taken; the close short 5 shows against the 5s |
+| A branch manager adding stock at another branch | ✅ 403 |
+| The cashier's own change | ✅ 35 as three 10s and a 5 instead of the suggested 20+10+5; "15 of 35" keeps the sale from going on; the server refuses a count that does not tally or is not in the drawer |
+| Exchange | ✅ 100 in, two 50s out, total unchanged; unbalanced or not-in-drawer refused; a shift kept by total cannot; only the cashier on the shift or a supervisor |
 
 ---
 
