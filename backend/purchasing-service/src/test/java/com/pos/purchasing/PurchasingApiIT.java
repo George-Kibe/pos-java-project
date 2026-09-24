@@ -125,6 +125,37 @@ class PurchasingApiIT extends PurchasingTestBase {
     }
 
     @Test
+    @DisplayName(
+            "only the administrator adds a supplier; managing one, as a branch manager may, is not"
+                    + " enough")
+    void onlyTheAdministratorAddsASupplier() throws Exception {
+        mockMvc.perform(
+                        post("/api/v1/suppliers")
+                                .with(at(BRANCH, "supplier:manage", "purchase:view"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        EventJson.write(
+                                                Map.of("code", "SUP-MGR", "name", "Managers Ltd"))))
+                .andExpect(status().isForbidden());
+
+        // Once the administrator has added it, managing it is the manager's business.
+        String id = createSupplier("SUP-ADMIN");
+        mockMvc.perform(
+                        put("/api/v1/suppliers/" + id)
+                                .with(at(BRANCH, "supplier:manage"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        EventJson.write(
+                                                Map.of(
+                                                        "code",
+                                                        "SUP-ADMIN",
+                                                        "name",
+                                                        "Renamed Ltd"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is("Renamed Ltd")));
+    }
+
+    @Test
     @DisplayName("recording an invoice needs the supplier-invoice permission, not a purchasing one")
     void invoiceMatchingIsSeparatelyPermissioned() throws Exception {
         mockMvc.perform(get("/api/v1/supplier-invoices").with(at(BRANCH, "purchase:view")))
@@ -168,7 +199,7 @@ class PurchasingApiIT extends PurchasingTestBase {
 
         mockMvc.perform(
                         post("/api/v1/suppliers")
-                                .with(at(BRANCH, "supplier:manage"))
+                                .with(at(BRANCH, "supplier:create"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         EventJson.write(
@@ -454,7 +485,7 @@ class PurchasingApiIT extends PurchasingTestBase {
         String body =
                 mockMvc.perform(
                                 post("/api/v1/suppliers")
-                                        .with(at(BRANCH, "supplier:manage"))
+                                        .with(at(BRANCH, "supplier:create"))
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
                                                 EventJson.write(

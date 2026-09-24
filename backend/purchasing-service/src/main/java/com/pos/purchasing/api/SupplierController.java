@@ -65,8 +65,11 @@ public class SupplierController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('supplier:manage')")
-    @Operation(summary = "Create a supplier")
+    @PreAuthorize("hasAuthority('supplier:create')")
+    @Operation(
+            summary =
+                    "Add a supplier - the administrator's alone (supplier:create, which no role"
+                            + " but SUPER_ADMIN holds); editing one needs supplier:manage")
     public ResponseEntity<PurchasingDtos.SupplierResponse> create(
             @Valid @RequestBody PurchasingDtos.SupplierRequest request) {
 

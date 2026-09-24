@@ -138,6 +138,10 @@ Rules:
 - Never store card data. Card payments record a terminal reference and approval code only.
 - Privileged actions (price override, void, refund, stock adjustment, role change, till drop) write
   an audit record with actor, branch, before/after and reason.
+- **Only the administrator adds a supplier.** `POST /suppliers` needs `supplier:create`, which no
+  role is granted - SUPER_ADMIN holds it through `*`. Everyone else who deals with suppliers keeps
+  `supplier:manage` for editing, holds and price lists. Do not grant `supplier:create` to a seeded
+  role; a new supplier is a new place the business's money can go.
 - **No one grants or manages beyond their own rights.** Creating a user or changing their roles
   needs every permission the granted roles carry; changing an account at all needs every permission
   that account holds. So only an administrator makes or touches an administrator, and a branch

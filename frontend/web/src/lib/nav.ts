@@ -18,6 +18,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/reports", label: "Reports", permissions: ["report:view", "report:view:branch"], shortcut: "g" },
   { href: "/stock", label: "Stock", permissions: ["inventory:view"], shortcut: "s" },
   { href: "/purchasing", label: "Purchasing", permissions: ["purchase:view"], shortcut: "h" },
+  { href: "/suppliers", label: "Suppliers", permissions: ["purchase:view", "supplier:create"], shortcut: "n" },
   { href: "/customers", label: "Customers", permissions: ["customer:manage"], shortcut: "m" },
   { href: "/cash", label: "Cash", permissions: ["cash:intraday", "till:manage"], shortcut: "k" },
   { href: "/users", label: "Users", permissions: ["user:view"], shortcut: "u" },

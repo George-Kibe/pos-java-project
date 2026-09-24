@@ -3763,7 +3763,7 @@
               }
             },
             {
-              "name": "Create a supplier",
+              "name": "Add a supplier - the administrator's alone (supplier:create, which no role but SUPER_ADMIN holds); editing one needs supplier:manage",
               "request": {
                 "method": "POST",
                 "header": [
@@ -3788,7 +3788,7 @@
                   ],
                   "query": []
                 },
-                "description": "Create a supplier",
+                "description": "Add a supplier - the administrator's alone (supplier:create, which no role but SUPER_ADMIN holds); editing one needs supplier:manage",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"code\": \"\",\n  \"name\": \"\",\n  \"contactName\": \"\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"0712345678\",\n  \"address\": \"\",\n  \"taxIdentifier\": \"\",\n  \"paymentTermsDays\": 30,\n  \"leadTimeDays\": 30,\n  \"currency\": \"KES\",\n  \"notes\": \"Recorded from Postman\"\n}",

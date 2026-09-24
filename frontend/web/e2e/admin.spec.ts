@@ -14,7 +14,7 @@ test("an administrator navigates to every right it holds and manages non-admin u
 
   // Navigation for every right.
   const nav = page.getByRole("navigation", { name: "Main" });
-  const expected = ["Till", "Dashboard", "Reports", "Stock", "Purchasing", "Customers", "Cash", "Users", "Roles", "Branches", "Audit", "Account"];
+  const expected = ["Till", "Dashboard", "Reports", "Stock", "Purchasing", "Suppliers", "Customers", "Cash", "Users", "Roles", "Branches", "Audit", "Account"];
   for (const label of expected) {
     await expect(nav.getByRole("link", { name: new RegExp(`^${label}`) })).toBeVisible();
   }
@@ -23,6 +23,7 @@ test("an administrator navigates to every right it holds and manages non-admin u
     ["Reports", "Reports"],
     ["Stock", "Stock"],
     ["Purchasing", "Purchasing"],
+    ["Suppliers", "Suppliers"],
     ["Customers", "Customers"],
     ["Roles", "Roles"],
     ["Branches", "Branches"],
@@ -62,4 +63,46 @@ test("an administrator navigates to every right it holds and manages non-admin u
   const users = (await admin(`/users?query=${encodeURIComponent(cashier.email)}`)) as { content: { roles: string[]; status: string }[] };
   expect(users.content[0].roles.sort()).toEqual(["CASHIER", "SUPERVISOR"]);
   expect(users.content[0].status).toBe("SUSPENDED");
+});
+
+/** A new supplier is the administrator's to add; a branch manager manages suppliers but cannot. */
+test("only the administrator adds a supplier", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const run = String(Date.now()).slice(-6);
+  const administrator = await staffMember(["SUPER_ADMIN"], "admin-supplier", `E2E Supplier Admin ${run}`);
+  const manager = await staffMember(["BRANCH_MANAGER"], "manager-supplier", `E2E Supplier Manager ${run}`);
+
+  const page = await (await browser.newContext()).newPage();
+  await replaceTemporaryPassword(page, administrator);
+  await signIn(page, administrator.email, PASSWORD);
+  await expect(page).not.toHaveURL(/\/login/);
+  await page.goto("/suppliers");
+  await page.getByRole("button", { name: "Add supplier" }).click();
+  await page.getByLabel("Name", { exact: true }).fill(`E2E Fresh Farms ${run}`);
+  await page.getByLabel("Code", { exact: true }).fill(`e2e-ff-${run}`);
+  await page.getByLabel("Email (optional)").fill(`orders-${run}@example.com`);
+  await page.getByLabel("Payment terms (days)").fill("14");
+  await page.getByRole("dialog").getByRole("button", { name: "Add supplier" }).click();
+  await expect(page.getByText(`E2E Fresh Farms ${run} added.`)).toBeVisible();
+  await page.getByLabel("Name or code").fill(`E2E-FF-${run}`);
+  await page.getByRole("button", { name: "Show" }).click();
+  const row = page.getByTestId("supplier-row");
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText(`E2E Fresh Farms ${run}`);
+  await expect(row).toContainText("14 days");
+  await page.context().close();
+
+  // The branch manager sees the suppliers, and no way to add one - nor does the service allow it.
+  const theirs = await (await browser.newContext()).newPage();
+  await replaceTemporaryPassword(theirs, manager);
+  await signIn(theirs, manager.email, PASSWORD);
+  await expect(theirs).not.toHaveURL(/\/login/);
+  await theirs.goto("/suppliers");
+  await expect(theirs.getByRole("heading", { name: "Suppliers", level: 1 })).toBeVisible();
+  await expect(theirs.getByRole("button", { name: "Add supplier" })).toHaveCount(0);
+  const refused = await theirs.request.post("/api/gateway/suppliers", {
+    data: { code: `E2E-MGR-${run}`, name: "Not allowed" },
+  });
+  expect(refused.status()).toBe(403);
+  await theirs.context().close();
 });

@@ -18,6 +18,11 @@ describe("navigation by permission", () => {
     expect(labels(BRANCH_MANAGER)).toEqual(["Till", "Dashboard", "Reports", "Users", "Account"]);
   });
 
+  it("shows the suppliers to whoever buys, and to the administrator who adds them", () => {
+    expect(labels(["purchase:view"])).toEqual(["Purchasing", "Suppliers", "Account"]);
+    expect(labels(["supplier:create"])).toEqual(["Suppliers", "Account"]);
+  });
+
   it("shows someone with no role only their account", () => {
     expect(labels([])).toEqual(["Account"]);
   });

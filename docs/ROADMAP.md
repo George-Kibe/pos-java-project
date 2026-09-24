@@ -1299,6 +1299,28 @@ tests, 10 browser runs three times in a row:**
 
 ---
 
+## Suppliers added by the administrator only (after Phase 14) ✅
+
+Asked for between phases: adding a supplier is the super administrator's alone.
+
+- New permission `supplier:create` (auth-service V6), granted to no role: SUPER_ADMIN holds it
+  through `*`, expanded at sign-in. `POST /suppliers` requires it; editing a supplier, putting one
+  on hold and its price list stay on `supplier:manage` (branch managers, stock controllers,
+  accountants).
+- A **Suppliers** page in the back office (Alt+N) for anyone who buys (`purchase:view`): searchable,
+  filtered by status, paged. Only the administrator sees **Add supplier** (name, code, contact,
+  email, phone, payment terms, lead time); the service refuses anyone else whatever the page shows.
+
+**Verified:**
+
+| Check | Result |
+|---|---|
+| A branch manager's rights (`supplier:manage`) adding a supplier | ✅ 403; editing one the administrator added, 200 |
+| Which roles hold `supplier:create` | ✅ none; the administrator's token carries it |
+| In the browser | ✅ the administrator adds a supplier and finds it by code; a branch manager sees the list, no Add button, and the service answers 403 |
+
+---
+
 ## Phase 15 — Frontend back office
 
 **Goal:** the business can be run without touching the database.

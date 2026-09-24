@@ -76,7 +76,8 @@ class AdministratorRightsIT extends AuthTestBase {
     void holdsEveryPermission() {
         Set<String> catalogue =
                 new HashSet<>(json(get("/api/v1/permissions", admin)).findValuesAsString("code"));
-        assertThat(catalogue).contains("branch:access:all", "report:view", "audit:view");
+        assertThat(catalogue)
+                .contains("branch:access:all", "report:view", "audit:view", "supplier:create");
 
         JsonNode claims = claims(admin);
         Set<String> held = new HashSet<>();
@@ -144,6 +145,28 @@ class AdministratorRightsIT extends AuthTestBase {
                                         admin)
                                 .getStatusCode())
                 .isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("is the only one who may add a supplier: no other role holds supplier:create")
+    void aloneAddsSuppliers() {
+        assertThat(claims(admin).get("perms").toString()).contains("\"supplier:create\"");
+        JsonNode roles = json(get("/api/v1/roles", admin));
+        java.util.List<String> holders = new java.util.ArrayList<>();
+        roles.forEach(
+                role -> {
+                    if (role.get("permissions").toString().contains("\"supplier:create\"")) {
+                        holders.add(role.get("code").asString());
+                    }
+                });
+        assertThat(holders).isEmpty();
+        // Branch managers still manage the suppliers the administrator adds.
+        roles.forEach(
+                role -> {
+                    if (role.get("code").asString().equals("BRANCH_MANAGER")) {
+                        assertThat(role.get("permissions").toString()).contains("supplier:manage");
+                    }
+                });
     }
 
     @Test

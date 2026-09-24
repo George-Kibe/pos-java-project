@@ -45,6 +45,20 @@ export const BranchSchema = z.object({
 });
 export type Branch = z.infer<typeof BranchSchema>;
 
+export const SupplierSchema = z.object({
+  id: z.uuid(),
+  code: z.string(),
+  name: z.string(),
+  contactName: z.string().nullable(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  paymentTermsDays: z.number().int(),
+  leadTimeDays: z.number().int(),
+  currency: z.string(),
+  status: z.string(),
+});
+export type Supplier = z.infer<typeof SupplierSchema>;
+
 export const AuditEntrySchema = z.object({
   id: z.uuid(),
   at: z.string(),
