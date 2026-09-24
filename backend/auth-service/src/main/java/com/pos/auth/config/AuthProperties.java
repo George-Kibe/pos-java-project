@@ -41,7 +41,11 @@ public class AuthProperties {
         private java.util.List<String> permissions =
                 new java.util.ArrayList<>(
                         java.util.List.of(
-                                "price:override", "sale:void", "sale:refund", "cash:drop"));
+                                "price:override",
+                                "sale:void",
+                                "sale:refund",
+                                "cash:drop",
+                                "cash:intraday"));
     }
 
     @Getter

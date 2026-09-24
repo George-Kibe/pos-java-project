@@ -47,11 +47,17 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('user:view')")
-    @Operation(summary = "Search users")
+    @Operation(
+            summary =
+                    "Search users; excludeAdministrators=true leaves out everyone holding every"
+                            + " permission")
     public PageResponse<AdminDtos.UserResponse> list(
             @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "false") boolean excludeAdministrators,
             @PageableDefault(size = 25) Pageable pageable) {
-        return PageResponse.of(service.search(query, pageable), AdminDtos.UserResponse::from);
+        return PageResponse.of(
+                service.search(query, excludeAdministrators, pageable),
+                AdminDtos.UserResponse::from);
     }
 
     @GetMapping("/{id}")

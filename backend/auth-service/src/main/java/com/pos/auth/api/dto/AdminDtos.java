@@ -55,7 +55,9 @@ public final class AdminDtos {
             Set<UUID> branchIds,
             boolean mustChangePassword,
             Instant lastLoginAt,
-            Instant createdAt) {
+            Instant createdAt,
+            /** Holds every permission: managed only by another administrator. */
+            boolean administrator) {
 
         public static UserResponse from(User user) {
             return new UserResponse(
@@ -68,7 +70,8 @@ public final class AdminDtos {
                     user.branchIds(),
                     user.isMustChangePassword(),
                     user.getLastLoginAt(),
-                    user.getCreatedAt());
+                    user.getCreatedAt(),
+                    com.pos.auth.service.UserAdminService.isAdministrator(user));
         }
     }
 
@@ -136,6 +139,9 @@ public final class AdminDtos {
 
     public record UpdateBranchRequest(
             @Size(max = 150) String name, @Size(max = 64) String timezone, Boolean active) {}
+
+    /** Someone who works at a branch: enough to pick them, nothing more. */
+    public record StaffMemberResponse(UUID id, String fullName, Set<String> roles) {}
 
     public record BranchResponse(
             UUID id, String code, String name, String timezone, boolean active) {

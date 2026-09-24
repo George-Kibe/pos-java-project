@@ -145,7 +145,8 @@ public class AuthController {
                 user.getPhone(),
                 user.getStatus().name(),
                 user.roleCodes(),
-                user.permissionCodes(),
+                // Expanded, as the token carries them: the web app checks names, not the wildcard.
+                users.effectivePermissions(user),
                 user.branchIds(),
                 user.isMustChangePassword(),
                 user.getBranches().stream()

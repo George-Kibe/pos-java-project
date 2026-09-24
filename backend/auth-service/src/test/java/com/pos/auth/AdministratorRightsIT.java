@@ -209,6 +209,191 @@ class AdministratorRightsIT extends AuthTestBase {
         assertThat(get("/api/v1/users", cashier).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    @Test
+    @DisplayName("sees its permissions on /me by name, not as a wildcard, as the web app needs")
+    void meListsEveryPermissionByName() {
+        Set<String> catalogue =
+                new HashSet<>(json(get("/api/v1/permissions", admin)).findValuesAsString("code"));
+        JsonNode me = json(get("/api/v1/auth/me", admin));
+        Set<String> listed = new HashSet<>();
+        me.get("permissions").forEach(permission -> listed.add(permission.asString()));
+        assertThat(listed).containsAll(catalogue);
+    }
+
+    @Test
+    @DisplayName("lists the people it manages page by page, administrators left out")
+    void listsNonAdministrators() {
+        String cashierId = person("CASHIER", "listed");
+
+        JsonNode everyone = json(get("/api/v1/users?size=100", admin));
+        assertThat(everyone.findValuesAsString("id")).contains(adminId, cashierId);
+
+        JsonNode others = json(get("/api/v1/users?excludeAdministrators=true&size=100", admin));
+        assertThat(others.findValuesAsString("id")).contains(cashierId).doesNotContain(adminId);
+        others.get("content")
+                .forEach(user -> assertThat(user.get("administrator").asBoolean()).isFalse());
+
+        JsonNode page = json(get("/api/v1/users?excludeAdministrators=true&size=1&page=0", admin));
+        assertThat(page.get("content").size()).isEqualTo(1);
+        assertThat(page.get("totalElements").asLong()).isGreaterThanOrEqualTo(1);
+
+        JsonNode searched =
+                json(get("/api/v1/users?excludeAdministrators=true&query=listed", admin));
+        assertThat(searched.findValuesAsString("id")).contains(cashierId);
+    }
+
+    @Test
+    @DisplayName("is the only one who can make or unmake an administrator")
+    void aManagerCannotGrantOrTouchWhatTheyDoNotHold() {
+        String branch = json(get("/api/v1/branches", admin)).get(0).get("id").asString();
+        String managerEmail = "manager-" + System.nanoTime() + "@pos.test";
+        String managerId =
+                json(post(
+                                "/api/v1/users",
+                                Map.of(
+                                        "email",
+                                        managerEmail,
+                                        "temporaryPassword",
+                                        TEMPORARY,
+                                        "fullName",
+                                        "A Manager",
+                                        "roles",
+                                        List.of("BRANCH_MANAGER")),
+                                admin))
+                        .get("id")
+                        .asString();
+        put(
+                "/api/v1/users/" + managerId + "/branches",
+                Map.of("branchIds", List.of(branch)),
+                admin);
+        String manager = loginForAccessToken(managerEmail, TEMPORARY);
+        String cashierId = person("CASHIER", "managed");
+
+        // Within their own rights, a manager manages people.
+        assertThat(
+                        put(
+                                        "/api/v1/users/" + cashierId + "/roles",
+                                        Map.of("roles", List.of("CASHIER", "SUPERVISOR")),
+                                        manager)
+                                .getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        // But never hands out more than they hold - to someone else or to themselves.
+        ResponseEntity<String> escalate =
+                put(
+                        "/api/v1/users/" + cashierId + "/roles",
+                        Map.of("roles", List.of("SUPER_ADMIN")),
+                        manager);
+        assertThat(escalate.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(escalate.getBody()).contains("role.beyond_your_rights");
+        assertThat(
+                        put(
+                                        "/api/v1/users/" + managerId + "/roles",
+                                        Map.of("roles", List.of("SUPER_ADMIN")),
+                                        manager)
+                                .getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(
+                        post(
+                                        "/api/v1/users",
+                                        Map.of(
+                                                "email",
+                                                "sneaky-" + System.nanoTime() + "@pos.test",
+                                                "temporaryPassword",
+                                                TEMPORARY,
+                                                "fullName",
+                                                "Sneaky",
+                                                "roles",
+                                                List.of("SUPER_ADMIN")),
+                                        manager)
+                                .getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        // Nor touches an administrator's account.
+        ResponseEntity<String> suspend =
+                put("/api/v1/users/" + adminId + "/status", Map.of("status", "SUSPENDED"), manager);
+        assertThat(suspend.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(suspend.getBody()).contains("user.beyond_your_rights");
+        assertThat(json(get("/api/v1/auth/me", admin)).get("status").asString())
+                .isEqualTo("ACTIVE");
+
+        // The administrator can do all of it.
+        assertThat(
+                        put(
+                                        "/api/v1/users/" + managerId + "/roles",
+                                        Map.of("roles", List.of("SUPER_ADMIN")),
+                                        admin)
+                                .getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("lists a branch's staff, and supervisors may too, for setting cash limits")
+    void listsBranchStaff() {
+        String code = "STF" + (System.nanoTime() % 1_000_000);
+        String branch =
+                json(post("/api/v1/branches", Map.of("code", code, "name", "Staff " + code), admin))
+                        .get("id")
+                        .asString();
+        String cashierId = person("CASHIER", "staffed");
+        put(
+                "/api/v1/users/" + cashierId + "/branches",
+                Map.of("branchIds", List.of(branch)),
+                admin);
+
+        JsonNode staff = json(get("/api/v1/branches/" + branch + "/staff", admin));
+        assertThat(staff.findValuesAsString("id")).containsExactly(cashierId);
+        assertThat(staff.get(0).get("fullName").asString()).isEqualTo("Person staffed");
+
+        // A supervisor at another branch sees neither the list nor its names.
+        String supervisorEmail = "sup-" + System.nanoTime() + "@pos.test";
+        String supervisorId =
+                json(post(
+                                "/api/v1/users",
+                                Map.of(
+                                        "email",
+                                        supervisorEmail,
+                                        "temporaryPassword",
+                                        TEMPORARY,
+                                        "fullName",
+                                        "A Supervisor",
+                                        "roles",
+                                        List.of("SUPERVISOR")),
+                                admin))
+                        .get("id")
+                        .asString();
+        String home = json(get("/api/v1/branches", admin)).get(0).get("id").asString();
+        put(
+                "/api/v1/users/" + supervisorId + "/branches",
+                Map.of("branchIds", List.of(home)),
+                admin);
+        String supervisor = loginForAccessToken(supervisorEmail, TEMPORARY);
+        assertThat(get("/api/v1/branches/" + branch + "/staff", supervisor).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(get("/api/v1/branches/" + home + "/staff", supervisor).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        // And holds the new till and intraday rights.
+        JsonNode me = json(get("/api/v1/auth/me", supervisor));
+        assertThat(me.get("permissions").toString()).contains("till:manage", "cash:intraday");
+    }
+
+    private String person(String role, String label) {
+        return json(post(
+                        "/api/v1/users",
+                        Map.of(
+                                "email",
+                                label + "-" + System.nanoTime() + "@pos.test",
+                                "temporaryPassword",
+                                TEMPORARY,
+                                "fullName",
+                                "Person " + label,
+                                "roles",
+                                List.of(role)),
+                        admin))
+                .get("id")
+                .asString();
+    }
+
     private static JsonNode claims(String jwt) {
         return EventJson.mapper()
                 .readTree(

@@ -116,7 +116,7 @@ pos:
       ttl: PT2M
       max-failures: 5
       lock-duration: PT15M
-      permissions: price:override,sale:void,sale:refund,cash:drop
+      permissions: price:override,sale:void,sale:refund,cash:drop,cash:intraday
     bootstrap:
       enabled: ${AUTH_BOOTSTRAP_ENABLED:true}
       email: ${AUTH_BOOTSTRAP_EMAIL:}

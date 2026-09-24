@@ -134,6 +134,14 @@ public class AccessTokenIssuer {
      * token then states plainly what it can do, which is easier to reason about and to debug, and
      * no service has to special-case it.
      */
+    /**
+     * What {@code user} may actually do: their roles' permissions, with the wildcard expanded into
+     * every concrete one - the same list their access token carries.
+     */
+    public Set<String> effectivePermissions(User user) {
+        return Set.copyOf(expand(user.permissionCodes()));
+    }
+
     private Set<String> expand(Set<String> permissions) {
         if (!permissions.contains(Permissions.ALL)) {
             return permissions;

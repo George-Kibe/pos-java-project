@@ -31,12 +31,27 @@ import lombok.RequiredArgsConstructor;
 public class BranchController {
 
     private final BranchService service;
+    private final com.pos.auth.service.UserAdminService users;
+    private final com.pos.common.security.BranchAccessGuard branchAccess;
 
     @GetMapping
     @PreAuthorize("hasAuthority('branch:view')")
     @Operation(summary = "List branches")
     public List<AdminDtos.BranchResponse> list() {
         return service.findAll().stream().map(AdminDtos.BranchResponse::from).toList();
+    }
+
+    @GetMapping("/{id}/staff")
+    @PreAuthorize("hasAnyAuthority('user:view', 'till:manage')")
+    @Operation(summary = "The active people assigned to a branch - for setting their cash limits")
+    public java.util.List<AdminDtos.StaffMemberResponse> staff(@PathVariable UUID id) {
+        branchAccess.requireAccess(id);
+        return users.staffAt(id).stream()
+                .map(
+                        user ->
+                                new AdminDtos.StaffMemberResponse(
+                                        user.getId(), user.getFullName(), user.roleCodes()))
+                .toList();
     }
 
     @GetMapping("/{id}")

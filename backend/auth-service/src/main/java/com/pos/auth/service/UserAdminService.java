@@ -35,13 +35,33 @@ public class UserAdminService {
     private final TokenVersionRegistry tokenVersions;
     private final AuditService audit;
     private final PasswordEncoder passwordEncoder;
+    private final com.pos.auth.security.AccessTokenIssuer tokens;
 
     @Transactional(readOnly = true)
-    public Page<User> search(String query, Pageable pageable) {
-        if (query == null || query.isBlank()) {
-            return users.findAll(pageable);
+    public Page<User> search(String query, boolean excludeAdministrators, Pageable pageable) {
+        boolean all = query == null || query.isBlank();
+        if (excludeAdministrators) {
+            return all
+                    ? users.findNonAdministrators(pageable)
+                    : users.searchNonAdministrators(query.trim(), pageable);
         }
-        return users.search(query.trim(), pageable);
+        return all ? users.findAll(pageable) : users.search(query.trim(), pageable);
+    }
+
+    /** Who works at a branch: the people a supervisor sets cash limits for. */
+    @Transactional(readOnly = true)
+    public java.util.List<User> staffAt(UUID branchId) {
+        return users.findActiveAtBranch(branchId);
+    }
+
+    /** What the user may actually do, the wildcard expanded - as their token carries it. */
+    public Set<String> effectivePermissions(User user) {
+        return tokens.effectivePermissions(user);
+    }
+
+    /** Whether the user holds every permission there is: an administrator. */
+    public static boolean isAdministrator(User user) {
+        return user.permissionCodes().contains(com.pos.common.security.Permissions.ALL);
     }
 
     @Transactional(readOnly = true)
@@ -65,6 +85,9 @@ public class UserAdminService {
             Set<String> roleCodes,
             Set<UUID> branchIds) {
 
+        Set<Role> granted = resolveRoles(roleCodes);
+        requireMayGrant(granted);
+
         String normalized = User.normalizeEmail(email);
         if (users.existsByEmailNormalized(normalized)) {
             throw new Errors.ConflictException(
@@ -79,7 +102,7 @@ public class UserAdminService {
         user.setPhone(phone);
         user.setStatus(UserStatus.ACTIVE);
         user.setMustChangePassword(true);
-        user.setRoles(resolveRoles(roleCodes));
+        user.setRoles(granted);
         user.setBranches(resolveBranches(branchIds));
         users.save(user);
 
@@ -98,6 +121,7 @@ public class UserAdminService {
     @Transactional
     public User updateProfile(UUID id, String fullName, String phone) {
         User user = get(id);
+        requireMayManage(user);
         if (fullName != null && !fullName.isBlank()) {
             user.setFullName(fullName.trim());
         }
@@ -117,9 +141,12 @@ public class UserAdminService {
     @Transactional
     public User assignRoles(UUID id, Set<String> roleCodes) {
         User user = get(id);
+        requireMayManage(user);
         Set<String> before = user.roleCodes();
 
-        user.setRoles(resolveRoles(roleCodes));
+        Set<Role> granted = resolveRoles(roleCodes);
+        requireMayGrant(granted);
+        user.setRoles(granted);
         user.bumpTokenVersion();
         users.save(user);
         // Revoking refresh tokens ends the session, but the access token they are holding right
@@ -138,6 +165,7 @@ public class UserAdminService {
     @Transactional
     public User assignBranches(UUID id, Set<UUID> branchIds) {
         User user = get(id);
+        requireMayManage(user);
         Set<UUID> before = user.branchIds();
 
         user.setBranches(resolveBranches(branchIds));
@@ -163,6 +191,7 @@ public class UserAdminService {
     @Transactional
     public User changeStatus(UUID id, UserStatus status) {
         User user = get(id);
+        requireMayManage(user);
 
         AuthenticatedUser.current()
                 .filter(actor -> actor.userId().equals(id))
@@ -192,6 +221,48 @@ public class UserAdminService {
                 id,
                 Map.of("before", before.name(), "after", status.name()));
         return user;
+    }
+
+    /**
+     * No one hands out what they do not hold. Without this, anyone with {@code user:manage} - a
+     * branch manager - could grant SUPER_ADMIN, to a colleague or to themselves.
+     */
+    private static void requireMayGrant(Set<Role> granted) {
+        Set<String> held = callerPermissions();
+        if (held == null) {
+            return; // startup, with no caller: the bootstrap administrator
+        }
+        for (Role role : granted) {
+            Set<String> needs =
+                    role.getPermissions().stream()
+                            .map(com.pos.auth.domain.Permission::getCode)
+                            .collect(java.util.stream.Collectors.toSet());
+            if (!held.containsAll(needs)) {
+                throw new Errors.ForbiddenException(
+                        "role.beyond_your_rights",
+                        "You cannot grant %s: it carries permissions you do not hold."
+                                .formatted(role.getName()));
+            }
+        }
+    }
+
+    /**
+     * No one manages an account that can do more than they can - so administrators are managed by
+     * administrators, and a branch manager cannot suspend or re-role one.
+     */
+    private static void requireMayManage(User target) {
+        Set<String> held = callerPermissions();
+        if (held != null && !held.containsAll(target.permissionCodes())) {
+            throw new Errors.ForbiddenException(
+                    "user.beyond_your_rights",
+                    "That account holds permissions you do not; only someone who holds them can"
+                            + " change it.");
+        }
+    }
+
+    /** The caller's permissions as their token carries them (wildcard expanded), or null. */
+    private static Set<String> callerPermissions() {
+        return AuthenticatedUser.current().map(AuthenticatedUser::permissions).orElse(null);
     }
 
     private Set<Role> resolveRoles(Set<String> roleCodes) {

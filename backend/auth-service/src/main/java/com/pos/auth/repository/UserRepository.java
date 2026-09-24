@@ -38,7 +38,40 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     long countByStatus(com.pos.auth.domain.UserStatus status);
 
+    /**
+     * Everyone but the administrators - those holding a role that grants every permission. Two
+     * queries, with and without a search term, for the same reason as {@link #search}.
+     */
+    @Query(
+            """
+            SELECT u FROM User u
+            WHERE NOT EXISTS (
+                SELECT 1 FROM User a JOIN a.roles r JOIN r.permissions p
+                WHERE a = u AND p.code = '*')
+            """)
+    Page<User> findNonAdministrators(Pageable pageable);
+
+    @Query(
+            """
+            SELECT u FROM User u
+            WHERE (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :query, '%'))
+                   OR u.emailNormalized LIKE LOWER(CONCAT('%', :query, '%')))
+              AND NOT EXISTS (
+                SELECT 1 FROM User a JOIN a.roles r JOIN r.permissions p
+                WHERE a = u AND p.code = '*')
+            """)
+    Page<User> searchNonAdministrators(@Param("query") String query, Pageable pageable);
+
     /** Everyone who could approve at a lane; the caller narrows by permission and branch. */
+    /** The active people assigned to a branch, by name. */
+    @Query(
+            """
+            SELECT u FROM User u JOIN u.branches b
+            WHERE b.id = :branchId AND u.status = com.pos.auth.domain.UserStatus.ACTIVE
+            ORDER BY u.fullName
+            """)
+    List<User> findActiveAtBranch(@Param("branchId") UUID branchId);
+
     List<User> findByStatusAndPinHashIsNotNull(com.pos.auth.domain.UserStatus status);
 
     /**
