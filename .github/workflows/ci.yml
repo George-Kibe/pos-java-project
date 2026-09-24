@@ -104,7 +104,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Vulnerability scan (dependencies and IaC)
-        uses: aquasecurity/trivy-action@0.28.0
+        # Pinned to a commit, not a tag: the unprefixed 0.x tags this used to name were withdrawn
+        # (releases are now v-prefixed), which broke every run. A tag can move or vanish; a commit
+        # cannot - and for the scanner that guards the supply chain that matters most. v0.36.0.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: fs
           scan-ref: .
