@@ -67,3 +67,6 @@ desktop.ini
 
 # Written by make demo-seed: ids of the local demo data
 postman/local.postman_environment.json
+
+# Python bytecode from the tooling scripts
+__pycache__/

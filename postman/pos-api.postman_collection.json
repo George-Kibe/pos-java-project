@@ -733,6 +733,33 @@
                   }
                 }
               }
+            },
+            {
+              "name": "The active people assigned to a branch - for setting their cash limits",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/branches/{{branchId}}/staff",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "branches",
+                    "{{branchId}}",
+                    "staff"
+                  ],
+                  "query": []
+                },
+                "description": "The active people assigned to a branch - for setting their cash limits"
+              }
             }
           ]
         },
@@ -1078,7 +1105,7 @@
           "name": "Users",
           "item": [
             {
-              "name": "Search users",
+              "name": "Search users; excludeAdministrators=true leaves out everyone holding every permission",
               "request": {
                 "method": "GET",
                 "header": [
@@ -1105,6 +1132,12 @@
                       "description": ""
                     },
                     {
+                      "key": "excludeAdministrators",
+                      "value": "False",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
                       "key": "page",
                       "value": "0",
                       "disabled": false
@@ -1121,7 +1154,7 @@
                     }
                   ]
                 },
-                "description": "Search users"
+                "description": "Search users; excludeAdministrators=true leaves out everyone holding every permission"
               }
             },
             {
@@ -4394,6 +4427,222 @@
           ]
         },
         {
+          "name": "Cash limits",
+          "item": [
+            {
+              "name": "A branch's cash limits: its default and each person's",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/cash-limits?branchId={{branchId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cash-limits"
+                  ],
+                  "query": [
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": false,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "A branch's cash limits: its default and each person's"
+              }
+            },
+            {
+              "name": "Set the branch default, or one person's limit",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/cash-limits",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cash-limits"
+                  ],
+                  "query": []
+                },
+                "description": "Set the branch default, or one person's limit",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"userId\": \"{{userId}}\",\n  \"limitAmount\": 100,\n  \"ceilingAmount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Remove a limit; a person then falls back to the branch default",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/cash-limits/{{cashLimitId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cash-limits",
+                    "{{cashLimitId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Remove a limit; a person then falls back to the branch default"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Intraday cash",
+          "item": [
+            {
+              "name": "What the intraday cash holds, note by note, and its latest movements",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/intraday?branchId={{branchId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "intraday"
+                  ],
+                  "query": [
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": false,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "What the intraday cash holds, note by note, and its latest movements"
+              }
+            },
+            {
+              "name": "Cash taken from the intraday to the bank",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/intraday/bankings",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "intraday",
+                    "bankings"
+                  ],
+                  "query": []
+                },
+                "description": "Cash taken from the intraday to the bank",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"notes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ],\n  \"reason\": \"Recorded from Postman\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Cash brought into the intraday: from the bank, or an opening balance",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/intraday/top-ups",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "intraday",
+                    "top-ups"
+                  ],
+                  "query": []
+                },
+                "description": "Cash brought into the intraday: from the bank, or an opening balance",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"notes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ],\n  \"reason\": \"Recorded from Postman\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "Returns",
           "item": [
             {
@@ -4743,7 +4992,7 @@
                 "description": "Replay sales a terminal took offline; duplicates are reported, never recreated",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"registerId\": \"{{registerId}}\",\n  \"sales\": [\n    {\n      \"clientSaleId\": \"{{clientSaleId}}\",\n      \"tillSessionId\": \"{{tillSessionId}}\",\n      \"customerId\": \"{{customerId}}\",\n      \"member\": false,\n      \"occurredAt\": \"2026-01-01T09:00:00Z\",\n      \"paymentMethod\": \"CASH\",\n      \"amountTendered\": 100,\n      \"claimedGrandTotal\": 100,\n      \"lines\": [\n        {\n          \"productId\": \"{{productId}}\",\n          \"sku\": \"\",\n          \"barcode\": \"\",\n          \"quantity\": 1,\n          \"unitPrice\": 100,\n          \"lineTotal\": 100\n        }\n      ]\n    }\n  ]\n}",
+                  "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"registerId\": \"{{registerId}}\",\n  \"sales\": [\n    {\n      \"clientSaleId\": \"{{clientSaleId}}\",\n      \"tillSessionId\": \"{{tillSessionId}}\",\n      \"customerId\": \"{{customerId}}\",\n      \"member\": false,\n      \"occurredAt\": \"2026-01-01T09:00:00Z\",\n      \"paymentMethod\": \"CASH\",\n      \"amountTendered\": 100,\n      \"claimedGrandTotal\": 100,\n      \"lines\": [\n        {\n          \"productId\": \"{{productId}}\",\n          \"sku\": \"\",\n          \"barcode\": \"\",\n          \"quantity\": 1,\n          \"unitPrice\": 100,\n          \"lineTotal\": 100\n        }\n      ],\n      \"cashReceived\": [\n        {\n          \"denomination\": 1,\n          \"count\": 1\n        }\n      ],\n      \"changeGiven\": [\n        {\n          \"denomination\": 1,\n          \"count\": 1\n        }\n      ]\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -4932,7 +5181,7 @@
                 "description": "Take payment: cash completes at once, a provider tender waits for the answer",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"tenders\": [\n    {\n      \"method\": \"CASH\",\n      \"amount\": 100,\n      \"phoneNumber\": \"0712345678\",\n      \"terminalReference\": \"\"\n    }\n  ],\n  \"amountTendered\": 100\n}",
+                  "raw": "{\n  \"tenders\": [\n    {\n      \"method\": \"CASH\",\n      \"amount\": 100,\n      \"phoneNumber\": \"0712345678\",\n      \"terminalReference\": \"\"\n    }\n  ],\n  \"amountTendered\": 100,\n  \"cashReceived\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ],\n  \"changeGiven\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5072,7 +5321,7 @@
                 "description": "Open a shift on a register with a declared float",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"registerId\": \"{{registerId}}\",\n  \"openingFloat\": 100\n}",
+                  "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"registerId\": \"{{registerId}}\",\n  \"openingFloat\": 100,\n  \"floatCount\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5230,13 +5479,40 @@
                 "description": "Accept the counted cash and close the shift",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"countedCash\": 100,\n  \"notes\": \"Recorded from Postman\"\n}",
+                  "raw": "{\n  \"countedCash\": 100,\n  \"notes\": \"Recorded from Postman\",\n  \"countedNotes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
                     }
                   }
                 }
+              }
+            },
+            {
+              "name": "What the drawer holds note by note, and where it stands against its cash limit",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/till-sessions/{{tillSessionId}}/drawer",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "till-sessions",
+                    "{{tillSessionId}}",
+                    "drawer"
+                  ],
+                  "query": []
+                },
+                "description": "What the drawer holds note by note, and where it stands against its cash limit"
               }
             },
             {
@@ -5275,7 +5551,52 @@
                 "description": "Move cash from the drawer to the safe",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"amount\": 100,\n  \"reason\": \"Recorded from Postman\",\n  \"reference\": \"\"\n}",
+                  "raw": "{\n  \"amount\": 100,\n  \"reason\": \"Recorded from Postman\",\n  \"reference\": \"\",\n  \"notes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Exchange notes for notes of the same total at the till - breaking a 1000 - without changing what it holds in money",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}",
+                    "description": "Makes a retry harmless; a fresh one per call."
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/till-sessions/{{tillSessionId}}/exchanges",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "till-sessions",
+                    "{{tillSessionId}}",
+                    "exchanges"
+                  ],
+                  "query": []
+                },
+                "description": "Exchange notes for notes of the same total at the till - breaking a 1000 - without changing what it holds in money",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"received\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ],\n  \"given\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5320,7 +5641,52 @@
                 "description": "Top up the drawer with change",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"amount\": 100,\n  \"reason\": \"Recorded from Postman\",\n  \"reference\": \"\"\n}",
+                  "raw": "{\n  \"amount\": 100,\n  \"reason\": \"Recorded from Postman\",\n  \"reference\": \"\",\n  \"notes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Change for a till from the branch's intraday cash; approved by whoever holds it",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}",
+                    "description": "Makes a retry harmless; a fresh one per call."
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/till-sessions/{{tillSessionId}}/replenishments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "till-sessions",
+                    "{{tillSessionId}}",
+                    "replenishments"
+                  ],
+                  "query": []
+                },
+                "description": "Change for a till from the branch's intraday cash; approved by whoever holds it",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"notes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ],\n  \"reason\": \"Recorded from Postman\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5354,6 +5720,82 @@
                   "query": []
                 },
                 "description": "What the shift took, by payment method, and whether the drawer agrees"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tills",
+          "item": [
+            {
+              "name": "A branch's tills, by number",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/registers?branchId={{branchId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "registers"
+                  ],
+                  "query": [
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": false,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "A branch's tills, by number"
+              }
+            },
+            {
+              "name": "Rename or renumber a till",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/registers/{{registerId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "registers",
+                    "{{registerId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Rename or renumber a till",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"number\": 1,\n  \"name\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
             }
           ]
