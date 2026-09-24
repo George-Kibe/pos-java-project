@@ -128,6 +128,12 @@ public abstract class SalesTestBase {
         // Children before parents.
         for (String table :
                 List.of(
+                        "sale_cash_denominations",
+                        "drawer_movements",
+                        "till_session_counts",
+                        "intraday_movements",
+                        "cash_limits",
+                        "registers",
                         "receipts",
                         "return_lines",
                         "returns",

@@ -53,6 +53,7 @@ public class OfflineSaleWriter {
     private final ReceiptNumberService receiptNumbers;
     private final ReceiptService receipts;
     private final SalesEventPublisher events;
+    private final CashDrawerService drawer;
 
     /**
      * One sale, in its own transaction.
@@ -167,6 +168,9 @@ public class OfflineSaleWriter {
         if (sale.getTillSession() != null) {
             BigDecimal cash = sale.cashPortion();
             sale.getTillSession().recordSale(cash, totals.grand().subtract(cash));
+            if (sale.getTillSession().isTracksDenominations() && cash.signum() > 0) {
+                recordOfflineCash(sale, offline, cash);
+            }
         }
 
         Sale saved = sales.save(sale);
@@ -234,5 +238,43 @@ public class OfflineSaleWriter {
                 offline.claimedGrandTotal(),
                 sale.getPriceVarianceAmount(),
                 "Already recorded");
+    }
+
+    /**
+     * The notes of a sale taken offline, into the drawer it went through. Taken as the lane counted
+     * them; where it did not say, the usual notes for the tender and change from what the drawer
+     * holds. Never refused: the customer has long gone with their change.
+     */
+    private void recordOfflineCash(
+            Sale sale, OfflineSyncService.OfflineSale offline, BigDecimal cash) {
+        var session = sale.getTillSession();
+        var in =
+                offline.cashReceived() != null
+                        ? com.pos.sales.domain.cash.CashCount.of(offline.cashReceived())
+                        : com.pos.sales.domain.cash.ChangeMaker.asHandedOver(
+                                offline.amountTendered() != null ? offline.amountTendered() : cash);
+        BigDecimal changeAmount = in.total().subtract(cash).max(BigDecimal.ZERO);
+        var out =
+                offline.changeGiven() != null
+                        ? com.pos.sales.domain.cash.CashCount.of(offline.changeGiven())
+                        : com.pos.sales.domain.cash.ChangeMaker.exact(
+                                        com.pos.sales.domain.cash.ChangeMaker.payableShillings(
+                                                changeAmount),
+                                        drawer.holdings(session.getId()).plus(in))
+                                .orElse(
+                                        com.pos.sales.domain.cash.ChangeMaker.asHandedOver(
+                                                changeAmount));
+        drawer.record(
+                session,
+                com.pos.sales.domain.cash.DrawerMovement.Kind.SALE_IN,
+                sale.getId(),
+                in,
+                1);
+        drawer.record(
+                session,
+                com.pos.sales.domain.cash.DrawerMovement.Kind.SALE_CHANGE,
+                sale.getId(),
+                out,
+                -1);
     }
 }

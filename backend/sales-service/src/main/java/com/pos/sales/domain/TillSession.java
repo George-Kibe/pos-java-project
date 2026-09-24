@@ -86,6 +86,13 @@ public class TillSession extends BaseEntity {
     @Column(length = 1000)
     private String notes;
 
+    /**
+     * Whether the drawer is tracked note by note. Set when the float is counted by denomination at
+     * open; a shift opened with a total alone keeps to money totals.
+     */
+    @Column(name = "tracks_denominations", nullable = false)
+    private boolean tracksDenominations;
+
     public TillSession(UUID branchId, UUID registerId, UUID cashierId, BigDecimal openingFloat) {
         this.branchId = branchId;
         this.registerId = registerId;

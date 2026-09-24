@@ -66,7 +66,37 @@ public class OfflineSyncService {
             PaymentMethod paymentMethod,
             BigDecimal amountTendered,
             BigDecimal claimedGrandTotal,
-            List<OfflineLine> lines) {}
+            List<OfflineLine> lines,
+            /** The notes handed over and given back, as the lane counted them; null if not. */
+            List<com.pos.sales.domain.cash.CashCount.Line> cashReceived,
+            List<com.pos.sales.domain.cash.CashCount.Line> changeGiven) {
+
+        public OfflineSale(
+                UUID clientSaleId,
+                UUID registerId,
+                UUID tillSessionId,
+                UUID customerId,
+                boolean member,
+                Instant occurredAt,
+                PaymentMethod paymentMethod,
+                BigDecimal amountTendered,
+                BigDecimal claimedGrandTotal,
+                List<OfflineLine> lines) {
+            this(
+                    clientSaleId,
+                    registerId,
+                    tillSessionId,
+                    customerId,
+                    member,
+                    occurredAt,
+                    paymentMethod,
+                    amountTendered,
+                    claimedGrandTotal,
+                    lines,
+                    null,
+                    null);
+        }
+    }
 
     /** What became of one submitted sale. */
     public record SaleResult(

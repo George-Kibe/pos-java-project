@@ -51,6 +51,7 @@ public class SaleController {
     private final ReceiptService receipts;
     private final OfflineSyncService offlineSync;
     private final BranchAccessGuard branchAccess;
+    private final com.pos.sales.service.CashDrawerService drawer;
 
     @PostMapping("/checkout")
     @PreAuthorize("hasAuthority('sale:create')")
@@ -73,7 +74,7 @@ public class SaleController {
     public SalesDtos.SaleResponse tender(
             @PathVariable UUID id, @Valid @RequestBody SalesDtos.TenderRequest request) {
         branchAccess.requireAccess(checkout.require(id).getBranchId());
-        return SalesDtos.SaleResponse.from(
+        Sale paid =
                 checkout.tender(
                         id,
                         request.tenders().stream()
@@ -85,7 +86,10 @@ public class SaleController {
                                                         line.phoneNumber(),
                                                         line.terminalReference()))
                                 .toList(),
-                        request.amountTendered()));
+                        request.amountTendered(),
+                        SalesDtos.lines(request.cashReceived()),
+                        SalesDtos.lines(request.changeGiven()));
+        return SalesDtos.SaleResponse.from(paid, drawer.changeFor(paid.getId()));
     }
 
     @PostMapping("/{id}/cancel")
@@ -113,7 +117,7 @@ public class SaleController {
     public SalesDtos.SaleResponse get(@PathVariable UUID id) {
         Sale sale = checkout.require(id);
         branchAccess.requireAccess(sale.getBranchId());
-        return SalesDtos.SaleResponse.from(sale);
+        return SalesDtos.SaleResponse.from(sale, drawer.changeFor(sale.getId()));
     }
 
     @GetMapping
@@ -221,7 +225,9 @@ public class SaleController {
                                                                                 line.quantity(),
                                                                                 line.unitPrice(),
                                                                                 line.lineTotal()))
-                                                        .toList()))
+                                                        .toList(),
+                                                SalesDtos.lines(sale.cashReceived()),
+                                                SalesDtos.lines(sale.changeGiven())))
                         .toList(),
                 bearerToken());
     }

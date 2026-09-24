@@ -22,6 +22,7 @@ import com.pos.sales.domain.Sale;
 import com.pos.sales.domain.SaleLine;
 import com.pos.sales.domain.SalePayment;
 import com.pos.sales.domain.SaleStatus;
+import com.pos.sales.domain.TillSession;
 import com.pos.sales.domain.totals.SaleTotals;
 import com.pos.sales.domain.totals.SaleTotalsCalculator;
 import com.pos.sales.messaging.SalesEventPublisher;
@@ -60,6 +61,8 @@ public class CheckoutService {
     private final ReceiptNumberService receiptNumbers;
     private final ReceiptService receipts;
     private final SalesEventPublisher events;
+    private final CashDrawerService drawer;
+    private final CashLimitService limits;
 
     /** One tender at checkout. */
     public record Tender(
@@ -143,6 +146,32 @@ public class CheckoutService {
      */
     @Transactional
     public Sale tender(UUID saleId, List<Tender> tenders, BigDecimal amountTendered) {
+        return tender(saleId, tenders, amountTendered, null);
+    }
+
+    /**
+     * Takes payment. {@code cashReceived} names the notes and coins handed over, for a drawer
+     * tracked by denomination; without it the usual notes for the amount are assumed.
+     */
+    @Transactional
+    public Sale tender(
+            UUID saleId,
+            List<Tender> tenders,
+            BigDecimal amountTendered,
+            List<com.pos.sales.domain.cash.CashCount.Line> cashReceived) {
+        return tender(saleId, tenders, amountTendered, cashReceived, null);
+    }
+
+    /**
+     * With the change the cashier chose to give, checked against the drawer before anything moves.
+     */
+    @Transactional
+    public Sale tender(
+            UUID saleId,
+            List<Tender> tenders,
+            BigDecimal amountTendered,
+            List<com.pos.sales.domain.cash.CashCount.Line> cashReceived,
+            List<com.pos.sales.domain.cash.CashCount.Line> changeGiven) {
         Sale sale = require(saleId);
 
         if (sale.getStatus() == SaleStatus.PAID) {
@@ -191,6 +220,17 @@ public class CheckoutService {
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal change = offered.subtract(outstanding);
         BigDecimal changeStillToTake = change;
+
+        // Before any money moves: the drawer may not take this much cash, or cannot make the
+        // change.
+        TillSession till = sale.getTillSession();
+        if (till != null && cashHandedOver.signum() > 0) {
+            limits.requireCashFits(till, cashHandedOver.subtract(change.min(cashHandedOver)));
+            if (till.isTracksDenominations()) {
+                drawer.prepareCashSale(
+                        sale, till, cashHandedOver, change, cashReceived, changeGiven);
+            }
+        }
 
         boolean awaitingProvider = false;
 
@@ -257,6 +297,9 @@ public class CheckoutService {
         if (sale.getTillSession() != null) {
             BigDecimal cash = sale.cashPortion();
             sale.getTillSession().recordSale(cash, sale.getGrandTotal().subtract(cash));
+            if (sale.getTillSession().isTracksDenominations()) {
+                drawer.applySale(sale, sale.getTillSession());
+            }
         }
 
         Sale paid = sales.save(sale);
@@ -342,6 +385,13 @@ public class CheckoutService {
             // The takings go back out of the shift, or the drawer will read as over at close.
             BigDecimal cash = sale.cashPortion();
             sale.getTillSession().recordRefund(cash);
+            if (sale.getTillSession().isTracksDenominations() && cash.signum() > 0) {
+                drawer.payOut(
+                        sale.getTillSession(),
+                        com.pos.sales.domain.cash.DrawerMovement.Kind.VOID_OUT,
+                        sale.getId(),
+                        cash);
+            }
         }
 
         Sale voided = sales.save(sale);

@@ -39,6 +39,16 @@ public class TillSessionController {
     private final TillSessionService sessions;
     private final ZReportService zReports;
     private final BranchAccessGuard branchAccess;
+    private final com.pos.sales.service.RegisterService registers;
+    private final com.pos.sales.service.CashDrawerService drawer;
+    private final com.pos.sales.service.CashLimitService limits;
+
+    /** A shift as the lane shows it: with its till's number. */
+    private SalesDtos.TillSessionResponse respond(TillSession session) {
+        return SalesDtos.TillSessionResponse.from(
+                session,
+                registers.byIds(List.of(session.getRegisterId())).get(session.getRegisterId()));
+    }
 
     @PostMapping
     @PreAuthorize("hasAuthority('shift:open')")
@@ -48,9 +58,13 @@ public class TillSessionController {
 
         branchAccess.requireAccess(request.branchId());
         TillSession session =
-                sessions.open(request.branchId(), request.registerId(), request.openingFloat());
+                sessions.open(
+                        request.branchId(),
+                        request.registerId(),
+                        request.openingFloat(),
+                        SalesDtos.lines(request.floatCount()));
         return ResponseEntity.created(URI.create("/api/v1/till-sessions/" + session.getId()))
-                .body(SalesDtos.TillSessionResponse.from(session));
+                .body(respond(session));
     }
 
     @GetMapping
@@ -59,8 +73,15 @@ public class TillSessionController {
     public PageResponse<SalesDtos.TillSessionResponse> list(
             @RequestParam UUID branchId, @PageableDefault(size = 50) Pageable pageable) {
         branchAccess.requireAccess(branchId);
+        var page = sessions.list(branchId, pageable);
+        var tills =
+                registers.byIds(
+                        page.getContent().stream().map(TillSession::getRegisterId).toList());
         return PageResponse.of(
-                sessions.list(branchId, pageable), SalesDtos.TillSessionResponse::from);
+                page,
+                session ->
+                        SalesDtos.TillSessionResponse.from(
+                                session, tills.get(session.getRegisterId())));
     }
 
     @GetMapping("/{id}")
@@ -69,7 +90,7 @@ public class TillSessionController {
     public SalesDtos.TillSessionResponse get(@PathVariable UUID id) {
         TillSession session = sessions.require(id);
         branchAccess.requireAccess(session.getBranchId());
-        return SalesDtos.TillSessionResponse.from(session);
+        return respond(session);
     }
 
     @GetMapping("/registers/{registerId}/current")
@@ -78,7 +99,7 @@ public class TillSessionController {
     public SalesDtos.TillSessionResponse current(@PathVariable UUID registerId) {
         TillSession session = sessions.requireOpenForRegister(registerId);
         branchAccess.requireAccess(session.getBranchId());
-        return SalesDtos.TillSessionResponse.from(session);
+        return respond(session);
     }
 
     @PostMapping("/{id}/drops")
@@ -87,8 +108,13 @@ public class TillSessionController {
     public SalesDtos.TillSessionResponse drop(
             @PathVariable UUID id, @Valid @RequestBody SalesDtos.CashMovementRequest request) {
         branchAccess.requireAccess(sessions.require(id).getBranchId());
-        return SalesDtos.TillSessionResponse.from(
-                sessions.recordDrop(id, request.amount(), request.reason(), request.reference()));
+        return respond(
+                sessions.recordDrop(
+                        id,
+                        request.amount(),
+                        request.reason(),
+                        request.reference(),
+                        SalesDtos.lines(request.notes())));
     }
 
     @PostMapping("/{id}/float")
@@ -97,8 +123,67 @@ public class TillSessionController {
     public SalesDtos.TillSessionResponse addFloat(
             @PathVariable UUID id, @Valid @RequestBody SalesDtos.CashMovementRequest request) {
         branchAccess.requireAccess(sessions.require(id).getBranchId());
-        return SalesDtos.TillSessionResponse.from(
-                sessions.addFloat(id, request.amount(), request.reason()));
+        return respond(
+                sessions.addFloat(
+                        id, request.amount(), request.reason(), SalesDtos.lines(request.notes())));
+    }
+
+    @PostMapping("/{id}/replenishments")
+    @PreAuthorize("hasAuthority('cash:intraday')")
+    @Operation(
+            summary =
+                    "Change for a till from the branch's intraday cash; approved by whoever holds it")
+    public SalesDtos.TillSessionResponse replenish(
+            @PathVariable UUID id, @Valid @RequestBody SalesDtos.ReplenishRequest request) {
+        branchAccess.requireAccess(sessions.require(id).getBranchId());
+        return respond(sessions.replenish(id, SalesDtos.lines(request.notes()), request.reason()));
+    }
+
+    @PostMapping("/{id}/exchanges")
+    @PreAuthorize("hasAuthority('shift:open')")
+    @Operation(
+            summary =
+                    "Exchange notes for notes of the same total at the till - breaking a 1000 -"
+                            + " without changing what it holds in money")
+    public SalesDtos.TillSessionResponse exchange(
+            @PathVariable UUID id, @Valid @RequestBody SalesDtos.ExchangeRequest request) {
+        branchAccess.requireAccess(sessions.require(id).getBranchId());
+        return respond(
+                sessions.exchange(
+                        id, SalesDtos.lines(request.received()), SalesDtos.lines(request.given())));
+    }
+
+    @GetMapping("/{id}/drawer")
+    @PreAuthorize("hasAnyAuthority('shift:open', 'shift:close:any', 'report:view:branch')")
+    @Operation(
+            summary =
+                    "What the drawer holds note by note, and where it stands against its cash"
+                            + " limit")
+    public SalesDtos.DrawerResponse drawer(@PathVariable UUID id) {
+        TillSession session = sessions.require(id);
+        branchAccess.requireAccess(session.getBranchId());
+        var held = session.isTracksDenominations() ? drawer.holdings(id) : null;
+        var standing = limits.standing(session);
+        var expected = session.reconcile(null).expectedCash();
+        return new SalesDtos.DrawerResponse(
+                id,
+                session.isTracksDenominations(),
+                held == null ? List.of() : SalesDtos.describe(held),
+                held == null ? null : held.total(),
+                expected,
+                held == null ? null : expected.subtract(held.total()),
+                standing.state().name(),
+                standing.limit(),
+                standing.ceiling(),
+                drawer.closingCount(id).stream()
+                        .map(
+                                line ->
+                                        new SalesDtos.ClosingCountLine(
+                                                line.getDenomination(),
+                                                line.getExpected(),
+                                                line.getCounted(),
+                                                line.getCounted() - line.getExpected()))
+                        .toList());
     }
 
     @PostMapping("/{id}/begin-close")
@@ -106,7 +191,7 @@ public class TillSessionController {
     @Operation(summary = "Stop taking sales so the drawer can be counted")
     public SalesDtos.TillSessionResponse beginClose(@PathVariable UUID id) {
         branchAccess.requireAccess(sessions.require(id).getBranchId());
-        return SalesDtos.TillSessionResponse.from(sessions.beginClose(id));
+        return respond(sessions.beginClose(id));
     }
 
     @PostMapping("/{id}/close")
@@ -115,8 +200,12 @@ public class TillSessionController {
     public SalesDtos.TillSessionResponse close(
             @PathVariable UUID id, @Valid @RequestBody SalesDtos.CloseSessionRequest request) {
         branchAccess.requireAccess(sessions.require(id).getBranchId());
-        return SalesDtos.TillSessionResponse.from(
-                sessions.close(id, request.countedCash(), request.notes()));
+        return respond(
+                sessions.close(
+                        id,
+                        request.countedCash(),
+                        request.notes(),
+                        SalesDtos.lines(request.countedNotes())));
     }
 
     @GetMapping("/{id}/z-report")

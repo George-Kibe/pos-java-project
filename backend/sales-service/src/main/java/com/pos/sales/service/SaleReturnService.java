@@ -49,6 +49,7 @@ public class SaleReturnService {
     private final ServiceEndpointProperties properties;
     private final SalesEventPublisher events;
     private final TillSessionService tillSessions;
+    private final CashDrawerService drawer;
 
     /** One line coming back. */
     public record ReturnLineRequest(
@@ -196,6 +197,13 @@ public class SaleReturnService {
                 && saleReturn.getRefundMethod() == PaymentMethod.CASH) {
             // Cash out of the drawer, or the count at close will read as over.
             saleReturn.getTillSession().recordRefund(saleReturn.getRefundTotal());
+            if (saleReturn.getTillSession().isTracksDenominations()) {
+                drawer.payOut(
+                        saleReturn.getTillSession(),
+                        com.pos.sales.domain.cash.DrawerMovement.Kind.REFUND_OUT,
+                        saleReturn.getId(),
+                        saleReturn.getRefundTotal());
+            }
         }
 
         sales.save(sale);

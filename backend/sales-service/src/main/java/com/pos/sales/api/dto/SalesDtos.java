@@ -39,13 +39,50 @@ public final class SalesDtos {
 
     private SalesDtos() {}
 
+    // --- cash by note and coin ---------------------------------------------------
+
+    /** So many of one note or coin, e.g. {1000, 3}. */
+    public record CashLine(
+            @NotNull @DecimalMin(value = "0.0", inclusive = false) BigDecimal denomination,
+            @jakarta.validation.constraints.Min(0) int count) {}
+
+    /** Request lines as the domain counts them; null stays null (not tracked). */
+    public static List<com.pos.sales.domain.cash.CashCount.Line> lines(List<CashLine> lines) {
+        return lines == null
+                ? null
+                : lines.stream()
+                        .map(
+                                line ->
+                                        new com.pos.sales.domain.cash.CashCount.Line(
+                                                line.denomination(), line.count()))
+                        .toList();
+    }
+
+    public record CashCountLine(
+            BigDecimal denomination, boolean note, int count, BigDecimal amount) {}
+
+    public static List<CashCountLine> describe(com.pos.sales.domain.cash.CashCount cash) {
+        return cash.lines().stream()
+                .map(
+                        line ->
+                                new CashCountLine(
+                                        line.denomination(),
+                                        com.pos.sales.domain.cash.Denominations.isNote(
+                                                line.denomination()),
+                                        line.count(),
+                                        line.denomination()
+                                                .multiply(BigDecimal.valueOf(line.count()))))
+                .toList();
+    }
+
     // --- till sessions ----------------------------------------------------------
 
     public record OpenSessionRequest(
             @NotNull UUID branchId,
             @NotNull UUID registerId,
-            @NotNull @DecimalMin("0.0") @Digits(integer = 15, fraction = 4)
-                    BigDecimal openingFloat) {}
+            @NotNull @DecimalMin("0.0") @Digits(integer = 15, fraction = 4) BigDecimal openingFloat,
+            /** The float counted note by note; given, the drawer is tracked by denomination. */
+            @Valid List<CashLine> floatCount) {}
 
     public record CashMovementRequest(
             @NotNull
@@ -53,11 +90,54 @@ public final class SalesDtos {
                     @Digits(integer = 15, fraction = 4)
                     BigDecimal amount,
             @NotBlank @Size(max = 500) String reason,
-            @Size(max = 100) String reference) {}
+            @Size(max = 100) String reference,
+            /** Which notes and coins, for a drawer tracked by denomination. */
+            @Valid List<CashLine> notes) {}
+
+    /** Change from the branch's intraday cash: exactly these notes and coins. */
+    public record ReplenishRequest(
+            @NotEmpty @Valid List<CashLine> notes, @Size(max = 500) String reason) {}
 
     public record CloseSessionRequest(
-            @NotNull @DecimalMin("0.0") @Digits(integer = 15, fraction = 4) BigDecimal countedCash,
-            @Size(max = 1000) String notes) {}
+            @DecimalMin("0.0") @Digits(integer = 15, fraction = 4) BigDecimal countedCash,
+            @Size(max = 1000) String notes,
+            /** The count note by note; the counted cash is then its total. */
+            @Valid List<CashLine> countedNotes) {}
+
+    /**
+     * What the drawer holds right now, note by note, and where it stands against its cash limit.
+     *
+     * @param unaccounted money the drawer should hold that is not in whole notes and coins: the
+     *     cents of four-decimal totals, which never physically change hands
+     */
+    public record DrawerResponse(
+            UUID tillSessionId,
+            boolean tracked,
+            List<CashCountLine> holdings,
+            BigDecimal countedTotal,
+            BigDecimal expectedCash,
+            BigDecimal unaccounted,
+            String limitState,
+            BigDecimal limit,
+            BigDecimal ceiling,
+            List<ClosingCountLine> closingCount) {}
+
+    public record ClosingCountLine(
+            BigDecimal denomination, int expected, int counted, int difference) {}
+
+    public record RegisterResponse(UUID id, UUID branchId, int number, String name, String label) {
+        public static RegisterResponse from(com.pos.sales.domain.Register register) {
+            return new RegisterResponse(
+                    register.getId(),
+                    register.getBranchId(),
+                    register.getNumber(),
+                    register.getName(),
+                    register.label());
+        }
+    }
+
+    public record RegisterUpdateRequest(
+            @jakarta.validation.constraints.Min(1) Integer number, @Size(max = 60) String name) {}
 
     public record TillSessionResponse(
             UUID id,
@@ -76,9 +156,17 @@ public final class SalesDtos {
             BigDecimal countedCash,
             BigDecimal variance,
             int saleCount,
-            String currency) {
+            String currency,
+            Integer tillNumber,
+            String tillLabel,
+            boolean tracksDenominations) {
 
         public static TillSessionResponse from(TillSession session) {
+            return from(session, null);
+        }
+
+        public static TillSessionResponse from(
+                TillSession session, com.pos.sales.domain.Register register) {
             return new TillSessionResponse(
                     session.getId(),
                     session.getBranchId(),
@@ -100,7 +188,10 @@ public final class SalesDtos {
                     session.getCountedCash(),
                     session.getVariance(),
                     session.getSaleCount(),
-                    session.getCurrency());
+                    session.getCurrency(),
+                    register == null ? null : register.getNumber(),
+                    register == null ? null : register.label(),
+                    session.isTracksDenominations());
         }
     }
 
@@ -250,7 +341,15 @@ public final class SalesDtos {
 
     public record TenderRequest(
             @NotEmpty @Valid List<TenderLine> tenders,
-            @DecimalMin("0.0") @Digits(integer = 15, fraction = 4) BigDecimal amountTendered) {}
+            @DecimalMin("0.0") @Digits(integer = 15, fraction = 4) BigDecimal amountTendered,
+            /** The notes and coins handed over in cash, for a drawer tracked by denomination. */
+            @Valid List<CashLine> cashReceived,
+            /** The change the cashier chose to give; checked against what is due and held. */
+            @Valid List<CashLine> changeGiven) {}
+
+    /** Notes in for notes out, of the same total. */
+    public record ExchangeRequest(
+            @NotEmpty @Valid List<CashLine> received, @NotEmpty @Valid List<CashLine> given) {}
 
     public record SaleLineResponse(
             UUID id,
@@ -354,14 +453,34 @@ public final class SalesDtos {
             List<PaymentResponse> payments) {
 
         public static SaleResponse from(Sale sale) {
+            return from(sale, null);
+        }
+
+        /**
+         * @param drawerChange the notes a tracked drawer actually gave back, which replace the
+         *     textbook breakdown: they came from what the drawer held
+         */
+        public static SaleResponse from(
+                Sale sale, com.pos.sales.domain.cash.CashCount drawerChange) {
             ChangeResponse change = null;
             if (sale.getAmountTendered() != null
                     && sale.getAmountTendered().compareTo(sale.getGrandTotal()) >= 0) {
                 ChangeDue due =
                         ChangeCalculator.calculate(sale.getGrandTotal(), sale.getAmountTendered());
                 change =
-                        new ChangeResponse(
-                                due.amount(), due.denominations(), due.unpayableRemainder());
+                        drawerChange == null
+                                ? new ChangeResponse(
+                                        due.amount(), due.denominations(), due.unpayableRemainder())
+                                : new ChangeResponse(
+                                        due.amount(),
+                                        drawerChange.lines().stream()
+                                                .map(
+                                                        line ->
+                                                                new ChangeDue.DenominationCount(
+                                                                        line.denomination(),
+                                                                        line.count()))
+                                                .toList(),
+                                        due.amount().subtract(drawerChange.total()));
             }
             return new SaleResponse(
                     sale.getId(),
@@ -554,7 +673,10 @@ public final class SalesDtos {
             PaymentMethod paymentMethod,
             @DecimalMin("0.0") BigDecimal amountTendered,
             @DecimalMin("0.0") BigDecimal claimedGrandTotal,
-            @NotEmpty @Valid List<OfflineLineRequest> lines) {
+            @NotEmpty @Valid List<OfflineLineRequest> lines,
+            /** The notes counted in and out at the lane while offline. */
+            @Valid List<CashLine> cashReceived,
+            @Valid List<CashLine> changeGiven) {
 
         public boolean isMember() {
             return Boolean.TRUE.equals(member);
