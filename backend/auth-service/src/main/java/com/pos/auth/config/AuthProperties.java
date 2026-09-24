@@ -17,12 +17,32 @@ public class AuthProperties {
     private final Lockout lockout = new Lockout();
     private final PasswordReset passwordReset = new PasswordReset();
     private final Bootstrap bootstrap = new Bootstrap();
+    private final Approval approval = new Approval();
 
     /**
      * Role granted to a self-registered user once verified. Empty by default: a new account should
      * be able to do nothing at all until an administrator assigns it a role.
      */
     private String defaultRole = "";
+
+    /** Supervisor approvals at the lane. */
+    @Getter
+    @Setter
+    public static class Approval {
+        /** How long an approval token lives: long enough to finish the action, no longer. */
+        private Duration ttl = Duration.ofMinutes(2);
+
+        /** Wrong PINs before the PIN locks. */
+        private int maxFailures = 5;
+
+        private Duration lockDuration = Duration.ofMinutes(15);
+
+        /** The permissions a PIN can approve at a lane. Anything else needs a real sign-in. */
+        private java.util.List<String> permissions =
+                new java.util.ArrayList<>(
+                        java.util.List.of(
+                                "price:override", "sale:void", "sale:refund", "cash:drop"));
+    }
 
     @Getter
     @Setter

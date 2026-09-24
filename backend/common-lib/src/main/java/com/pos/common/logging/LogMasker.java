@@ -39,6 +39,7 @@ public final class LogMasker {
                     "refreshToken",
                     "resetToken",
                     "idToken",
+                    "approvalToken",
                     "otp",
                     "otpCode",
                     "pin",

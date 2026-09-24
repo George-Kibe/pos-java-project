@@ -111,6 +111,12 @@ pos:
       max-duration: PT1H
     password-reset:
       ttl: PT30M
+    # Supervisor PINs at the lane. An approval token allows one permission at one branch.
+    approval:
+      ttl: PT2M
+      max-failures: 5
+      lock-duration: PT15M
+      permissions: price:override,sale:void,sale:refund,cash:drop
     bootstrap:
       enabled: ${AUTH_BOOTSTRAP_ENABLED:true}
       email: ${AUTH_BOOTSTRAP_EMAIL:}

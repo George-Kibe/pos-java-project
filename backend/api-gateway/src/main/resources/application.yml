@@ -62,7 +62,7 @@ spring:
             - id: catalog-service
               uri: ${CATALOG_SERVICE_URI:http://localhost:8082}
               predicates:
-                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/price-lists/**,/api/v1/promotions/**,/api/v1/tax-classes/**,/api/v1/units-of-measure/**,/api/v1/pricing/**
+                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/price-lists/**,/api/v1/promotions/**,/api/v1/tax-classes/**,/api/v1/units-of-measure/**,/api/v1/scale-barcode-rules/**,/api/v1/pricing/**
               filters:
                 - name: CircuitBreaker
                   args:

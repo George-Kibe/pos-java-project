@@ -78,6 +78,51 @@ public class AccessTokenIssuer {
     }
 
     /**
+     * A supervisor's approval: a token for the supervisor, good for one permission at one branch
+     * for a couple of minutes, naming the user whose lane asked for it.
+     *
+     * <p>Scoped this narrowly so that what a PIN unlocks is exactly the action it was entered for.
+     * The services treat it like any other token, which is the point: the supervisor is the caller,
+     * so the audit trail names the person who approved, not the cashier who asked.
+     */
+    public IssuedToken issueApproval(
+            User approver,
+            String permission,
+            UUID branchId,
+            UUID actingFor,
+            java.time.Duration ttl) {
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(ttl);
+        String jwtId = UUID.randomUUID().toString();
+        JwtClaimsSet claims =
+                JwtClaimsSet.builder()
+                        .issuer(properties.getIssuer())
+                        .subject(approver.getId().toString())
+                        .issuedAt(now)
+                        .expiresAt(expiresAt)
+                        .id(jwtId)
+                        .claim(JwtClaims.USER_ID, approver.getId().toString())
+                        .claim(JwtClaims.EMAIL, approver.getEmail())
+                        .claim(JwtClaims.ROLES, List.of())
+                        .claim(JwtClaims.PERMISSIONS, List.of(permission))
+                        .claim(JwtClaims.BRANCHES, List.of(branchId.toString()))
+                        .claim(JwtClaims.TOKEN_VERSION, approver.getTokenVersion())
+                        .claim(JwtClaims.ACTING_FOR, actingFor.toString())
+                        .claim(JwtClaims.APPROVAL, true)
+                        .build();
+        JwsHeader header =
+                JwsHeader.with(SignatureAlgorithm.RS256).keyId(activeKey.getKeyID()).build();
+        String value = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+        return new IssuedToken(value, expiresAt, jwtId);
+    }
+
+    /** Whether {@code user} holds {@code permission}, the wildcard included. */
+    public static boolean holds(User user, String permission) {
+        Set<String> held = user.permissionCodes();
+        return held.contains(permission) || held.contains(Permissions.ALL);
+    }
+
+    /**
      * Expands the wildcard permission into the concrete list.
      *
      * <p>Necessary because authorization is expressed as {@code hasAuthority('role:manage')}, and

@@ -38,6 +38,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     long countByStatus(com.pos.auth.domain.UserStatus status);
 
+    /** Everyone who could approve at a lane; the caller narrows by permission and branch. */
+    List<User> findByStatusAndPinHashIsNotNull(com.pos.auth.domain.UserStatus status);
+
     /**
      * Invalidates outstanding access tokens for everyone holding a role.
      *

@@ -155,6 +155,7 @@ public class AuthController {
                                 branch ->
                                         new AuthDtos.BranchSummary(
                                                 branch.getId(), branch.getCode(), branch.getName()))
-                        .toList());
+                        .toList(),
+                user.hasPin());
     }
 }

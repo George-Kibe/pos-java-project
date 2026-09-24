@@ -27,4 +27,13 @@ public final class JwtClaims {
     public static final String TOKEN_VERSION = "tv";
 
     public static final String JWT_ID = "jti";
+
+    /**
+     * On a supervisor's approval token: the user it acts for (RFC 8693's actor claim), whose lane
+     * asked for the approval. The token's subject is the supervisor, who is the actor on record.
+     */
+    public static final String ACTING_FOR = "act";
+
+    /** Marks a supervisor's single-action approval token (a few minutes, one permission). */
+    public static final String APPROVAL = "approval";
 }

@@ -81,9 +81,41 @@ public final class AuthDtos {
              * The caller's own branches, named - what a branch switcher shows. A cashier holds no
              * {@code branch:view} and could not look the names up otherwise.
              */
-            java.util.List<BranchSummary> branches) {}
+            java.util.List<BranchSummary> branches,
+            /** Whether the caller has set a supervisor PIN, so the lane can offer to set one. */
+            boolean hasPin) {}
 
     public record BranchSummary(UUID id, String code, String name) {}
+
+    /**
+     * Four to six digits. Digits only because it is typed on a lane's keypad; short because the
+     * lockout, not the length, is what stops guessing.
+     */
+    public record SetPinRequest(
+            @NotBlank String currentPassword,
+            @NotBlank @Pattern(regexp = "\\d{4,6}", message = "must be 4 to 6 digits")
+                    String pin) {}
+
+    public record ApprovalRequest(
+            @jakarta.validation.constraints.NotNull UUID approverId,
+            @NotBlank @Pattern(regexp = "\\d{4,6}", message = "must be 4 to 6 digits") String pin,
+            @NotBlank @Size(max = 64) String permission,
+            @jakarta.validation.constraints.NotNull UUID branchId) {}
+
+    /**
+     * A single-action token. Handed to the BFF, which performs the approved action with it and
+     * never passes it to the browser.
+     */
+    public record ApprovalResponse(
+            String approvalToken,
+            java.time.Instant expiresAt,
+            UUID approverId,
+            String approverName,
+            String permission,
+            UUID branchId) {}
+
+    /** Someone who can approve at the lane: a name to pick, never an email or a role. */
+    public record ApproverResponse(UUID id, String fullName) {}
 
     /**
      * Deliberately vague. Used for register, resend and forgot-password, all of which must look the

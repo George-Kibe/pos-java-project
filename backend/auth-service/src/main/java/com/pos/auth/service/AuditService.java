@@ -45,6 +45,10 @@ public class AuditService {
     public static final String ROLE_UPDATED = "role.updated";
     public static final String BRANCH_CREATED = "branch.created";
     public static final String BRANCH_UPDATED = "branch.updated";
+    public static final String PIN_SET = "pin.set";
+    public static final String PIN_FAILED = "pin.failed";
+    public static final String PIN_LOCKED = "pin.locked";
+    public static final String APPROVAL_GRANTED = "approval.granted";
 
     private final AuditEntryRepository repository;
     private final ObjectMapper objectMapper;

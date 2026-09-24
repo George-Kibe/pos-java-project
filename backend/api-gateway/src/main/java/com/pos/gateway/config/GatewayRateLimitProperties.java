@@ -58,7 +58,11 @@ public class GatewayRateLimitProperties {
                             "/api/v1/auth/resend-otp",
                             "/api/v1/auth/refresh",
                             "/api/v1/auth/forgot-password",
-                            "/api/v1/auth/reset-password"));
+                            "/api/v1/auth/reset-password",
+                            // A supervisor PIN is four to six digits: the lockout stops guessing
+                            // one person's, this stops trying one PIN against everyone's.
+                            "/api/v1/auth/approvals",
+                            "/api/v1/auth/pin"));
 
     @Getter
     @Setter

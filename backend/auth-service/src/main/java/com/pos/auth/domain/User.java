@@ -70,6 +70,19 @@ public class User extends BaseEntity {
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
 
+    /** A supervisor's approval PIN, hashed. Null until they set one. */
+    @Column(name = "pin_hash", length = 100)
+    private String pinHash;
+
+    @Column(name = "pin_set_at")
+    private Instant pinSetAt;
+
+    @Column(name = "pin_failed_attempts", nullable = false)
+    private int pinFailedAttempts = 0;
+
+    @Column(name = "pin_locked_until")
+    private Instant pinLockedUntil;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
@@ -106,6 +119,14 @@ public class User extends BaseEntity {
 
     public boolean isLocked() {
         return lockedUntil != null && lockedUntil.isAfter(Instant.now());
+    }
+
+    public boolean hasPin() {
+        return pinHash != null;
+    }
+
+    public boolean isPinLocked() {
+        return pinLockedUntil != null && pinLockedUntil.isAfter(Instant.now());
     }
 
     /** Only an active account may authenticate. */
