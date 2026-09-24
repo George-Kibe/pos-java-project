@@ -99,6 +99,35 @@ public final class CatalogDtos {
 
     public record BarcodesRequest(@NotNull List<String> barcodes) {}
 
+    /**
+     * One scale label format. Offsets are zero-based into the 13 digits; the embedded integer is
+     * divided by {@code valueDivisor} (grams to kilograms, cents to shillings). The item code is
+     * matched against a product's SKU, exactly or as its ending.
+     */
+    public record ScaleBarcodeRuleResponse(
+            String prefix,
+            String name,
+            int itemCodeStart,
+            int itemCodeLength,
+            int valueStart,
+            int valueLength,
+            String embeddedType,
+            BigDecimal valueDivisor) {
+
+        public static ScaleBarcodeRuleResponse from(
+                com.pos.catalog.domain.barcode.ScaleBarcodeRule rule) {
+            return new ScaleBarcodeRuleResponse(
+                    rule.getPrefix(),
+                    rule.getName(),
+                    rule.getItemCodeStart(),
+                    rule.getItemCodeLength(),
+                    rule.getValueStart(),
+                    rule.getValueLength(),
+                    rule.getEmbeddedType().name(),
+                    rule.getValueDivisor());
+        }
+    }
+
     // --- pricing --------------------------------------------------------------
 
     public record PriceLineRequest(

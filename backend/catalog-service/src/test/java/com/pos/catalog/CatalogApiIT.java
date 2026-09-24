@@ -307,6 +307,12 @@ class CatalogApiIT extends CatalogTestBase {
         mockMvc.perform(get("/api/v1/categories").with(withPermissions("product:view")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(org.hamcrest.Matchers.greaterThan(0))));
+
+        // The seeded weight format, as an offline lane needs it to decode labels itself.
+        mockMvc.perform(get("/api/v1/scale-barcode-rules").with(withPermissions("product:view")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.prefix=='20')].embeddedType", is(List.of("WEIGHT"))))
+                .andExpect(jsonPath("$[?(@.prefix=='20')].valueStart", is(List.of(7))));
     }
 
     @Test

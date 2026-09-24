@@ -37,6 +37,7 @@ public class ReferenceDataController {
     private final CategoryRepository categories;
     private final TaxClassRepository taxClasses;
     private final UnitOfMeasureRepository unitsOfMeasure;
+    private final com.pos.catalog.repository.ScaleBarcodeRuleRepository scaleRules;
 
     @GetMapping("/categories")
     @PreAuthorize("hasAuthority('product:view')")
@@ -96,6 +97,18 @@ public class ReferenceDataController {
     public List<CatalogDtos.TaxClassResponse> listTaxClasses() {
         return taxClasses.findAllByOrderByCodeAsc().stream()
                 .map(ReferenceDataController::toResponse)
+                .toList();
+    }
+
+    @GetMapping("/scale-barcode-rules")
+    @PreAuthorize("hasAuthority('product:view')")
+    @Operation(
+            summary =
+                    "The active scale barcode formats, so an offline lane decodes weighed and"
+                            + " priced labels exactly as the server does")
+    public List<CatalogDtos.ScaleBarcodeRuleResponse> listScaleBarcodeRules() {
+        return scaleRules.findByActiveTrueOrderByPrefixAsc().stream()
+                .map(CatalogDtos.ScaleBarcodeRuleResponse::from)
                 .toList();
     }
 
