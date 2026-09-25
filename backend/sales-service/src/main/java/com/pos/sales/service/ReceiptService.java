@@ -114,11 +114,6 @@ public class ReceiptService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    /** The breakdown as it will be printed, for a caller that wants it without the document. */
-    public List<TaxClassTotal> taxBreakdownOf(Sale sale) {
-        return totalsOf(sale).taxBreakdown();
-    }
-
     /**
      * Totals a sale from its snapshotted lines.
      *

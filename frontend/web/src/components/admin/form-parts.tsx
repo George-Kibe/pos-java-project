@@ -97,6 +97,14 @@ export function Section({ title, actions, children, id }: { title: string; actio
 }
 
 /** Field errors from a problem response, or one message for the whole form. */
+/** A number, or nothing, as an input's text. */
+export const inputText = (value: number | string | null | undefined) => (value === null || value === undefined ? "" : String(value));
+
+/** One line saying why a request failed: the service's own words when it gave them. */
+export function failureMessage(failure: unknown, fallback: string): string {
+  return failure instanceof ApiError && failure.message ? failure.message : fallback;
+}
+
 export function problemErrors(failure: unknown, fallback: string): Record<string, string> {
   if (failure instanceof ApiError) {
     const fields = failure.fieldErrors();

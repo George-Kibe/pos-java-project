@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
-import { FormError, ProductPicker, problemErrors, SelectInput } from "@/components/admin/form-parts";
+import { failureMessage, FormError, problemErrors, ProductPicker, SelectInput } from "@/components/admin/form-parts";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -122,7 +122,7 @@ export function AdjustmentActions({ id }: { id: string }) {
       toast.success(action === "post" ? "Adjustment posted." : "Adjustment cancelled.");
       router.refresh();
     } catch (failure) {
-      toast.error(problemErrors(failure, "That did not go through.").form ?? "That did not go through.");
+      toast.error(failureMessage(failure, "That did not go through."));
     } finally {
       setBusy(false);
     }
@@ -216,7 +216,7 @@ export function StockTakeOpener({ branchId }: { branchId: string }) {
       toast.success(`Count ${count.reference} opened.`);
       router.push(`/stock/counts/${count.id}`);
     } catch (failure) {
-      toast.error(problemErrors(failure, "The count was not opened.").form ?? "The count was not opened.");
+      toast.error(failureMessage(failure, "The count was not opened."));
     } finally {
       setBusy(false);
     }

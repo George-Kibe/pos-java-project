@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { FormError, problemErrors } from "@/components/admin/form-parts";
+import { FormError, inputText, problemErrors } from "@/components/admin/form-parts";
 import { DataTable } from "@/components/admin/page-parts";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,10 @@ import { type StockTake, StockTakeSchema, type Transfer, TransferSchema } from "
 import { formatQuantity, formatWhen } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const text = (value: number | null) => (value === null ? "" : String(value));
 
 export function ReorderPointForm({ productId, branchId, reorderPoint }: { productId: string; branchId: string; reorderPoint: number | null }) {
   const router = useRouter();
-  const [point, setPoint] = useState(text(reorderPoint));
+  const [point, setPoint] = useState(inputText(reorderPoint));
   const [quantity, setQuantity] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -147,7 +146,7 @@ export function CountSheet({ count }: { count: StockTake }) {
   const router = useRouter();
   const counting = count.status === "OPEN" || count.status === "COUNTING";
   const reviewed = count.status === "REVIEW" || count.status === "POSTED";
-  const [counts, setCounts] = useState<Record<string, string>>(Object.fromEntries(count.lines.map((line) => [line.stockItemId, text(line.countedQuantity)])));
+  const [counts, setCounts] = useState<Record<string, string>>(Object.fromEntries(count.lines.map((line) => [line.stockItemId, inputText(line.countedQuantity)])));
   const [filter, setFilter] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -169,7 +168,7 @@ export function CountSheet({ count }: { count: StockTake }) {
   }
 
   const changed = count.lines
-    .filter((line) => counts[line.stockItemId] !== "" && counts[line.stockItemId] !== text(line.countedQuantity))
+    .filter((line) => counts[line.stockItemId] !== "" && counts[line.stockItemId] !== inputText(line.countedQuantity))
     .map((line) => ({ stockItemId: line.stockItemId, countedQuantity: counts[line.stockItemId] }));
   const shown = count.lines.filter((line) => !filter || `${line.productName} ${line.sku}`.toLowerCase().includes(filter.toLowerCase()));
 

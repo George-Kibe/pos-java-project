@@ -7,12 +7,11 @@ import { AuditEntrySchema, PageOf, UserSchema } from "@/lib/api/admin-schemas";
 import { branchChoices } from "@/lib/api/branches";
 import { pageNumber, param, serverRead } from "@/lib/api/server";
 import { can, requireUser } from "@/lib/auth/dal";
-import { formatWhen } from "@/lib/format";
+import { formatWhen, SHOP_ZONE } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Audit" };
 
 /** The shops' zone: a day picked here is a trading day there, not the server's UTC day. */
-const SHOP_ZONE = "Africa/Nairobi";
 
 /** Midnight at the start of `day` (yyyy-mm-dd) in the shops' zone, as an instant. */
 function startOf(day: string): string {

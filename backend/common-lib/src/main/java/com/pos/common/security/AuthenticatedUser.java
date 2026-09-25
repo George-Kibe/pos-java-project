@@ -31,6 +31,14 @@ public record AuthenticatedUser(
         return Optional.of(from(jwt));
     }
 
+    /**
+     * Who is acting, taken from the verified token; null when nobody is - a Kafka listener or a
+     * scheduled job acts for the system.
+     */
+    public static UUID currentUserId() {
+        return current().map(AuthenticatedUser::userId).orElse(null);
+    }
+
     /** The caller, or an {@link IllegalStateException} if there is none. */
     public static AuthenticatedUser require() {
         return current()

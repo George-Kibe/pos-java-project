@@ -1,7 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
 
-import type { ScaleRule } from "./scale";
-
 /**
  * What the lane keeps on the device, in IndexedDB: the catalogue and prices it sells from when the
  * network is gone, and the sales it took meanwhile until the server has them. Never a token, never
@@ -154,5 +152,3 @@ export const META = {
   /** The branch's receipt text, per branch, so offline receipts carry it too. */
   receiptText: "receiptText",
 } as const;
-
-export type ScaleRules = ScaleRule[];

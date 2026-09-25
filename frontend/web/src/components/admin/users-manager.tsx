@@ -5,6 +5,7 @@ import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
+import { failureMessage } from "@/components/admin/form-parts";
 import { useSession } from "@/components/session-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,9 +19,6 @@ import { cn } from "@/lib/utils";
 const PAGE_SIZE = 20;
 const STATUSES = ["ACTIVE", "SUSPENDED", "DEACTIVATED"] as const;
 
-function failure(error: unknown, fallback: string): string {
-  return error instanceof ApiError ? error.message : fallback;
-}
 
 /** Whether the signed-in person may hand out this role: they must hold everything it grants. */
 export function assignable(role: Role, held: readonly string[]): boolean {
@@ -65,7 +63,7 @@ export function UsersManager({ roles, branches, canManage }: { roles: Role[]; br
         {canManage ? <Button onClick={() => setCreating(true)}>New user</Button> : null}
       </div>
 
-      {users.error ? <p role="alert" className="text-destructive">{failure(users.error, "Users could not be loaded.")}</p> : null}
+      {users.error ? <p role="alert" className="text-destructive">{failureMessage(users.error, "Users could not be loaded.")}</p> : null}
 
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm" aria-label="Users">
@@ -221,13 +219,13 @@ function ManageDialog({ user, roles, branches, onClose }: { user: User; roles: R
       toast.success(`${user.fullName} updated.`);
       onClose();
     },
-    onError: (error) => toast.error(failure(error, "The changes were not saved.")),
+    onError: (error) => toast.error(failureMessage(error, "The changes were not saved.")),
   });
 
   const reset = useMutation({
     mutationFn: () => api(`users/${user.id}/password-reset`, UserSchema, { method: "POST" }),
     onSuccess: () => toast.success(`${user.fullName} is signed out everywhere and has been sent a reset link.`),
-    onError: (error) => toast.error(failure(error, "The reset was not sent.")),
+    onError: (error) => toast.error(failureMessage(error, "The reset was not sent.")),
   });
 
   return (
@@ -300,7 +298,7 @@ function CreateDialog({ roles, branches, onClose }: { roles: Role[]; branches: B
     },
     onError: (error) => {
       if (error instanceof ApiError && Object.keys(error.fieldErrors()).length > 0) setErrors(error.fieldErrors());
-      else toast.error(failure(error, "The account was not created."));
+      else toast.error(failureMessage(error, "The account was not created."));
     },
   });
 

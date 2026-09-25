@@ -120,7 +120,7 @@ public class AdjustmentService {
                             .formatted(adjustment.getStatus()));
         }
 
-        UUID actor = AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
+        UUID actor = AuthenticatedUser.currentUserId();
         List<AdjustmentPostedPayload.AdjustmentLine> posted = new ArrayList<>();
 
         for (StockAdjustmentLine line : adjustment.getLines()) {

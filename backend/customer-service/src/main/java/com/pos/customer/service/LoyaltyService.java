@@ -420,8 +420,7 @@ public class LoyaltyService {
         LoyaltyTransaction adjustment =
                 new LoyaltyTransaction(account, LoyaltyTransactionType.ADJUSTMENT, points);
         adjustment.setReason(reason);
-        adjustment.setActorId(
-                AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null));
+        adjustment.setActorId(AuthenticatedUser.currentUserId());
         if (points > 0) {
             adjustment.setExpiresAt(
                     clock.instant().plus(properties.expiryMonths() * 30L, ChronoUnit.DAYS));

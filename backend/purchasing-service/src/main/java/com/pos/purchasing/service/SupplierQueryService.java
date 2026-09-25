@@ -27,8 +27,4 @@ public class SupplierQueryService {
     public List<SupplierProduct> productsOf(UUID supplierId) {
         return supplierProducts.findBySupplierId(supplierId);
     }
-
-    public List<SupplierProduct> suppliersOf(UUID productId) {
-        return supplierProducts.findByProductId(productId);
-    }
 }

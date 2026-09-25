@@ -6,12 +6,12 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { CashPosition } from "@/components/admin/cash-position";
+import { failureMessage } from "@/components/admin/form-parts";
 import { CashCounter } from "@/components/lane/cash-counter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api/client";
-import { ApiError } from "@/lib/api/errors";
 import { type CashCount, COINS, fromLines, lines, NOTES, total } from "@/lib/lane/cash";
 import { money } from "@/lib/lane/decimal";
 import { CashLineSchema } from "@/lib/lane/schemas";
@@ -30,9 +30,6 @@ const StaffSchema = z.object({ id: z.uuid(), fullName: z.string(), roles: z.arra
 
 const KINDS: Record<string, string> = { TOP_UP: "Brought in", BANKED: "Banked", FROM_TILL: "Deposit from a till", TO_TILL: "Replenished a till", TILL_CLOSE: "Returned at a till's close" };
 
-function failure(error: unknown, fallback: string) {
-  return error instanceof ApiError ? error.message : fallback;
-}
 
 export function CashManager({ branchId, canHold, canManage }: { branchId: string; canHold: boolean; canManage: boolean }) {
   return (
@@ -62,7 +59,7 @@ function Intraday({ branchId }: { branchId: string }) {
           </Button>
         </div>
       </div>
-      {intraday.error ? <p role="alert" className="text-destructive">{failure(intraday.error, "Could not load the intraday cash.")}</p> : null}
+      {intraday.error ? <p role="alert" className="text-destructive">{failureMessage(intraday.error, "Could not load the intraday cash.")}</p> : null}
       <div className="grid gap-4 md:grid-cols-[2fr_3fr]">
         <div className="rounded-lg border p-3">
           <p className="text-3xl font-semibold tabular-nums" data-testid="intraday-total">
@@ -121,7 +118,7 @@ function IntradayMove({ mode, max, branchId, onClose, onDone }: { mode: "top-ups
       toast.success(mode === "top-ups" ? `${money(total(cash))} brought in.` : `${money(total(cash))} banked.`);
       await onDone();
     },
-    onError: (error) => toast.error(failure(error, "Not recorded.")),
+    onError: (error) => toast.error(failureMessage(error, "Not recorded.")),
   });
   return (
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
@@ -166,7 +163,7 @@ function Tills({ branchId, canManage }: { branchId: string; canManage: boolean }
       setEditing(null);
       toast.success("Till updated.");
     },
-    onError: (error) => toast.error(failure(error, "Not saved.")),
+    onError: (error) => toast.error(failureMessage(error, "Not saved.")),
   });
 
   return (
@@ -241,12 +238,12 @@ function Limits({ branchId }: { branchId: string }) {
       await client.invalidateQueries({ queryKey: ["cash-limits", branchId] });
       toast.success("Limit saved. It applies from the next payment.");
     },
-    onError: (error) => toast.error(failure(error, "Not saved.")),
+    onError: (error) => toast.error(failureMessage(error, "Not saved.")),
   });
   const remove = useMutation({
     mutationFn: (id: string) => api(`cash-limits/${id}`, z.null(), { method: "DELETE" }),
     onSuccess: async () => client.invalidateQueries({ queryKey: ["cash-limits", branchId] }),
-    onError: (error) => toast.error(failure(error, "Not removed.")),
+    onError: (error) => toast.error(failureMessage(error, "Not removed.")),
   });
 
   return (

@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.pos.inventory.domain.MovementType;
 import com.pos.inventory.domain.StockBatch;
 import com.pos.inventory.domain.StockItem;
 import com.pos.inventory.domain.fefo.Allocation;
@@ -120,18 +119,5 @@ public class BatchConsumer {
     /** Where a positive adjustment's stock should sit when nothing better is known. */
     public static String syntheticBatchNumber(String prefix, Object reference) {
         return prefix + "-" + reference;
-    }
-
-    /** What an item's batches actually hold, regardless of the cached figure. */
-    @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
-    public BigDecimal batchQuantityFor(StockItem item) {
-        return FefoAllocator.availableIn(
-                batches.findSellable(item.getId()).stream().map(StockBatch::toAvailable).toList());
-    }
-
-    /** Exposed so callers can note the movement type they are consuming for. */
-    public static StockLedgerService.MovementContext writeOff(
-            String referenceType, java.util.UUID id) {
-        return StockLedgerService.MovementContext.of(MovementType.WRITE_OFF, referenceType, id);
     }
 }

@@ -120,7 +120,7 @@ public class SupplierInvoiceService {
         }
 
         MatchResult result = runMatch(order, grn, lines);
-        applyVerdict(invoice, result, currentActor());
+        applyVerdict(invoice, result, AuthenticatedUser.currentUserId());
 
         return new MatchedInvoice(invoices.save(invoice), result);
     }
@@ -151,7 +151,7 @@ public class SupplierInvoiceService {
         invoice.setMatchStatus(InvoiceMatchStatus.APPROVED_FOR_PAYMENT);
         invoice.setOverrideReason(reason);
         invoice.setApprovedForPaymentAt(Instant.now());
-        invoice.setApprovedForPaymentBy(currentActor());
+        invoice.setApprovedForPaymentBy(AuthenticatedUser.currentUserId());
         return invoices.save(invoice);
     }
 
@@ -178,13 +178,8 @@ public class SupplierInvoiceService {
 
         invoice.setMatchStatus(InvoiceMatchStatus.APPROVED_FOR_PAYMENT);
         invoice.setApprovedForPaymentAt(Instant.now());
-        invoice.setApprovedForPaymentBy(currentActor());
+        invoice.setApprovedForPaymentBy(AuthenticatedUser.currentUserId());
         return invoices.save(invoice);
-    }
-
-    /** Who is doing this, taken from the verified token rather than from the request. */
-    private static UUID currentActor() {
-        return AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
     }
 
     private MatchResult runMatch(

@@ -1,7 +1,6 @@
 package com.pos.auth.service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -193,10 +192,5 @@ public class RegistrationService {
     private static Errors.BadRequestException invalidCode() {
         return new Errors.BadRequestException(
                 "otp.invalid", "That code is not valid. Request a new one if it has expired.");
-    }
-
-    /** Exposed for the audit trail of a registration performed by an administrator. */
-    public Map<String, Object> registrationDetails(User user) {
-        return Map.of("email", user.getEmail(), "status", user.getStatus().name());
     }
 }

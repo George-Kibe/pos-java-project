@@ -121,7 +121,6 @@ export const GoodsReceiptSchema = z.object({
   notes: s,
   lines: z.array(GrnLineSchema),
 });
-export type GoodsReceipt = z.infer<typeof GoodsReceiptSchema>;
 
 export const VarianceSchema = z.object({
   productId: z.uuid().nullable(),
@@ -157,7 +156,6 @@ export const SupplierInvoiceSchema = z.object({
   justifiedTotal: nn,
   variances: z.array(VarianceSchema),
 });
-export type SupplierInvoice = z.infer<typeof SupplierInvoiceSchema>;
 
 export const SupplierReturnSchema = z.object({
   id: z.uuid(),
@@ -178,7 +176,6 @@ export const SupplierReturnSchema = z.object({
     z.object({ id: z.uuid(), lineNumber: z.number().int(), productId: z.uuid(), sku: s, productName: s, batchNumber: s, quantity: n, unitCost: n, lineTotal: n, currency: z.string() }),
   ),
 });
-export type SupplierReturn = z.infer<typeof SupplierReturnSchema>;
 
 export const ReorderSuggestionSchema = z.object({
   id: z.uuid(),

@@ -105,11 +105,3 @@ export async function searchOffline(query: string, limit = 20): Promise<CachedPr
     .limit(limit)
     .toArray();
 }
-
-export async function catalogStatus(): Promise<{ count: number; syncedAt?: number; branchId?: string }> {
-  return {
-    count: await laneDb().products.count(),
-    syncedAt: await getMeta<number>(META.catalogSyncedAt),
-    branchId: await getMeta<string>(META.catalogBranchId),
-  };
-}

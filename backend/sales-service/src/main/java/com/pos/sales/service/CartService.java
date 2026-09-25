@@ -289,6 +289,6 @@ public class CartService {
     }
 
     static UUID currentActor() {
-        return AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
+        return AuthenticatedUser.currentUserId();
     }
 }

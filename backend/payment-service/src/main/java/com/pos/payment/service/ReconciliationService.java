@@ -106,7 +106,7 @@ public class ReconciliationService {
         run.setStatementTotal(result.statementTotal());
         run.setRecordedTotal(result.recordedTotal());
         run.setVarianceTotal(result.variance());
-        run.setRunBy(AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null));
+        run.setRunBy(AuthenticatedUser.currentUserId());
         ReconciliationRun saved = runs.save(run);
 
         for (StatementReconciler.Item found : result.items()) {
