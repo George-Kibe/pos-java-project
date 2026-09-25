@@ -172,13 +172,19 @@ public final class InventoryDtos {
                                                     line.getStockItem().getProductId(),
                                                     line.getStockItem().getSku(),
                                                     line.getQuantityDelta(),
-                                                    line.getNotes()))
+                                                    line.getNotes(),
+                                                    line.getStockItem().getProductName()))
                             .toList());
         }
     }
 
     public record AdjustmentLineResponse(
-            UUID id, UUID productId, String sku, BigDecimal quantityDelta, String notes) {}
+            UUID id,
+            UUID productId,
+            String sku,
+            BigDecimal quantityDelta,
+            String notes,
+            String productName) {}
 
     // --- stock takes ------------------------------------------------------------
 
@@ -228,7 +234,9 @@ public final class InventoryDtos {
             BigDecimal snapshotQuantity,
             BigDecimal countedQuantity,
             BigDecimal variance,
-            String notes) {
+            String notes,
+            String productName,
+            String unitOfMeasure) {
 
         static StockTakeLineResponse from(StockTakeLine line) {
             return new StockTakeLineResponse(
@@ -239,7 +247,9 @@ public final class InventoryDtos {
                     line.getSnapshotQuantity(),
                     line.getCountedQuantity(),
                     line.variance(),
-                    line.getNotes());
+                    line.getNotes(),
+                    line.getStockItem().getProductName(),
+                    line.getStockItem().getUnitOfMeasure());
         }
     }
 
@@ -288,6 +298,65 @@ public final class InventoryDtos {
                                                     line.getQuantitySent(),
                                                     line.getQuantityReceived()))
                             .toList());
+        }
+    }
+
+    /** A transfer in a list: where from and to, and how far it has got. Lines are on the detail. */
+    public record TransferSummaryResponse(
+            UUID id,
+            String reference,
+            UUID fromBranchId,
+            UUID toBranchId,
+            String status,
+            Instant createdAt,
+            Instant dispatchedAt,
+            Instant receivedAt) {
+
+        public static TransferSummaryResponse from(StockTransfer transfer) {
+            return new TransferSummaryResponse(
+                    transfer.getId(),
+                    transfer.getReference(),
+                    transfer.getFromBranchId(),
+                    transfer.getToBranchId(),
+                    transfer.getStatus().name(),
+                    transfer.getCreatedAt(),
+                    transfer.getDispatchedAt(),
+                    transfer.getReceivedAt());
+        }
+    }
+
+    /** A batch close to (or past) its expiry date, and what it is worth at cost. */
+    public record ExpiringBatchResponse(
+            UUID batchId,
+            UUID productId,
+            String sku,
+            String productName,
+            String unitOfMeasure,
+            String batchNumber,
+            LocalDate expiryDate,
+            long daysLeft,
+            BigDecimal quantity,
+            BigDecimal unitCost,
+            BigDecimal value,
+            String currency) {
+
+        public static ExpiringBatchResponse from(StockBatch batch, LocalDate today) {
+            StockItem item = batch.getStockItem();
+            return new ExpiringBatchResponse(
+                    batch.getId(),
+                    item.getProductId(),
+                    item.getSku(),
+                    item.getProductName(),
+                    item.getUnitOfMeasure(),
+                    batch.getBatchNumber(),
+                    batch.getExpiryDate(),
+                    java.time.temporal.ChronoUnit.DAYS.between(today, batch.getExpiryDate()),
+                    batch.getQuantity(),
+                    batch.getUnitCost(),
+                    batch.getQuantity()
+                            .multiply(batch.getUnitCost())
+                            .setScale(4, java.math.RoundingMode.HALF_UP),
+                    batch.getCurrency());
         }
     }
 

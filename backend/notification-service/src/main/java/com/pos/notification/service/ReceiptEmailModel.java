@@ -87,7 +87,20 @@ public final class ReceiptEmailModel {
                 receipt.changeGiven() == null || isZero(receipt.changeGiven())
                         ? null
                         : money(receipt.changeGiven()));
+        // The branch's own text: lines above and below the sale, and how to reach it.
+        var text = receipt.receiptText();
+        model.put("headerLines", text == null ? List.of() : lines(text.header()));
+        model.put("footerLines", text == null ? List.of() : lines(text.footer()));
+        model.put("branchAddress", text == null ? null : text.address());
+        model.put("branchPhone", text == null ? null : text.phone());
+        model.put("taxPin", text == null ? null : text.taxPin());
         return model;
+    }
+
+    private static List<String> lines(String text) {
+        return text == null
+                ? List.of()
+                : text.lines().map(String::strip).filter(l -> !l.isEmpty()).toList();
     }
 
     static String money(BigDecimal amount) {
@@ -174,6 +187,12 @@ public final class ReceiptEmailModel {
                 new BigDecimal("17.9310"),
                 new BigDecimal("218.2000"),
                 new BigDecimal("300.0000"),
-                new BigDecimal("81.80"));
+                new BigDecimal("81.80"),
+                new ReceiptEmailRequestedPayload.ReceiptText(
+                        "Open every day, 7am to 10pm",
+                        "Goods may be returned within 7 days with this receipt.\nThank you for shopping with us.",
+                        "Moi Avenue, Nairobi",
+                        "+254 700 000 000",
+                        "P000000000X"));
     }
 }

@@ -1,6 +1,7 @@
 import { type Browser, expect, type Page, test } from "@playwright/test";
 
 import {
+  admin,
   countFloat,
   createProduct,
   ean13,
@@ -31,10 +32,23 @@ let cashier: { email: string; temporaryPassword: string };
 
 test.describe.configure({ mode: "serial" });
 
+/**
+ * A scale label names its product by the last digits of the SKU, so a code another product's SKU
+ * already ends with makes the label ambiguous and the lane refuses it. Earlier runs leave plenty of
+ * products behind: pick a code no SKU contains.
+ */
+async function unusedItemCode(): Promise<string> {
+  for (;;) {
+    const code = String(10000 + Math.floor(Math.random() * 90000));
+    const page = (await admin(`/products?query=${code}&size=1`)) as { content: unknown[] };
+    if (page.content.length === 0) return code;
+  }
+}
+
 test.beforeAll(async ({ browser }) => {
   // Two accounts through their first sign-in, and a PIN: slower than one test's minute.
   test.setTimeout(180_000);
-  itemCode = String(10000 + (Number(RUN) % 90000)).padStart(5, "0");
+  itemCode = await unusedItemCode();
   milk = await createProduct({ name: `E2E Milk ${RUN}`, sku: `E2E-MILK-${RUN}`, price: 65, weighed: false });
   bananas = await createProduct({ name: `E2E Bananas ${RUN}`, sku: `E2E-BAN-${itemCode}`, price: 120, weighed: true });
 

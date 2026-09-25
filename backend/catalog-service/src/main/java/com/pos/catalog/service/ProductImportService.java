@@ -71,7 +71,7 @@ public class ProductImportService {
 
         try (BufferedReader reader =
                         new BufferedReader(new InputStreamReader(csv, StandardCharsets.UTF_8));
-                var parser = format.parse(reader)) {
+                var parser = format.parse(skipByteOrderMark(reader))) {
 
             for (CSVRecord record : parser) {
                 String sku = get(record, "sku");
@@ -102,10 +102,26 @@ public class ProductImportService {
     }
 
     static String get(CSVRecord record, String column) {
-        return record.isMapped(column) ? record.get(column) : null;
+        return record.isMapped(column) ? ProductExportService.unguarded(record.get(column)) : null;
+    }
+
+    /**
+     * Excel writes one, and so does our own export; left in place it becomes part of the first
+     * column's name and every row fails for want of a {@code sku}.
+     */
+    private static BufferedReader skipByteOrderMark(BufferedReader reader) throws IOException {
+        reader.mark(1);
+        if (reader.read() != '\uFEFF') {
+            reader.reset();
+        }
+        return reader;
     }
 
     private static String rootMessage(RuntimeException e) {
+        if (e instanceof org.springframework.dao.DataIntegrityViolationException
+                && String.valueOf(e.getMessage()).contains("uq_product_barcodes_barcode")) {
+            return "A barcode on this row already belongs to another product";
+        }
         Throwable cause = e;
         while (cause.getCause() != null && cause.getCause() != cause) {
             cause = cause.getCause();
@@ -200,12 +216,30 @@ public class ProductImportService {
 
             String barcodes = get(record, "barcodes");
             if (barcodes != null && !barcodes.isBlank()) {
-                product.getBarcodes().clear();
-                String[] codes = barcodes.split("\\|");
-                for (int i = 0; i < codes.length; i++) {
-                    String barcode = codes[i].trim();
-                    if (!barcode.isEmpty()) {
-                        product.addBarcode(barcode, i == 0);
+                List<String> codes =
+                        java.util.Arrays.stream(barcodes.split("\\|"))
+                                .map(String::trim)
+                                .filter(code -> !code.isEmpty())
+                                .toList();
+                List<String> held =
+                        product.getBarcodes().stream()
+                                .sorted(
+                                        java.util.Comparator.comparing(
+                                                        com.pos.catalog.domain.ProductBarcode
+                                                                ::isPrimary)
+                                                .reversed())
+                                .map(com.pos.catalog.domain.ProductBarcode::getBarcode)
+                                .toList();
+                // An exported file carries the barcodes a product already has; leave them be.
+                if (!codes.equals(held)) {
+                    product.getBarcodes().clear();
+                    if (existing.isPresent()) {
+                        // Orphan removal deletes after it inserts: re-adding a code the product
+                        // already had would collide with its own old row.
+                        products.saveAndFlush(product);
+                    }
+                    for (int i = 0; i < codes.size(); i++) {
+                        product.addBarcode(codes.get(i), i == 0);
                     }
                 }
             }

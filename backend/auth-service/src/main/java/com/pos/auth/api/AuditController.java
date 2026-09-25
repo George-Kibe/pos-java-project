@@ -27,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class AuditController {
 
     private final AuditQueryService audit;
+    private final com.pos.common.security.BranchAccessGuard branchAccess;
 
     public record AuditEntryResponse(
             UUID id,
@@ -57,11 +58,22 @@ public class AuditController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('audit:view')")
-    @Operation(summary = "The audit trail, newest first; filter by action and by who did it")
+    @Operation(
+            summary =
+                    "The audit trail, newest first; filter by action, who did it, branch and a"
+                            + " time range [from, to)")
     public PageResponse<AuditEntryResponse> search(
             @RequestParam(required = false) String action,
             @RequestParam(required = false) UUID actorId,
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) java.time.Instant from,
+            @RequestParam(required = false) java.time.Instant to,
             @PageableDefault(size = 50) Pageable pageable) {
-        return PageResponse.of(audit.search(action, actorId, pageable), AuditEntryResponse::from);
+        if (branchId != null) {
+            branchAccess.requireAccess(branchId);
+        }
+        return PageResponse.of(
+                audit.search(action, actorId, branchId, from, to, pageable),
+                AuditEntryResponse::from);
     }
 }

@@ -419,6 +419,11 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   8 for Testcontainers' Kafka). Check Docker Hub before pinning. There is no local SMTP sink: mail
   goes through Gmail in development and AWS SES in production, and e2e runs use
   `MAIL_TRANSPORT=capture`.
+- **MinIO no longer publishes Docker images** (`minio/minio` is gone from Docker Hub and quay).
+  Development's S3-compatible store is RustFS (`rustfs/rustfs:1.0.0`, service `object-store`);
+  catalog talks path-style S3 to it and creates its bucket at first use. Production uses S3 itself:
+  `S3_ENDPOINT` empty, path style and bucket creation off, credentials from the environment or
+  the instance's role - never invented.
 - **Postgres 18 moved its data directory.** The volume mounts at `/var/lib/postgresql`, not
   `.../data` - the 18 entrypoint refuses the old path. A major-version bump never reuses the
   previous major's volume: dump and restore, or start fresh.
@@ -456,6 +461,20 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   rules, not create an empty package to satisfy it.
 
 ## Frontend traps
+
+- **Prettier is not this repo's formatter.** There is no config, and running it reflows whole files
+  to its defaults - a 1,000-line diff for a 10-line change. Match the surrounding style by hand;
+  `npm run lint` and `tsc` are the checks.
+
+- **A dropdown filled from one page of results hides everything past it.** Add stock and the
+  purchasing forms listed `suppliers?size=100`, and the 101st supplier could never be chosen -
+  found only when test runs had created that many. Choices from a table that grows are searched
+  (`SupplierSelect`, `ProductPicker`), keeping the current choice in the list.
+
+- **A file download is a plain link to `/api/gateway/...`, without a `download` attribute.** The
+  service answers `Content-Disposition: attachment`, which is enough; with the attribute Chrome
+  cancelled the product CSV export before a request left the browser, while the reports' plain
+  links worked.
 
 - **Two refreshers revoke the session.** auth-service treats a refresh token spent twice as theft
   and revokes the whole family. The proxy is bundled apart from the route handlers, so each had
@@ -504,11 +523,27 @@ rollback-only, so the commit fails anyway and takes the batch with it.
 - **A raw-JDBC test that creates a table in `public` breaks every Flyway test after it** on the
   same container: "Found non-empty schema(s) public but no schema history table". Give such a test
   its own schema (`CREATE SCHEMA ...; setCurrentSchema(...)`).
+- **Test data outlives the run, and lookups by suffix collide with it.** A scale label names its
+  product by the SKU's last digits, and a clock-derived code eventually matched an older run's SKU:
+  the label went ambiguous and the lane refused it. Choose such codes by checking none exist.
+
 - **Asynchronous retries continue after an assertion passes.** A second test truncating tables
   while the first message is still being retried produces rows belonging to neither. Follow one
   message to its end in one test.
 
 ## Traps specific to this codebase
+
+- **A read model fed by an event keeps what the event said, not only patches rows that already
+  exist.** Inventory refreshed product names on existing stock rows only, so a product's first
+  delivery to a branch - made after catalog had announced it - arrived nameless. The details are
+  kept per product (`product_details`) and new rows are filled from them.
+- **Every way goods leave a branch must reach inventory.** A return to a supplier was recorded in
+  purchasing and nowhere else: the goods left, the shelf count stayed. It now sends
+  `supplier-return-sent`, and inventory takes them off the named batch first.
+- **Shrinkage is stock taken off at its batches' cost**: write-offs and a stock take's shortfalls,
+  both announced as `adjustment-posted` (a count as reason `STOCK_TAKE`) with a signed
+  `valueAtCost`. Stock put back on has no delivery behind it, so it carries no value and is not
+  shrinkage.
 
 - A sale's totals are computed **server-side, always.** Client-sent totals are advisory and must be
   revalidated — an offline terminal may hold stale prices, and the server flags the variance rather

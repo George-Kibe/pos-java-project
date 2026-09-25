@@ -103,7 +103,8 @@ public abstract class ReportingTestBase {
                         TRUNCATE event_log, rebuild_runs, report_products, report_sales,
                                  report_sale_lines, report_sale_tenders, report_sale_costs,
                                  report_sale_voids, report_returns, report_return_lines,
-                                 report_shifts, report_stock_valuations, report_expiring_batches
+                                 report_shifts, report_stock_valuations, report_expiring_batches,
+                                 report_stock_adjustments
                         """)
                 .update();
     }
@@ -149,6 +150,8 @@ public abstract class ReportingTestBase {
     protected final UUID saleTwo = UUID.randomUUID();
     protected final UUID saleThree = UUID.randomUUID();
     protected final UUID returnOne = UUID.randomUUID();
+    protected final UUID adjustmentOne = UUID.randomUUID();
+    protected final UUID countOne = UUID.randomUUID();
 
     /**
      * One shift, worked by hand:
@@ -328,6 +331,56 @@ public abstract class ReportingTestBase {
                                 money("3"),
                                 money("240.00"),
                                 "KES")));
+        // Shrinkage: two bars of soap damaged (and one found again), a bag of flour missing at the
+        // count.
+        events.add(
+                event(
+                        Topics.INVENTORY_ADJUSTMENT_POSTED,
+                        adjustmentOne,
+                        new com.pos.events.inventory.AdjustmentPostedPayload(
+                                adjustmentOne,
+                                BRANCH,
+                                "DAMAGE",
+                                CASHIER,
+                                now,
+                                "Dropped in the aisle",
+                                List.of(
+                                        new com.pos.events.inventory.AdjustmentPostedPayload
+                                                .AdjustmentLine(
+                                                SOAP,
+                                                "SOAP-1",
+                                                money("-2"),
+                                                null,
+                                                money("-160.00"),
+                                                "KES"),
+                                        new com.pos.events.inventory.AdjustmentPostedPayload
+                                                .AdjustmentLine(
+                                                SOAP,
+                                                "SOAP-1",
+                                                money("1"),
+                                                null,
+                                                money("0"),
+                                                "KES")))));
+        events.add(
+                event(
+                        Topics.INVENTORY_ADJUSTMENT_POSTED,
+                        countOne,
+                        new com.pos.events.inventory.AdjustmentPostedPayload(
+                                countOne,
+                                BRANCH,
+                                "STOCK_TAKE",
+                                CASHIER,
+                                now,
+                                "Stock take ST-1",
+                                List.of(
+                                        new com.pos.events.inventory.AdjustmentPostedPayload
+                                                .AdjustmentLine(
+                                                FLOUR,
+                                                "FLOUR-2KG",
+                                                money("-1"),
+                                                null,
+                                                money("-90.00"),
+                                                "KES")))));
         return events;
     }
 

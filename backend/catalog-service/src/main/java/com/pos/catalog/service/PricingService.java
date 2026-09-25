@@ -78,13 +78,29 @@ public class PricingService {
         return breakdowns;
     }
 
+    /**
+     * Prices one line as it would be with {@code draft} live - a promotion not saved yet, or an
+     * edit of one that is - so the promotions builder shows the price before anyone commits to it.
+     * The draft takes the saved version's place; nothing is written.
+     */
+    @Transactional(readOnly = true)
+    public PriceBreakdown preview(PricingRequestSpec spec, Promotion draft, UUID replacing) {
+        Product product = products.require(spec);
+        return priceFor(product, spec, draft, replacing);
+    }
+
     private PriceBreakdown priceFor(Product product, PricingRequestSpec spec) {
+        return priceFor(product, spec, null, null);
+    }
+
+    private PriceBreakdown priceFor(
+            Product product, PricingRequestSpec spec, Promotion draft, UUID replacing) {
         Instant at = spec.effectiveAt();
 
         ResolvedPrice price = resolveUnitPrice(product, spec.branchId(), at);
         BigDecimal taxRate = resolveTaxRate(product, at);
         List<PromotionCandidate> candidates =
-                candidatesFor(product, spec.branchId(), spec.member(), at);
+                candidatesFor(product, spec.branchId(), spec.member(), at, draft, replacing);
 
         PricingRequest request =
                 new PricingRequest(
@@ -180,9 +196,26 @@ public class PricingService {
     }
 
     private List<PromotionCandidate> candidatesFor(
-            Product product, UUID branchId, boolean member, Instant at) {
+            Product product,
+            UUID branchId,
+            boolean member,
+            Instant at,
+            Promotion draft,
+            UUID replacing) {
 
-        return promotions.findByActiveTrueOrderByPriorityAscCodeAsc().stream()
+        List<Promotion> live =
+                new ArrayList<>(promotions.findByActiveTrueOrderByPriorityAscCodeAsc());
+        if (draft != null) {
+            live.removeIf(
+                    promotion ->
+                            promotion.getId().equals(replacing)
+                                    || promotion.getCode().equals(draft.getCode()));
+            live.add(draft);
+            live.sort(
+                    Comparator.comparingInt(Promotion::getPriority)
+                            .thenComparing(Promotion::getCode));
+        }
+        return live.stream()
                 .filter(promotion -> promotion.runsAt(at))
                 .filter(promotion -> promotion.appliesToBranch(branchId))
                 // A member-only offer must not apply to a walk-in customer, and the till knows

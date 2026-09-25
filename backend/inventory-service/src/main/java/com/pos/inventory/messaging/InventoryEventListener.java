@@ -47,6 +47,7 @@ public class InventoryEventListener {
     private static final String RETURN_CONSUMER = "inventory.restock-on-return";
     private static final String RECEIPT_CONSUMER = "inventory.receive-on-goods-received";
     private static final String PRODUCT_CONSUMER = "inventory.cache-product-details";
+    private static final String SUPPLIER_RETURN_CONSUMER = "inventory.deduct-on-supplier-return";
 
     private final IdempotentConsumer idempotentConsumer;
     private final StockService stock;
@@ -135,6 +136,37 @@ public class InventoryEventListener {
                                                             line.batchNumber()))
                                     .toList();
                     stock.restockFromReturn(returned.returnId(), returned.branchId(), lines);
+                });
+    }
+
+    /** Goods sent back to a supplier leave the shelf; a redelivered event changes nothing. */
+    @KafkaListener(
+            topics = Topics.PURCHASING_SUPPLIER_RETURN_SENT,
+            groupId = "${spring.kafka.consumer.group-id}")
+    @Transactional
+    public void onSupplierReturnSent(String message) {
+        EventEnvelope<com.pos.events.purchasing.SupplierReturnSentPayload> event =
+                EventJson.readEnvelope(
+                        message, com.pos.events.purchasing.SupplierReturnSentPayload.class);
+        CorrelationId.set(event.correlationId());
+
+        idempotentConsumer.consumeOnce(
+                event,
+                SUPPLIER_RETURN_CONSUMER,
+                envelope -> {
+                    var sent = envelope.payload();
+                    stock.returnToSupplier(
+                            sent.returnId(),
+                            sent.branchId(),
+                            sent.lines().stream()
+                                    .map(
+                                            line ->
+                                                    new StockService.SupplierReturnLine(
+                                                            line.productId(),
+                                                            line.sku(),
+                                                            line.batchNumber(),
+                                                            line.quantity()))
+                                    .toList());
                 });
     }
 

@@ -97,6 +97,7 @@ Full detail: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md).
              (SMTP email, alerts)          (CQRS read models)
 
   PostgreSQL (schema per service) · Redis (rate limits, idempotency, cache)
+  S3 object storage (product images; RustFS in development)
   OpenTelemetry → Tempo · Prometheus → Grafana · Loki (logs)
 ```
 
@@ -135,7 +136,7 @@ business logic and no service-specific entities.**
 - **Spring Boot 4.0.8** with **Spring Cloud 2025.1.3** (the aligned pair — Cloud 2025.1.x targets
   Boot 4.0.x; Boot 4.1 has no matching Cloud release yet and we need Cloud Gateway)
 - Spring Security (OAuth2 resource server), Spring Data JPA, Spring for Apache Kafka
-- PostgreSQL 18, Flyway, Redis 8
+- PostgreSQL 18, Flyway, Redis 8, S3 via the AWS SDK 2.x (RustFS locally)
 - MapStruct 1.6.3, Lombok, Bean Validation, springdoc-openapi 3.1.1
 - Maven 3.9.16 via the wrapper (`backend/mvnw`), multi-module, all versions in the parent POM
 
@@ -279,6 +280,7 @@ Demo sign-in: any `...@demo.pos.local` user with `Demo-Password-2026` (see
 | localhost:5432 | PostgreSQL (**live now**) |
 | localhost:29092 | Kafka, from the host (`kafka:9092` inside the network) (**live now**) |
 | localhost:6379 | Redis (**live now**) |
+| localhost:9000 | Object store (RustFS, S3-compatible): product images (**live now**) |
 | http://localhost:3000 | Next.js app: sign in, register, lane and back office |
 | http://localhost:8080/swagger-ui.html | Aggregated OpenAPI |
 | http://localhost:3001 | Grafana (Phase 16) |

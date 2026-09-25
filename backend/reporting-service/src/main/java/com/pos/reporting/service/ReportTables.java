@@ -35,6 +35,8 @@ public class ReportTables {
                     "sales-by-product",
                     "margin-by-category",
                     "payment-mix",
+                    "sales-by-hour",
+                    "shrinkage",
                     "stock-valuation",
                     "dead-stock",
                     "near-expiry");
@@ -54,6 +56,8 @@ public class ReportTables {
             case "sales-by-product" -> products(subtitle, reports.salesByProduct(filter));
             case "margin-by-category" -> categories(subtitle, reports.marginByCategory(filter));
             case "payment-mix" -> paymentMix(subtitle, reports.paymentMix(filter));
+            case "sales-by-hour" -> hours(subtitle, reports.salesByHour(filter));
+            case "shrinkage" -> shrinkage(subtitle, reports.shrinkage(filter));
             case "stock-valuation" -> valuation(requireBranch(filter), filter.categoryId());
             case "dead-stock" -> deadStock(requireBranch(filter), days, filter.to());
             case "near-expiry" -> nearExpiry(requireBranch(filter), days, filter.to());
@@ -112,6 +116,43 @@ public class ReportTables {
     }
 
     // --- tables -------------------------------------------------------------------------
+
+    private static Table hours(List<String> subtitle, List<ReportQueries.HourRow> rows) {
+        return new Table(
+                "Sales by hour",
+                subtitle,
+                List.of("Hour", "Baskets", "Net", "Average basket", "Items", "Items per basket"),
+                rows.stream()
+                        .map(
+                                row ->
+                                        (List<Object>)
+                                                listOf(
+                                                        "%02d:00".formatted(row.hour()),
+                                                        row.baskets(),
+                                                        row.netSales(),
+                                                        row.averageBasket(),
+                                                        row.items(),
+                                                        row.itemsPerBasket()))
+                        .toList());
+    }
+
+    private static Table shrinkage(List<String> subtitle, List<ReportQueries.ShrinkageRow> rows) {
+        return new Table(
+                "Shrinkage",
+                subtitle,
+                List.of("Reason", "SKU", "Product", "Quantity lost", "Value at cost"),
+                rows.stream()
+                        .map(
+                                row ->
+                                        (List<Object>)
+                                                listOf(
+                                                        row.reasonCode(),
+                                                        row.sku(),
+                                                        row.productName(),
+                                                        row.quantity(),
+                                                        row.valueAtCost()))
+                        .toList());
+    }
 
     private static Table sales(
             String title, List<String> subtitle, List<ReportQueries.SalesRow> rows) {

@@ -135,6 +135,7 @@ public abstract class SalesTestBase {
                         "intraday_movements",
                         "cash_limits",
                         "registers",
+                        "receipt_settings",
                         "receipts",
                         "return_lines",
                         "returns",

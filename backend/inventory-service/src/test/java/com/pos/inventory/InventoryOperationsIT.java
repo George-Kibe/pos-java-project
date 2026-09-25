@@ -96,6 +96,19 @@ class InventoryOperationsIT extends InventoryTestBase {
                         .query(String.class)
                         .single();
         assertThat(type).isEqualTo("WRITE_OFF");
+
+        // Announced with what it was worth: two at the 100.00 they came in at.
+        var posted =
+                com.pos.events.EventJson.readEnvelope(
+                                jdbc.sql(
+                                                "SELECT payload FROM inventory.outbox WHERE topic = :t"
+                                                        + " ORDER BY created_at DESC LIMIT 1")
+                                        .param("t", Topics.INVENTORY_ADJUSTMENT_POSTED)
+                                        .query(String.class)
+                                        .single(),
+                                com.pos.events.inventory.AdjustmentPostedPayload.class)
+                        .payload();
+        assertThat(posted.lines().getFirst().valueAtCost()).isEqualByComparingTo("-200.00");
     }
 
     @Test
@@ -184,6 +197,27 @@ class InventoryOperationsIT extends InventoryTestBase {
 
         // And the ledger still reconciles after posting.
         assertThat(items.findLedgerDiscrepancies()).isEmpty();
+
+        // The differences are announced like an adjustment, so shrinkage counts what went missing.
+        var announced =
+                com.pos.events.EventJson.readEnvelope(
+                                jdbc.sql(
+                                                "SELECT payload FROM inventory.outbox WHERE topic = :t"
+                                                        + " AND aggregate_id = :id")
+                                        .param("t", Topics.INVENTORY_ADJUSTMENT_POSTED)
+                                        .param("id", stockTake.getId())
+                                        .query(String.class)
+                                        .single(),
+                                com.pos.events.inventory.AdjustmentPostedPayload.class)
+                        .payload();
+        assertThat(announced.reasonCode()).isEqualTo("STOCK_TAKE");
+        assertThat(announced.lines()).hasSize(2);
+        assertThat(announced.lines())
+                .anySatisfy(
+                        line -> {
+                            assertThat(line.productId()).isEqualTo(shortProduct);
+                            assertThat(line.valueAtCost()).isEqualByComparingTo("-300.00");
+                        });
     }
 
     @Test

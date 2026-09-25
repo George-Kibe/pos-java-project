@@ -45,7 +45,8 @@ public class RebuildService {
                     "report_return_lines",
                     "report_shifts",
                     "report_stock_valuations",
-                    "report_expiring_batches");
+                    "report_expiring_batches",
+                    "report_stock_adjustments");
 
     private final JdbcClient jdbc;
     private final Projector projector;

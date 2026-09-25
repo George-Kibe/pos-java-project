@@ -363,9 +363,10 @@ class InventoryApiIT extends InventoryTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("IN_TRANSIT")));
 
+        // Received by the branch it was sent to.
         mockMvc.perform(
                         post("/api/v1/transfers/" + transferId + "/receive")
-                                .with(at(BRANCH, "transfer:manage")))
+                                .with(at(OTHER_BRANCH, "transfer:manage")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("RECEIVED")));
     }

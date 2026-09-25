@@ -16,6 +16,9 @@ export const NAV: readonly NavItem[] = [
   { href: "/lane", label: "Till", permissions: ["sale:create"], shortcut: "t" },
   { href: "/dashboard", label: "Dashboard", permissions: ["report:view", "report:view:branch"], shortcut: "d" },
   { href: "/reports", label: "Reports", permissions: ["report:view", "report:view:branch"], shortcut: "g" },
+  { href: "/products", label: "Products", permissions: ["product:manage"], shortcut: "j" },
+  { href: "/catalog", label: "Catalog setup", permissions: ["product:manage", "tax:manage"], shortcut: "q" },
+  { href: "/pricing", label: "Pricing", permissions: ["price:manage", "promotion:manage"], shortcut: "w" },
   { href: "/stock", label: "Stock", permissions: ["inventory:view"], shortcut: "s" },
   { href: "/purchasing", label: "Purchasing", permissions: ["purchase:view"], shortcut: "h" },
   { href: "/suppliers", label: "Suppliers", permissions: ["purchase:view", "supplier:create"], shortcut: "n" },
@@ -24,6 +27,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/users", label: "Users", permissions: ["user:view"], shortcut: "u" },
   { href: "/roles", label: "Roles", permissions: ["role:view"], shortcut: "o" },
   { href: "/branches", label: "Branches", permissions: ["branch:view"], shortcut: "b" },
+  { href: "/settings", label: "Settings", permissions: ["branch:manage", "settings:manage"], shortcut: "z" },
   { href: "/audit", label: "Audit", permissions: ["audit:view"], shortcut: "i" },
   { href: "/account", label: "Account", permissions: [], shortcut: "a" },
 ];

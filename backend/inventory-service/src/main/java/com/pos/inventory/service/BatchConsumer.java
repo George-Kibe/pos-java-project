@@ -33,11 +33,25 @@ public class BatchConsumer {
     private final StockLedgerService ledger;
 
     /**
+     * What a depletion took: the part no batch covered, and what the covered part was worth at the
+     * cost each batch came in at.
+     */
+    public record Consumption(BigDecimal shortfall, BigDecimal valueAtCost) {}
+
+    /**
      * @return what could not be covered by any batch
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public BigDecimal consume(
             StockItem item, BigDecimal quantity, StockLedgerService.MovementContext context) {
+        return consumeValued(item, quantity, context).shortfall();
+    }
+
+    /** As {@link #consume}, also valuing what was taken - for write-offs and count shortfalls. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Consumption consumeValued(
+            StockItem item, BigDecimal quantity, StockLedgerService.MovementContext context) {
+        BigDecimal value = BigDecimal.ZERO;
 
         List<StockBatch> sellable = batches.findSellable(item.getId());
         AllocationResult allocation =
@@ -53,6 +67,7 @@ public class BatchConsumer {
             batch.consume(part.quantity());
             batches.save(batch);
             ledger.record(item, batch, part.quantity().negate(), context);
+            value = value.add(part.quantity().multiply(batch.getUnitCost()));
         }
 
         if (allocation.isShort()) {
@@ -61,7 +76,8 @@ public class BatchConsumer {
             ledger.record(item, null, allocation.shortfall().negate(), context);
         }
 
-        return allocation.shortfall();
+        return new Consumption(
+                allocation.shortfall(), value.setScale(4, java.math.RoundingMode.HALF_UP));
     }
 
     /**

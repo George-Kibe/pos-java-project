@@ -22,5 +22,7 @@ public enum MovementType {
     /** Posted from a physical count. */
     STOCK_TAKE,
     /** The starting figure when a product is first stocked at a branch. */
-    OPENING_BALANCE
+    OPENING_BALANCE,
+    /** Sent back to the supplier it came from. */
+    SUPPLIER_RETURN
 }

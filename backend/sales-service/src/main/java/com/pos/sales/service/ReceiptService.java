@@ -34,6 +34,7 @@ public class ReceiptService {
 
     private final ReceiptRepository receipts;
     private final SalesEventPublisher events;
+    private final ReceiptSettingsService receiptSettings;
 
     public Receipt require(UUID id) {
         return receipts.findById(id).orElseThrow(() -> Errors.NotFoundException.of("Receipt", id));
@@ -94,7 +95,18 @@ public class ReceiptService {
         }
         List<TaxClassTotal> breakdown =
                 List.of(EventJson.read(receipt.getTaxBreakdown(), TaxClassTotal[].class));
-        events.receiptEmailRequested(receipt, breakdown, email.trim(), blankToNull(recipientName));
+        var text = receiptSettings.of(receipt.getSale().getBranchId());
+        events.receiptEmailRequested(
+                receipt,
+                breakdown,
+                email.trim(),
+                blankToNull(recipientName),
+                new com.pos.events.sales.ReceiptEmailRequestedPayload.ReceiptText(
+                        text.getHeader(),
+                        text.getFooter(),
+                        text.getAddress(),
+                        text.getPhone(),
+                        text.getTaxPin()));
         return receipt;
     }
 

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.pos.catalog.api.dto.CatalogDtos;
+import com.pos.catalog.service.ProductImageService;
 import com.pos.catalog.service.ProductImportService;
 import com.pos.catalog.service.ProductService;
 import com.pos.common.web.PageResponse;
@@ -36,6 +37,8 @@ public class ProductController {
 
     private final ProductService products;
     private final ProductImportService importer;
+    private final com.pos.catalog.service.ProductExportService exporter;
+    private final ProductImageService images;
 
     @GetMapping
     @PreAuthorize("hasAuthority('product:view')")
@@ -94,6 +97,51 @@ public class ProductController {
     }
 
     @PostMapping(
+            value = "/{id}/image",
+            consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('product:manage')")
+    @Operation(
+            summary = "Upload the product's picture: JPEG, PNG or WebP, up to 2 MB",
+            description = "Replaces any picture it had. The type is read from the file itself.")
+    public CatalogDtos.ProductResponse uploadImage(
+            @PathVariable UUID id,
+            @org.springframework.web.bind.annotation.RequestParam("file")
+                    org.springframework.web.multipart.MultipartFile file) {
+        return CatalogDtos.ProductResponse.from(images.upload(id, bytesOf(file)));
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}/image")
+    @PreAuthorize("hasAuthority('product:manage')")
+    @Operation(summary = "Remove the product's picture")
+    public CatalogDtos.ProductResponse removeImage(@PathVariable UUID id) {
+        return CatalogDtos.ProductResponse.from(images.remove(id));
+    }
+
+    @GetMapping("/{id}/image")
+    @PreAuthorize("hasAuthority('product:view')")
+    @Operation(summary = "The product's picture")
+    public ResponseEntity<byte[]> image(@PathVariable UUID id) {
+        ProductImageService.Image image = images.image(id);
+        // The URL carries a version of the key, so a new picture is a new URL: safe to keep.
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(image.contentType()))
+                .cacheControl(
+                        org.springframework.http.CacheControl.maxAge(java.time.Duration.ofDays(30))
+                                .cachePrivate())
+                .header("X-Content-Type-Options", "nosniff")
+                .body(image.bytes());
+    }
+
+    private static byte[] bytesOf(org.springframework.web.multipart.MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (java.io.IOException unreadable) {
+            throw new com.pos.common.error.Errors.BadRequestException(
+                    "image.unreadable", "The uploaded file could not be read.");
+        }
+    }
+
+    @PostMapping(
             value = "/import",
             consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('product:manage')")
@@ -114,6 +162,28 @@ public class ProductController {
                     "import.empty_file", "The uploaded file is empty.");
         }
         return importer.importFrom(file.getInputStream());
+    }
+
+    @GetMapping(value = "/export", produces = "text/csv")
+    @PreAuthorize("hasAuthority('product:manage')")
+    @Operation(
+            summary = "Every product as CSV",
+            description =
+                    "The import's columns, so the file can be corrected and loaded back. A cell"
+                            + " starting =, +, - or @ is prefixed with an apostrophe, which the"
+                            + " import removes.")
+    public ResponseEntity<byte[]> exportProducts() {
+        return ResponseEntity.ok()
+                .contentType(
+                        org.springframework.http.MediaType.parseMediaType(
+                                "text/csv; charset=UTF-8"))
+                .header(
+                        org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.attachment()
+                                .filename("products.csv")
+                                .build()
+                                .toString())
+                .body(exporter.csv());
     }
 
     private static ProductService.NewProduct toCommand(CatalogDtos.ProductRequest request) {

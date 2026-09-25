@@ -78,6 +78,7 @@ public abstract class InventoryTestBase {
         jdbc.sql("DELETE FROM inventory.stock_movements").update();
         jdbc.sql("DELETE FROM inventory.stock_batches").update();
         jdbc.sql("DELETE FROM inventory.stock_items").update();
+        jdbc.sql("DELETE FROM inventory.product_details").update();
         jdbc.sql("DELETE FROM inventory.processed_event").update();
         jdbc.sql("DELETE FROM inventory.outbox").update();
     }

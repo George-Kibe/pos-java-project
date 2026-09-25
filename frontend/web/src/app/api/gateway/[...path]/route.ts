@@ -25,7 +25,7 @@ const BLOCKED_PREFIXES = ["auth"];
 const FORWARDED_REQUEST_HEADERS = ["content-type", "idempotency-key", "accept", "if-match"];
 
 /** Response headers worth passing back. */
-const FORWARDED_RESPONSE_HEADERS = ["content-type", "content-disposition", "location", "etag"];
+const FORWARDED_RESPONSE_HEADERS = ["content-type", "content-disposition", "location", "etag", "cache-control", "x-content-type-options"];
 
 async function handle(
   request: NextRequest,

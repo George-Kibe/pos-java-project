@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { FilterForm, SelectField, TextField } from "@/components/admin/filters";
 import { DataTable, LoadFailure, PageHeader, Pager } from "@/components/admin/page-parts";
@@ -56,7 +57,11 @@ export default async function SuppliersPage({ searchParams }: PageProps<"/suppli
           <DataTable headings={["Supplier", "Code", "Contact", "Terms", "Lead time", "Status"]} empty={suppliers.data.content.length === 0}>
             {suppliers.data.content.map((supplier) => (
               <tr key={supplier.id} className="border-t" data-testid="supplier-row">
-                <td className="px-3 py-2 font-medium">{supplier.name}</td>
+                <td className="px-3 py-2 font-medium">
+                  <Link href={`/suppliers/${supplier.id}`} className="underline-offset-4 hover:underline">
+                    {supplier.name}
+                  </Link>
+                </td>
                 <td className="px-3 py-2">{supplier.code}</td>
                 <td className="px-3 py-2 text-muted-foreground">
                   {[supplier.contactName, supplier.email, supplier.phone].filter(Boolean).join(" · ") || "-"}

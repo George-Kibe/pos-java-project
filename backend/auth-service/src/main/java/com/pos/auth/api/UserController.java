@@ -118,4 +118,14 @@ public class UserController {
         return AdminDtos.UserResponse.from(
                 service.changeStatus(id, UserStatus.valueOf(request.status())));
     }
+
+    @PostMapping("/{id}/password-reset")
+    @PreAuthorize("hasAuthority('user:manage')")
+    @Operation(
+            summary =
+                    "Force a password reset: every session ends and the person is emailed a"
+                            + " single-use link to choose a new password")
+    public AdminDtos.UserResponse forcePasswordReset(@PathVariable UUID id) {
+        return AdminDtos.UserResponse.from(service.forcePasswordReset(id));
+    }
 }

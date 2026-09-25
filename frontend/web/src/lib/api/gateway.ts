@@ -16,7 +16,9 @@ export async function gatewayFetch(
 ): Promise<Response> {
   const { accessToken, headers, ...rest } = init;
   const outgoing = new Headers(headers);
-  outgoing.set("Accept", "application/json, application/problem+json");
+  // JSON unless the caller asked for something else - a product image, say - which Spring would
+  // otherwise refuse as not acceptable.
+  if (!outgoing.has("Accept")) outgoing.set("Accept", "application/json, application/problem+json");
   if (accessToken) {
     outgoing.set("Authorization", `Bearer ${accessToken}`);
   }

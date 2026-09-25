@@ -111,7 +111,7 @@
           "name": "Audit",
           "item": [
             {
-              "name": "The audit trail, newest first; filter by action and by who did it",
+              "name": "The audit trail, newest first; filter by action, who did it, branch and a time range [from, to)",
               "request": {
                 "method": "GET",
                 "header": [
@@ -144,6 +144,24 @@
                       "description": ""
                     },
                     {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "from",
+                      "value": "{{day}}",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{day}}",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
                       "key": "page",
                       "value": "0",
                       "disabled": false
@@ -160,7 +178,7 @@
                     }
                   ]
                 },
-                "description": "The audit trail, newest first; filter by action and by who did it"
+                "description": "The audit trail, newest first; filter by action, who did it, branch and a time range [from, to)"
               }
             }
           ]
@@ -1301,6 +1319,33 @@
               }
             },
             {
+              "name": "Force a password reset: every session ends and the person is emailed a single-use link to choose a new password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/users/{{userId}}/password-reset",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "users",
+                    "{{userId}}",
+                    "password-reset"
+                  ],
+                  "query": []
+                },
+                "description": "Force a password reset: every session ends and the person is emailed a single-use link to choose a new password"
+              }
+            },
+            {
               "name": "Replace a user's roles; ends their sessions",
               "request": {
                 "method": "PUT",
@@ -1388,6 +1433,251 @@
       "name": "Catalogue and pricing",
       "description": "catalog-service: OpenAPI definition",
       "item": [
+        {
+          "name": "Price lists",
+          "item": [
+            {
+              "name": "Every price list, highest priority first",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-lists",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-lists"
+                  ],
+                  "query": []
+                },
+                "description": "Every price list, highest priority first"
+              }
+            },
+            {
+              "name": "Create a price list",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-lists",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-lists"
+                  ],
+                  "query": []
+                },
+                "description": "Create a price list",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"\",\n  \"name\": \"\",\n  \"branchId\": \"{{branchId}}\",\n  \"priority\": 1,\n  \"validFrom\": \"2026-01-01T09:00:00Z\",\n  \"validTo\": \"2026-01-01T09:00:00Z\",\n  \"active\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "One price list",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-lists/{{priceListId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-lists",
+                    "{{priceListId}}"
+                  ],
+                  "query": []
+                },
+                "description": "One price list"
+              }
+            },
+            {
+              "name": "Change a price list's name, branch, priority, window or status",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-lists/{{priceListId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-lists",
+                    "{{priceListId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Change a price list's name, branch, priority, window or status",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"\",\n  \"name\": \"\",\n  \"branchId\": \"{{branchId}}\",\n  \"priority\": 1,\n  \"validFrom\": \"2026-01-01T09:00:00Z\",\n  \"validTo\": \"2026-01-01T09:00:00Z\",\n  \"active\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "The list's prices, a page at a time",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-lists/{{priceListId}}/items?page=0&size=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-lists",
+                    "{{priceListId}}",
+                    "items"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0",
+                      "disabled": false
+                    },
+                    {
+                      "key": "size",
+                      "value": "20",
+                      "disabled": false
+                    },
+                    {
+                      "key": "sort",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "The list's prices, a page at a time"
+              }
+            },
+            {
+              "name": "Set a product's price on the list",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-lists/{{priceListId}}/items/{{productId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-lists",
+                    "{{priceListId}}",
+                    "items",
+                    "{{productId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Set a product's price on the list",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"price\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Take a product off the list, back to its base price",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-lists/{{priceListId}}/items/{{productId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-lists",
+                    "{{priceListId}}",
+                    "items",
+                    "{{productId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Take a product off the list, back to its base price"
+              }
+            }
+          ]
+        },
         {
           "name": "Pricing",
           "item": [
@@ -1578,6 +1868,32 @@
               }
             },
             {
+              "name": "Every product as CSV",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/products/export",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "products",
+                    "export"
+                  ],
+                  "query": []
+                },
+                "description": "The import's columns, so the file can be corrected and loaded back. A cell starting =, +, - or @ is prefixed with an apostrophe, which the import removes."
+              }
+            },
+            {
               "name": "Bulk load products from CSV",
               "request": {
                 "method": "POST",
@@ -1741,12 +2057,401 @@
                   }
                 }
               }
+            },
+            {
+              "name": "The product's picture",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/products/{{productId}}/image",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "products",
+                    "{{productId}}",
+                    "image"
+                  ],
+                  "query": []
+                },
+                "description": "The product's picture"
+              }
+            },
+            {
+              "name": "Upload the product's picture: JPEG, PNG or WebP, up to 2 MB",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/products/{{productId}}/image",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "products",
+                    "{{productId}}",
+                    "image"
+                  ],
+                  "query": []
+                },
+                "description": "Replaces any picture it had. The type is read from the file itself."
+              }
+            },
+            {
+              "name": "Remove the product's picture",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/products/{{productId}}/image",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "products",
+                    "{{productId}}",
+                    "image"
+                  ],
+                  "query": []
+                },
+                "description": "Remove the product's picture"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Promotions",
+          "item": [
+            {
+              "name": "Every promotion, in the order pricing weighs them",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/promotions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "promotions"
+                  ],
+                  "query": []
+                },
+                "description": "Every promotion, in the order pricing weighs them"
+              }
+            },
+            {
+              "name": "Create a promotion",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/promotions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "promotions"
+                  ],
+                  "query": []
+                },
+                "description": "Create a promotion",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"\",\n  \"name\": \"\",\n  \"type\": \"PERCENTAGE_OFF\",\n  \"value\": 1,\n  \"buyQuantity\": 1,\n  \"getQuantity\": 1,\n  \"minQuantity\": 1,\n  \"priority\": 1,\n  \"stackable\": false,\n  \"memberOnly\": false,\n  \"branchId\": \"{{branchId}}\",\n  \"validFrom\": \"2026-01-01T09:00:00Z\",\n  \"validTo\": \"2026-01-01T09:00:00Z\",\n  \"active\": false,\n  \"rules\": [\n    {\n      \"scope\": \"PRODUCT\",\n      \"scopeId\": \"{{scopeId}}\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "What a product would cost with this promotion live - a draft, or an edit of one - beside every other live promotion. Nothing is saved",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/promotions/preview",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "promotions",
+                    "preview"
+                  ],
+                  "query": []
+                },
+                "description": "What a product would cost with this promotion live - a draft, or an edit of one - beside every other live promotion. Nothing is saved",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"promotion\": {\n    \"code\": \"\",\n    \"name\": \"\",\n    \"type\": \"PERCENTAGE_OFF\",\n    \"value\": 1,\n    \"buyQuantity\": 1,\n    \"getQuantity\": 1,\n    \"minQuantity\": 1,\n    \"priority\": 1,\n    \"stackable\": false,\n    \"memberOnly\": false,\n    \"branchId\": \"{{branchId}}\",\n    \"validFrom\": \"2026-01-01T09:00:00Z\",\n    \"validTo\": \"2026-01-01T09:00:00Z\",\n    \"active\": false,\n    \"rules\": [\n      {\n        \"scope\": \"PRODUCT\",\n        \"scopeId\": \"{{scopeId}}\"\n      }\n    ]\n  },\n  \"promotionId\": \"{{promotionId}}\",\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 1,\n  \"branchId\": \"{{branchId}}\",\n  \"member\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "One promotion",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/promotions/{{promotionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "promotions",
+                    "{{promotionId}}"
+                  ],
+                  "query": []
+                },
+                "description": "One promotion"
+              }
+            },
+            {
+              "name": "Change a promotion; its code never changes",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/promotions/{{promotionId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "promotions",
+                    "{{promotionId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Change a promotion; its code never changes",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"\",\n  \"name\": \"\",\n  \"type\": \"PERCENTAGE_OFF\",\n  \"value\": 1,\n  \"buyQuantity\": 1,\n  \"getQuantity\": 1,\n  \"minQuantity\": 1,\n  \"priority\": 1,\n  \"stackable\": false,\n  \"memberOnly\": false,\n  \"branchId\": \"{{branchId}}\",\n  \"validFrom\": \"2026-01-01T09:00:00Z\",\n  \"validTo\": \"2026-01-01T09:00:00Z\",\n  \"active\": false,\n  \"rules\": [\n    {\n      \"scope\": \"PRODUCT\",\n      \"scopeId\": \"{{scopeId}}\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Start or stop a promotion",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/promotions/{{promotionId}}/active?active=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "promotions",
+                    "{{promotionId}}",
+                    "active"
+                  ],
+                  "query": [
+                    {
+                      "key": "active",
+                      "value": "",
+                      "disabled": false,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "Start or stop a promotion"
+              }
             }
           ]
         },
         {
           "name": "Reference data",
           "item": [
+            {
+              "name": "List brands",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/brands",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "brands"
+                  ],
+                  "query": []
+                },
+                "description": "List brands"
+              }
+            },
+            {
+              "name": "Create a brand",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/brands",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "brands"
+                  ],
+                  "query": []
+                },
+                "description": "Create a brand",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"\",\n  \"name\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Rename or retire a brand",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/brands/{{brandId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "brands",
+                    "{{brandId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Rename or retire a brand",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"\",\n  \"active\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
             {
               "name": "List categories",
               "request": {
@@ -1811,6 +2516,45 @@
               }
             },
             {
+              "name": "Rename, move or retire a category; its code never changes",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "categories",
+                    "{{categoryId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Rename, move or retire a category; its code never changes",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"\",\n  \"parentId\": \"{{parentId}}\",\n  \"active\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
               "name": "The active scale barcode formats, so an offline lane decodes weighed and priced labels exactly as the server does",
               "request": {
                 "method": "GET",
@@ -1861,6 +2605,150 @@
               }
             },
             {
+              "name": "Create a tax class with the rate it starts at",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/tax-classes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "tax-classes"
+                  ],
+                  "query": []
+                },
+                "description": "Create a tax class with the rate it starts at",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"\",\n  \"name\": \"\",\n  \"description\": \"\",\n  \"rate\": 1,\n  \"validFrom\": \"2026-01-01T09:00:00Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Rename, describe or retire a tax class",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/tax-classes/{{taxClasseId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "tax-classes",
+                    "{{taxClasseId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Rename, describe or retire a tax class",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"\",\n  \"description\": \"\",\n  \"active\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Make this the tax class new products start with",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/tax-classes/{{taxClasseId}}/default",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "tax-classes",
+                    "{{taxClasseId}}",
+                    "default"
+                  ],
+                  "query": []
+                },
+                "description": "Make this the tax class new products start with"
+              }
+            },
+            {
+              "name": "Change a tax class's rate from a moment on; the current rate closes then. Never backdated",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/tax-classes/{{taxClasseId}}/rates",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "tax-classes",
+                    "{{taxClasseId}}",
+                    "rates"
+                  ],
+                  "query": []
+                },
+                "description": "Change a tax class's rate from a moment on; the current rate closes then. Never backdated",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"rate\": 1,\n  \"validFrom\": \"2026-01-01T09:00:00Z\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
               "name": "List units of measure",
               "request": {
                 "method": "GET",
@@ -1883,6 +2771,83 @@
                   "query": []
                 },
                 "description": "List units of measure"
+              }
+            },
+            {
+              "name": "Create a unit of measure",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/units-of-measure",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "units-of-measure"
+                  ],
+                  "query": []
+                },
+                "description": "Create a unit of measure",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"\",\n  \"name\": \"\",\n  \"allowsDecimal\": false,\n  \"decimalPlaces\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Rename a unit of measure; whether it allows fractions never changes",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/units-of-measure/{{unitsOfMeasureId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "units-of-measure",
+                    "{{unitsOfMeasureId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Rename a unit of measure; whether it allows fractions never changes",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
             }
           ]
@@ -2112,6 +3077,53 @@
               }
             },
             {
+              "name": "Counts at a branch, newest first",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/stock-takes?branchId={{branchId}}&page=0&size=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "stock-takes"
+                  ],
+                  "query": [
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "page",
+                      "value": "0",
+                      "disabled": false
+                    },
+                    {
+                      "key": "size",
+                      "value": "20",
+                      "disabled": false
+                    },
+                    {
+                      "key": "sort",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Counts at a branch, newest first"
+              }
+            },
+            {
               "name": "Open a count and snapshot what the system believes",
               "request": {
                 "method": "POST",
@@ -2173,6 +3185,33 @@
                   "query": []
                 },
                 "description": "A count sheet with its variances"
+              }
+            },
+            {
+              "name": "Abandon a count that has not been posted",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/stock-takes/{{stockTakeId}}/cancel",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "stock-takes",
+                    "{{stockTakeId}}",
+                    "cancel"
+                  ],
+                  "query": []
+                },
+                "description": "Abandon a count that has not been posted"
               }
             },
             {
@@ -2270,6 +3309,53 @@
               }
             },
             {
+              "name": "Transfers into or out of a branch, newest first",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/transfers?branchId={{branchId}}&page=0&size=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "transfers"
+                  ],
+                  "query": [
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "page",
+                      "value": "0",
+                      "disabled": false
+                    },
+                    {
+                      "key": "size",
+                      "value": "20",
+                      "disabled": false
+                    },
+                    {
+                      "key": "sort",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Transfers into or out of a branch, newest first"
+              }
+            },
+            {
               "name": "Draft a transfer between branches",
               "request": {
                 "method": "POST",
@@ -2305,6 +3391,32 @@
                     }
                   }
                 }
+              }
+            },
+            {
+              "name": "One transfer, line by line",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/transfers/{{transferId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "transfers",
+                    "{{transferId}}"
+                  ],
+                  "query": []
+                },
+                "description": "One transfer, line by line"
               }
             },
             {
@@ -2424,6 +3536,45 @@
                   ]
                 },
                 "description": "Stock held at a branch"
+              }
+            },
+            {
+              "name": "Batches at a branch expiring within the next days, soonest first - already expired included - with their value at cost",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/stock/expiring?branchId={{branchId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "stock",
+                    "expiring"
+                  ],
+                  "query": [
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "days",
+                      "value": "30",
+                      "disabled": true,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "Batches at a branch expiring within the next days, soonest first - already expired included - with their value at cost"
               }
             },
             {
@@ -4688,6 +5839,76 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"notes\": [\n    {\n      \"denomination\": 1,\n      \"count\": 1\n    }\n  ],\n  \"reason\": \"Recorded from Postman\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Receipt settings",
+          "item": [
+            {
+              "name": "What a branch prints around the sale on its receipts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/receipt-settings/{{branchId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "receipt-settings",
+                    "{{branchId}}"
+                  ],
+                  "query": []
+                },
+                "description": "What a branch prints around the sale on its receipts"
+              }
+            },
+            {
+              "name": "Set a branch's receipt text; the layout is fixed",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/receipt-settings/{{branchId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "receipt-settings",
+                    "{{branchId}}"
+                  ],
+                  "query": []
+                },
+                "description": "Set a branch's receipt text; the layout is fixed",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"header\": \"\",\n  \"footer\": \"\",\n  \"address\": \"\",\n  \"phone\": \"0712345678\",\n  \"taxPin\": \"\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -7333,6 +8554,52 @@
               }
             },
             {
+              "name": "Sales by hour of the shop's day: baskets, average basket and items per basket",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/reports/sales/by-hour?from={{day}}&to={{day}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "reports",
+                    "sales",
+                    "by-hour"
+                  ],
+                  "query": [
+                    {
+                      "key": "from",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": true,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "Sales by hour of the shop's day: baskets, average basket and items per basket"
+              }
+            },
+            {
               "name": "Sales per week, month, quarter or year - per branch, or across every branch with acrossBranches=true (report:view)",
               "request": {
                 "method": "GET",
@@ -7643,6 +8910,58 @@
               }
             },
             {
+              "name": "Stock lost - written off or found short by a count - by reason and product, valued at cost",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/reports/stock/shrinkage?from={{day}}&to={{day}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "reports",
+                    "stock",
+                    "shrinkage"
+                  ],
+                  "query": [
+                    {
+                      "key": "from",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "categoryId",
+                      "value": "{{categoryId}}",
+                      "disabled": true,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "Stock lost - written off or found short by a count - by reason and product, valued at cost"
+              }
+            },
+            {
               "name": "The latest complete stock valuation inventory sent for a branch",
               "request": {
                 "method": "GET",
@@ -7727,6 +9046,147 @@
                   ]
                 },
                 "description": "Stock value by day: each day's last complete snapshot"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "notification-service: OpenAPI definition",
+      "item": [
+        {
+          "name": "Email wording",
+          "item": [
+            {
+              "name": "The wording of every kind of email, and whether it has been changed",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/notification-templates",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "notification-templates"
+                  ],
+                  "query": []
+                },
+                "description": "The wording of every kind of email, and whether it has been changed"
+              }
+            },
+            {
+              "name": "Change an email's wording; the next one sent uses it",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/notification-templates/{{type}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "notification-templates",
+                    "{{type}}"
+                  ],
+                  "query": []
+                },
+                "description": "Change an email's wording; the next one sent uses it",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"subject\": \"\",\n  \"intro\": \"\",\n  \"closing\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Put an email back to the wording that ships",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/notification-templates/{{type}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "notification-templates",
+                    "{{type}}"
+                  ],
+                  "query": []
+                },
+                "description": "Put an email back to the wording that ships"
+              }
+            },
+            {
+              "name": "Render an email with this wording and sample values; nothing is saved",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/notification-templates/{{type}}/preview",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "notification-templates",
+                    "{{type}}",
+                    "preview"
+                  ],
+                  "query": []
+                },
+                "description": "Render an email with this wording and sample values; nothing is saved",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"subject\": \"\",\n  \"intro\": \"\",\n  \"closing\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
             }
           ]

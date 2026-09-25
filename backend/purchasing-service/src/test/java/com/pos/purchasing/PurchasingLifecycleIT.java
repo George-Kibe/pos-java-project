@@ -79,6 +79,18 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
         SupplierReturn sent = returnService.markSent(drafted.getId());
         assertThat(sent.getStatus()).isEqualTo(SupplierReturnStatus.SENT);
         assertThat(sent.getSentAt()).isNotNull();
+        // Sent in the same transaction as the status: inventory takes the goods off the shelf.
+        assertThat(
+                        jdbc.sql(
+                                        "SELECT payload FROM purchasing.outbox WHERE topic ="
+                                                + " 'pos.purchasing.supplier-return-sent.v1' AND"
+                                                + " aggregate_id = :id")
+                                .param("id", sent.getId())
+                                .query(String.class)
+                                .list())
+                .singleElement()
+                .asString()
+                .contains(sent.getReturnNumber());
 
         SupplierReturn credited = returnService.recordCredit(sent.getId(), "CN-7781");
         assertThat(credited.getStatus()).isEqualTo(SupplierReturnStatus.CREDITED);

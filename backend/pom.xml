@@ -59,6 +59,8 @@
     <commons-csv.version>1.14.1</commons-csv.version>
     <!-- Not managed by the Boot BOM. LGPL/MPL; reporting's PDF exports. -->
     <openpdf.version>2.4.0</openpdf.version>
+    <!-- Product images in S3 (an S3-compatible store in development). -->
+    <aws-sdk.version>2.46.7</aws-sdk.version>
 
     <spotless.version>3.10.2</spotless.version>
     <google-java-format.version>1.36.1</google-java-format.version>
@@ -75,6 +77,13 @@
         <groupId>org.springframework.cloud</groupId>
         <artifactId>spring-cloud-dependencies</artifactId>
         <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws-sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

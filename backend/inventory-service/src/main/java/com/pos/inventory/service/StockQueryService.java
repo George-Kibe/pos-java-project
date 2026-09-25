@@ -15,8 +15,6 @@ import com.pos.inventory.repository.StockBatchRepository;
 import com.pos.inventory.repository.StockItemRepository;
 import com.pos.inventory.repository.StockMovementRepository;
 
-import lombok.RequiredArgsConstructor;
-
 /**
  * The read side of stock.
  *
@@ -25,7 +23,6 @@ import lombok.RequiredArgsConstructor;
  * the only thing the controller does with the result.
  */
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class StockQueryService {
 
@@ -33,6 +30,22 @@ public class StockQueryService {
     private final StockBatchRepository batches;
     private final StockMovementRepository movements;
     private final StockService stock;
+    private final java.time.ZoneId shopZone;
+
+    public StockQueryService(
+            StockItemRepository items,
+            StockBatchRepository batches,
+            StockMovementRepository movements,
+            StockService stock,
+            @org.springframework.beans.factory.annotation.Value(
+                            "${pos.inventory.shop-time-zone:Africa/Nairobi}")
+                    java.time.ZoneId shopZone) {
+        this.items = items;
+        this.batches = batches;
+        this.movements = movements;
+        this.stock = stock;
+        this.shopZone = shopZone;
+    }
 
     public Page<StockItem> atBranch(UUID branchId, Pageable pageable) {
         return items.findByBranchId(branchId, pageable);
@@ -50,6 +63,22 @@ public class StockQueryService {
     public Page<StockMovement> movementsOf(UUID productId, UUID branchId, Pageable pageable) {
         return movements.findByStockItemIdOrderByOccurredAtDesc(
                 stock.require(productId, branchId).getId(), pageable);
+    }
+
+    /**
+     * What will expire at a branch within {@code days} - already expired included, since stock that
+     * has passed its date but not been written off is exactly what needs finding.
+     */
+    public List<StockBatch> expiringAt(UUID branchId, int days) {
+        return batches.findExpiringAtBranch(branchId, today().plusDays(days));
+    }
+
+    /**
+     * Today where the shops are. An expiry date is a shop's date, so it is compared with the shop's
+     * today - not UTC's, which is still yesterday for the last hours of a Nairobi evening.
+     */
+    public java.time.LocalDate today() {
+        return java.time.LocalDate.now(shopZone);
     }
 
     public List<StockItem> belowReorderPoint(UUID branchId) {

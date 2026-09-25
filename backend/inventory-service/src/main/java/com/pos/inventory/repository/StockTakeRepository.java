@@ -12,7 +12,8 @@ import com.pos.inventory.domain.StockTake;
 
 public interface StockTakeRepository extends JpaRepository<StockTake, UUID> {
 
-    @EntityGraph(attributePaths = "lines")
+    /** With each line's stock item: the count sheet names the product it is counting. */
+    @EntityGraph(attributePaths = {"lines", "lines.stockItem"})
     Optional<StockTake> findWithLinesById(UUID id);
 
     Optional<StockTake> findByReference(String reference);

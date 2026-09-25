@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { SupplierSelect } from "@/components/admin/supplier-select";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,7 +15,6 @@ import { api } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { ProductSchema } from "@/lib/lane/schemas";
 
-const SupplierSchema = z.object({ id: z.uuid(), code: z.string(), name: z.string() });
 const ReceiptSchema = z.object({ id: z.uuid(), status: z.string().optional() });
 
 interface Line {
@@ -35,7 +35,6 @@ export function AddStock({ branches, defaultBranch }: { branches: { id: string; 
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [branchId, setBranchId] = useState(defaultBranch ?? branches[0]?.id ?? "");
-  const [suppliers, setSuppliers] = useState<z.infer<typeof SupplierSchema>[]>([]);
   const [supplierId, setSupplierId] = useState("");
   const [reference, setReference] = useState("");
   const [query, setQuery] = useState("");
@@ -43,21 +42,6 @@ export function AddStock({ branches, defaultBranch }: { branches: { id: string; 
   const [lines, setLines] = useState<Line[]>([]);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    api("suppliers?size=100&status=ACTIVE", PageOf(SupplierSchema))
-      .then((page) => {
-        if (cancelled) return;
-        setSuppliers(page.content);
-        setSupplierId((current) => current || page.content[0]?.id || "");
-      })
-      .catch(() => !cancelled && setError("Suppliers could not be loaded."));
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
 
   async function search(event: FormEvent) {
     event.preventDefault();
@@ -148,16 +132,7 @@ export function AddStock({ branches, defaultBranch }: { branches: { id: string; 
                 ))}
               </select>
             </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium">Supplier</span>
-              <select aria-label="Supplier" value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className="h-11 rounded-lg border bg-background px-3 text-base">
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SupplierSelect id="add-stock-supplier" value={supplierId} onChange={setSupplierId} />
             <Field id="delivery-ref" label="Delivery note (optional)" value={reference} onChange={(event) => setReference(event.target.value)} />
           </div>
           <form onSubmit={search} className="flex gap-2">

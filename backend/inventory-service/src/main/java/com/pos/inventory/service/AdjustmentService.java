@@ -136,8 +136,15 @@ public class AdjustmentService {
                             actor,
                             Instant.now());
 
+            // Signed like the quantity: a write-off is worth a negative amount at cost. Stock put
+            // back on has no delivery behind it, so no known cost.
+            BigDecimal value = BigDecimal.ZERO;
             if (delta.signum() < 0) {
-                batchConsumer.consume(item, delta.abs(), context);
+                value =
+                        batchConsumer
+                                .consumeValued(item, delta.abs(), context)
+                                .valueAtCost()
+                                .negate();
             } else {
                 batchConsumer.addUntrackedStock(
                         item,
@@ -150,12 +157,7 @@ public class AdjustmentService {
 
             posted.add(
                     new AdjustmentPostedPayload.AdjustmentLine(
-                            item.getProductId(),
-                            item.getSku(),
-                            delta,
-                            null,
-                            BigDecimal.ZERO,
-                            "KES"));
+                            item.getProductId(), item.getSku(), delta, null, value, "KES"));
         }
 
         adjustment.setStatus(StockAdjustment.Status.POSTED);

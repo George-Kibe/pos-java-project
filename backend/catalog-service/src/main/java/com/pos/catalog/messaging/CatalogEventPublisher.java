@@ -52,6 +52,35 @@ public class CatalogEventPublisher {
                         .build());
     }
 
+    /**
+     * A price list's price for a product changed: {@code branchId} is the list's branch, or null
+     * for a group-wide list.
+     */
+    public void priceChanged(
+            Product product,
+            java.util.UUID branchId,
+            BigDecimal previousPrice,
+            BigDecimal newPrice) {
+        outbox.record(
+                Topics.CATALOG_PRICE_CHANGED,
+                "Product",
+                product.getId(),
+                EventEnvelope.<PriceChangedPayload>builder()
+                        .topic(Topics.CATALOG_PRICE_CHANGED)
+                        .correlationId(CorrelationId.get())
+                        .branchId(branchId)
+                        .payload(
+                                new PriceChangedPayload(
+                                        product.getId(),
+                                        product.getSku(),
+                                        branchId,
+                                        previousPrice,
+                                        newPrice,
+                                        product.getCurrency(),
+                                        product.isPriceIncludesTax()))
+                        .build());
+    }
+
     public void priceChanged(Product product, BigDecimal previousPrice) {
         outbox.record(
                 Topics.CATALOG_PRICE_CHANGED,

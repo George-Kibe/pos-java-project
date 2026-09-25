@@ -25,6 +25,8 @@ volumes:
     name: pos-kafka-data
   redis_data:
     name: pos-redis-data
+  object_store_data:
+    name: pos-object-store-data
 
 services:
   postgres:
@@ -128,6 +130,28 @@ services:
     volumes:
       - ../kafka/create-topics.sh:/create-topics.sh:ro
     entrypoint: ["/bin/bash", "/create-topics.sh"]
+
+  # Product images. Production keeps them in S3; development runs RustFS, an S3-compatible store
+  # (MinIO no longer publishes images). The catalog creates its bucket at first use.
+  object-store:
+    image: rustfs/rustfs:1.0.0
+    container_name: pos-object-store
+    restart: unless-stopped
+    networks: [pos]
+    <<: *logging
+    environment:
+      RUSTFS_ACCESS_KEY: ${OBJECT_STORE_ROOT_USER:-pos-dev}
+      RUSTFS_SECRET_KEY: ${OBJECT_STORE_ROOT_PASSWORD:?OBJECT_STORE_ROOT_PASSWORD is required - run "make env-sync"}
+    ports:
+      - "127.0.0.1:${OBJECT_STORE_PORT:-9000}:9000"
+    volumes:
+      - object_store_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
 
   redis:
     image: redis:8-alpine

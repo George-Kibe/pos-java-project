@@ -16,6 +16,7 @@ import com.pos.common.security.AuthenticatedUser;
 import com.pos.purchasing.config.PurchasingProperties;
 import com.pos.purchasing.domain.GoodsReceivedNote;
 import com.pos.purchasing.domain.InvoiceMatchStatus;
+import com.pos.purchasing.domain.InvoiceVariance;
 import com.pos.purchasing.domain.PurchaseOrder;
 import com.pos.purchasing.domain.Supplier;
 import com.pos.purchasing.domain.SupplierInvoice;
@@ -256,6 +257,11 @@ public class SupplierInvoiceService {
                     case EXCEPTION -> InvoiceMatchStatus.EXCEPTION;
                 });
         invoice.setVarianceAmount(result.variance());
+        invoice.setJustifiedTotal(result.justifiedTotal());
+        result.variances()
+                .forEach(
+                        finding ->
+                                invoice.getVariances().add(new InvoiceVariance(invoice, finding)));
         invoice.setMatchedAt(Instant.now());
         invoice.setMatchedBy(actorId);
         invoice.setMatchNotes(summarise(result));

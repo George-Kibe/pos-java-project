@@ -75,6 +75,42 @@ class EmailDeliveryIT extends NotificationTestBase {
     }
 
     @Test
+    @DisplayName(
+            "wording saved for an email goes out in the next one; reset, the shipped wording returns")
+    void savedWordingGoesOut(
+            @org.springframework.beans.factory.annotation.Autowired
+                    com.pos.notification.service.TemplateTextService wording)
+            throws Exception {
+        wording.save(
+                com.pos.notification.domain.NotificationType.OTP_CODE,
+                "Your {brand} code",
+                "Here is the code you asked for:",
+                null);
+
+        publish(
+                Topics.AUTH_OTP_REQUESTED,
+                otpEvent("grace@example.com", "Grace", "551177"),
+                UUID.randomUUID());
+        assertThat(SMTP.waitForIncomingEmail(20_000, 1)).isTrue();
+        MimeMessage message = SMTP.getReceivedMessages()[0];
+        assertThat(message.getSubject()).isEqualTo("Your Test Supermarket code");
+        String body = GreenMailUtil.getBody(message);
+        assertThat(body).contains("Here is the code you asked for:").contains("551177");
+        // No closing was saved, so none is shown - not the shipped one.
+        assertThat(body).doesNotContain("nobody can use the code");
+
+        wording.reset(com.pos.notification.domain.NotificationType.OTP_CODE);
+        SMTP.purgeEmailFromAllMailboxes();
+        publish(
+                Topics.AUTH_OTP_REQUESTED,
+                otpEvent("grace@example.com", "Grace", "551178"),
+                UUID.randomUUID());
+        assertThat(SMTP.waitForIncomingEmail(20_000, 1)).isTrue();
+        assertThat(SMTP.getReceivedMessages()[0].getSubject())
+                .isEqualTo("Your Test Supermarket verification code");
+    }
+
+    @Test
     @DisplayName("the subject line never carries the code")
     void theSubjectNeverCarriesTheCode() throws Exception {
         String code = "119977";

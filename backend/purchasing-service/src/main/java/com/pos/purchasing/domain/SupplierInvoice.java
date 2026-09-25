@@ -77,6 +77,21 @@ public class SupplierInvoice extends BaseEntity {
     @Column(name = "variance_amount", precision = 19, scale = 4)
     private BigDecimal varianceAmount;
 
+    /** What the delivery justifies paying, as the match found it. */
+    @Column(name = "justified_total", precision = 19, scale = 4)
+    private BigDecimal justifiedTotal;
+
+    /**
+     * The match's findings, product by product. Loaded with the invoice (a handful per invoice at
+     * most), in batches across a page of them.
+     */
+    @jakarta.persistence.OneToMany(
+            mappedBy = "invoice",
+            cascade = jakarta.persistence.CascadeType.ALL,
+            fetch = FetchType.EAGER)
+    @org.hibernate.annotations.BatchSize(size = 50)
+    private java.util.List<InvoiceVariance> variances = new java.util.ArrayList<>();
+
     @Column(name = "match_notes", length = 1000)
     private String matchNotes;
 

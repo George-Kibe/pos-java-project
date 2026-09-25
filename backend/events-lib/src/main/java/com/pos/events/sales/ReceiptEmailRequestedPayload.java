@@ -35,7 +35,16 @@ public record ReceiptEmailRequestedPayload(
         BigDecimal taxTotal,
         BigDecimal grandTotal,
         BigDecimal amountTendered,
-        BigDecimal changeGiven) {
+        BigDecimal changeGiven,
+        /**
+         * The branch's own receipt text, as the branch has set it; null when it has set none. Added
+         * in 15; a consumer that predates it simply ignores it.
+         */
+        ReceiptText receiptText) {
+
+    /** Lines above and below the sale (newline-separated), and how to reach the branch. */
+    public record ReceiptText(
+            String header, String footer, String address, String phone, String taxPin) {}
 
     /** One line as charged. Quantity is fractional for weighed goods. */
     public record Line(

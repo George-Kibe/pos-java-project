@@ -1348,7 +1348,7 @@ holding per person.
 
 ---
 
-## Phase 15 — Frontend back office
+## Phase 15 — Frontend back office ✅
 
 **Goal:** the business can be run without touching the database.
 
@@ -1366,6 +1366,79 @@ holding per person.
 
 **Done when:** every workflow in [REQUIREMENTS.md](REQUIREMENTS.md) is reachable through the UI by a
 user with the right permissions and correctly hidden from one without.
+
+Agreed at the start: product pictures in **object storage** (S3 in production, an S3-compatible
+store in development), and templates editable as **text, not layout** - the receipt's header,
+footer, address, phone and tax PIN per branch, and each email's subject, opening and closing.
+
+Delivered:
+- **Catalog** (`/products`, `/catalog`, `/pricing`): products with barcodes and a picture (JPEG,
+  PNG or WebP up to 2 MB, type read from the bytes, stored under a content-hashed key and served
+  at `/products/{id}/image?v=`); **CSV export in the import's columns** and an import dialog that
+  lists each refused row with its reason, so a file round-trips through a spreadsheet; categories,
+  brands, units; tax classes with rates that are never backdated and never leave a gap, and one
+  default class (V4) a new product starts with; branch price lists, each change announced as
+  `price-changed` with its branch; a promotions builder whose preview prices the draft against a
+  real basket before anything is saved
+- **Stock** (`/stock`): stock by branch, a product's batches, near expiry in the shop's time zone
+  with value at cost, adjustments with reasons, transfers (dispatched by the sender, received by
+  the receiver, each checked against the caller's branches), blind stock takes with variance
+  review and posting, low stock
+- **Purchasing** (`/purchasing`, `/suppliers`): orders through approval and sending, deliveries
+  with batch, expiry and landed cost, supplier invoices matched per product with the findings kept,
+  returns to supplier, reorder suggestions
+- **Users and access** (`/users`, `/roles`, `/audit`): the role builder's permission matrix, a
+  forced password reset (sessions revoked, a reset email sent), the audit trail filtered by action,
+  actor, branch and day
+- **Customers** (`/customers`): search, profile, points history, adjustment with a reason,
+  addresses and consents, data export and erasure
+- **Reports** (`/reports`): thirteen reports, including the new sales by hour and shrinkage, each
+  filtered and exported as CSV and PDF
+- **Settings** (`/settings`, `/branches`, `/cash`): receipt text per branch (previewed as printed;
+  the lane caches it for offline receipts and it rides on emailed receipts), email wording with a
+  live preview and a way back to the standard text (`settings:manage`, V7), branches, registers,
+  the default tax class
+
+Gaps in the services found by driving them from the UI, and fixed:
+- A **return to a supplier never left inventory**: it now sends `supplier-return-sent` and
+  inventory takes the goods off the named batch (`SUPPLIER_RETURN` movements)
+- **Invoice matching findings were computed and thrown away**: kept per invoice (purchasing V2)
+- **A product's first delivery to a branch had no name**: inventory keeps `product_details` from
+  catalog's events
+- **Write-offs carried no value** (`valueAtCost` was always zero), and **stock takes told reporting
+  nothing**: both now announce `adjustment-posted` valued at the batches' cost, which is what the
+  shrinkage report reads
+- **Transfers and stock takes lacked branch checks** on post, cancel, dispatch and receive
+- **Re-importing a product with its own barcodes failed** on the barcode's unique constraint
+  (orphan removal deletes after it inserts); unchanged barcodes are now left alone and a changed
+  list is flushed first
+- An editor filled from the server could overwrite what someone had already typed; its fields stay
+  shut until the saved text is in
+- **Supplier dropdowns stopped at 100**: the 101st supplier could not be chosen for an order, a
+  delivery, an invoice or a return. Suppliers are now searched, and a search among active ones no
+  longer offers suppliers on hold
+- Purchasing lists had no order, so a new delivery could land on page 2; they list newest first
+
+**Deviation:** MinIO no longer publishes images, so development runs **RustFS** as the
+S3-compatible store (ADR-015). The production bucket and credentials are to be supplied, not
+invented.
+
+**Verified — three consecutive clean browser runs against the built images (19 of 19 specs), after
+the runs before them found the supplier dropdown cap and a test's colliding scale code; 87 web unit
+tests; all 812 backend tests with every coverage gate met; `make api-smoke` with no 5xx:**
+
+| Check | Result |
+|---|---|
+| Catalog: category, brand, tax class, product with barcode and picture, branch price, promotion previewed | ✅ `catalog.spec` |
+| Catalog CSV: exported, and a two-row file loaded with one row refused and the reason shown | ✅ `catalog.spec`; `CatalogAdminIT` round-trip, formula guard, barcodes |
+| A branch manager prices and promotes but cannot edit products, in the UI or at the service | ✅ `catalog.spec` |
+| Stock received, near expiry, written off, transferred, counted and posted | ✅ `stock.spec` |
+| Order approved and sent, received with landed cost, invoice mismatch found, damaged stock returned | ✅ `purchasing.spec` |
+| Role built from the matrix, forced reset, audit filters | ✅ `access.spec` |
+| Member enrolled, points adjusted, consent, export, erasure | ✅ `customers.spec` |
+| Every report opens and exports; a write-off shows as shrinkage | ✅ `reports.spec` |
+| Receipt text, email wording (previewed, saved, reset), branch renamed, default tax class | ✅ `settings.spec` |
+| Navigation shows each area only to the permissions that use it | ✅ `nav.test.ts`, `admin.spec`, `auth.spec` |
 
 ---
 

@@ -14,7 +14,7 @@ test("an administrator navigates to every right it holds and manages non-admin u
 
   // Navigation for every right.
   const nav = page.getByRole("navigation", { name: "Main" });
-  const expected = ["Till", "Dashboard", "Reports", "Stock", "Purchasing", "Suppliers", "Customers", "Cash", "Users", "Roles", "Branches", "Audit", "Account"];
+  const expected = ["Till", "Dashboard", "Reports", "Products", "Catalog setup", "Pricing", "Stock", "Purchasing", "Suppliers", "Customers", "Cash", "Users", "Roles", "Branches", "Settings", "Audit", "Account"];
   for (const label of expected) {
     await expect(nav.getByRole("link", { name: new RegExp(`^${label}`) })).toBeVisible();
   }

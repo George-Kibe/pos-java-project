@@ -61,6 +61,7 @@ public class Projector {
                     Topics.INVENTORY_STOCK_DEDUCTED,
                     Topics.INVENTORY_STOCK_VALUED,
                     Topics.INVENTORY_BATCH_EXPIRING,
+                    Topics.INVENTORY_ADJUSTMENT_POSTED,
                     Topics.CATALOG_PRODUCT_CHANGED);
 
     public void apply(String topic, String json) {
@@ -77,6 +78,10 @@ public class Projector {
                     stockDeducted(EventJson.readEnvelope(json, StockDeductedPayload.class));
             case Topics.INVENTORY_STOCK_VALUED ->
                     stockValued(EventJson.readEnvelope(json, StockValuedPayload.class));
+            case Topics.INVENTORY_ADJUSTMENT_POSTED ->
+                    adjustmentPosted(
+                            EventJson.readEnvelope(
+                                    json, com.pos.events.inventory.AdjustmentPostedPayload.class));
             case Topics.INVENTORY_BATCH_EXPIRING ->
                     batchExpiring(EventJson.readEnvelope(json, BatchExpiringPayload.class));
             case Topics.CATALOG_PRODUCT_CHANGED ->
@@ -86,6 +91,41 @@ public class Projector {
     }
 
     // --- sales ------------------------------------------------------------------
+
+    /** Each line of a posted adjustment or count, as it was; shrinkage is summed at read time. */
+    private void adjustmentPosted(
+            EventEnvelope<com.pos.events.inventory.AdjustmentPostedPayload> event) {
+        var adjustment = event.payload();
+        Instant at = adjustment.postedAt() != null ? adjustment.postedAt() : event.occurredAt();
+        int number = 0;
+        for (var line : adjustment.lines()) {
+            number++;
+            jdbc.sql(
+                            """
+                            INSERT INTO report_stock_adjustments
+                                (adjustment_id, line_number, branch_id, reason_code, posted_at,
+                                 business_date, product_id, sku, quantity_delta, value_at_cost,
+                                 currency)
+                            VALUES (:id, :line, :branch, :reason, :at, :day, :product, :sku,
+                                    :quantity, :value, :currency)
+                            ON CONFLICT (adjustment_id, line_number) DO NOTHING
+                            """)
+                    .param("id", adjustment.adjustmentId())
+                    .param("line", number)
+                    .param("branch", adjustment.branchId())
+                    .param("reason", adjustment.reasonCode())
+                    .param("at", Timestamp.from(at))
+                    .param("day", Date.valueOf(BusinessDates.of(at)))
+                    .param("product", line.productId())
+                    .param("sku", line.sku())
+                    .param("quantity", line.quantityDelta())
+                    .param(
+                            "value",
+                            line.valueAtCost() == null ? BigDecimal.ZERO : line.valueAtCost())
+                    .param("currency", line.currency() == null ? "KES" : line.currency())
+                    .update();
+        }
+    }
 
     private void saleCompleted(EventEnvelope<SaleCompletedPayload> event) {
         SaleCompletedPayload sale = event.payload();

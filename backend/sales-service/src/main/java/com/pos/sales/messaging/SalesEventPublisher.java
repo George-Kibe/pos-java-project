@@ -270,7 +270,8 @@ public class SalesEventPublisher {
             Receipt receipt,
             List<com.pos.sales.domain.totals.TaxClassTotal> taxBreakdown,
             String email,
-            String recipientName) {
+            String recipientName,
+            ReceiptEmailRequestedPayload.ReceiptText receiptText) {
         Sale sale = receipt.getSale();
         outbox.record(
                 Topics.SALES_RECEIPT_EMAIL_REQUESTED,
@@ -327,7 +328,8 @@ public class SalesEventPublisher {
                                         sale.getTaxTotal(),
                                         sale.getGrandTotal(),
                                         sale.getAmountTendered(),
-                                        sale.getChangeGiven()))
+                                        sale.getChangeGiven(),
+                                        receiptText))
                         .build());
     }
 

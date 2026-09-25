@@ -44,6 +44,10 @@ public class TaxClass extends BaseEntity {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** The class a new product starts with; one at most. */
+    @Column(name = "is_default", nullable = false)
+    private boolean defaultClass = false;
+
     @OneToMany(
             mappedBy = "taxClass",
             cascade = CascadeType.ALL,

@@ -160,6 +160,20 @@ lane counted them.
 
 ---
 
+### ADR-015 — Product images in object storage
+**Decision:** a product's picture is uploaded to catalog-service, which keeps it in S3 (an
+S3-compatible store, RustFS, in development - MinIO no longer publishes images) under a key on the
+product, and serves it back at `/api/v1/products/{id}/image?v=<key>`. The type is read from the
+file's bytes (JPEG, PNG, WebP; 2 MB), never from what the browser declares; a replaced picture's
+object is deleted only after the new key commits. Without a bucket configured the catalog still
+runs and uploads answer 503.
+**Why:** decided with the user - images do not bloat the database or its backups, and production
+already lives on AWS. Serving through the catalog (not a public bucket URL) keeps pictures behind
+the same sign-in as everything else, and the versioned URL lets browsers cache them for good.
+**Cost:** a second store to back up, and one more service in development.
+
+---
+
 ## 2. Event catalogue
 
 Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = aggregate id.
@@ -170,10 +184,11 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.auth.user-registered.v1` | auth | notification, reporting | userId, email, name, roles |
 | `pos.auth.password-reset-requested.v1` | auth | notification | email, resetToken, expiresAt |
 | `pos.auth.user-role-changed.v1` | auth | reporting | userId, added[], removed[], actorId |
-| `pos.catalog.product-changed.v1` | catalog | inventory, reporting, sales | productId, sku, name, taxClassId, sellByWeight, active |
-| `pos.catalog.price-changed.v1` | catalog | sales, reporting | productId, branchId, price, effectiveFrom |
+| `pos.catalog.product-changed.v1` | catalog | inventory (kept per product in `product_details`, so a first stock row is named), reporting, sales | productId, sku, name, taxClassId, sellByWeight, active |
+| `pos.catalog.price-changed.v1` | catalog | (none yet) | productId, branchId (a price list's branch; null for the base price or a group-wide list), previousPrice, newPrice |
 | `pos.purchasing.po-approved.v1` | purchasing | notification, reporting | poId, supplierId, total, approvedBy |
 | `pos.purchasing.goods-received.v1` | purchasing | inventory, reporting | grnId, branchId, lines[{productId, qty, batchNo, expiry, unitCost — **landed**}] |
+| `pos.purchasing.supplier-return-sent.v1` | purchasing | inventory | returnId, returnNumber, supplierId, branchId, reasonCode, lines[{productId, batchNumber?, quantity, unitCost}] - the goods leave the named batch first, then soonest-expiring |
 | `pos.purchasing.supplier-cost-changed.v1` | purchasing | catalog, reporting | supplierId, productId, previousUnitCost, newUnitCost, sourceType |
 | `pos.payments.payment-requested.v1` | sales | payment, customer | paymentIntentId (the dedupe key), saleId, branchId, method, amount, phoneNumber (M-Pesa only), terminalReference (card only), customerId (loyalty only) — one event per tender, taken by whichever service settles that method |
 | `pos.payments.payment-authorized.v1` | payment, customer (loyalty) | sales, reporting | paymentIntentId, saleId, method, amountAuthorized (the intent amount when the whole-shilling M-Pesa charge was paid), providerReference, approvalCode |
@@ -184,7 +199,7 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.sales.sale-cancelled.v1` | sales | inventory, customer | saleId, branchId, cartId? (whose stock holds inventory releases), reason |
 | `pos.sales.return-processed.v1` | sales | inventory, payment, customer, reporting | returnId, saleId, lines[{productId, qty, resaleable, batchNo?}], refundTotal, refundMethod (non-cash is refunded by payment), tillSessionId (the open shift that paid it; required for cash) |
 | `pos.sales.shift-closed.v1` | sales | reporting, notification | shiftId, branchId, registerId, expected, declared, variance |
-| `pos.sales.receipt-email-requested.v1` | sales | notification | saleId, receiptId, receiptNumber, email, recipientName?, lines[] as charged, taxBreakdown[] as stored on the receipt, payments[], totals, amountTendered?, changeGiven? - the address travels on the event only; sales keeps none |
+| `pos.sales.receipt-email-requested.v1` | sales | notification | saleId, receiptId, receiptNumber, email, recipientName?, lines[] as charged, taxBreakdown[] as stored on the receipt, payments[], totals, amountTendered?, changeGiven?, receiptText? (the branch's header/footer, address, phone, tax PIN) - the address travels on the event only; sales keeps none |
 | `pos.customers.loyalty-accrued.v1` | customer | reporting, notification | customerId, saleId, points, balanceAfter, eligibleSpend, tierCode, expiresAt |
 | `pos.customers.tier-changed.v1` | customer | reporting, notification | customerId, previousTierCode, tierCode, rollingSpend, upgrade (it falls as well as rises) |
 | `pos.inventory.stock-deducted.v1` | inventory | reporting | saleId, branchId, lines[{productId, qty, batchAllocations[]}] |
@@ -192,7 +207,7 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.inventory.batch-expiring.v1` | inventory | notification, reporting | batchId, productId, branchId, expiry, qty, value |
 | `pos.inventory.stock-valued.v1` | inventory | reporting | snapshotId, branchId, valuedAt, page, pageCount, lines[{productId, sku, quantityOnHand, valueAtCost, currency}] — nightly and on demand; a snapshot counts only once every page has arrived |
 | `pos.inventory.negative-stock-detected.v1` | inventory | notification, reporting | productId, branchId, onHand, triggeredBy |
-| `pos.inventory.adjustment-posted.v1` | inventory | reporting | adjustmentId, branchId, lines[], reason, actorId |
+| `pos.inventory.adjustment-posted.v1` | inventory | reporting | adjustmentId, branchId, reasonCode (a stock take posts its differences as `STOCK_TAKE`), lines[{productId, quantityDelta, valueAtCost - signed, what stock taken off was worth at its batches' cost}] - reporting's shrinkage |
 | `pos.customers.loyalty-accrued.v1` | customer | notification, reporting | customerId, saleId, points, balance |
 | `pos.customers.tier-changed.v1` | customer | notification | customerId, fromTier, toTier |
 

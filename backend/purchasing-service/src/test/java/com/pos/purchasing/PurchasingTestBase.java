@@ -73,6 +73,7 @@ public abstract class PurchasingTestBase {
         // Children before parents.
         jdbc.sql("DELETE FROM purchasing.supplier_return_lines").update();
         jdbc.sql("DELETE FROM purchasing.supplier_returns").update();
+        jdbc.sql("DELETE FROM purchasing.supplier_invoice_variances").update();
         jdbc.sql("DELETE FROM purchasing.supplier_invoices").update();
         jdbc.sql("DELETE FROM purchasing.grn_lines").update();
         jdbc.sql("DELETE FROM purchasing.goods_received_notes").update();

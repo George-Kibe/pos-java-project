@@ -64,7 +64,10 @@ public abstract class NotificationTestBase {
     @BeforeEach
     void clearLedgers() {
         // Each test asserts on its own rows; leftovers from an earlier test would make counts lie.
-        jdbc.sql("TRUNCATE notification.notification_log, notification.processed_event").update();
+        jdbc.sql(
+                        "TRUNCATE notification.notification_log, notification.processed_event,"
+                                + " notification.template_texts")
+                .update();
     }
 
     /** Publishes an event the way the outbox relay does: envelope JSON, keyed by aggregate id. */

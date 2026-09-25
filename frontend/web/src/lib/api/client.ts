@@ -10,6 +10,8 @@ import { ApiError, parseBody, problemFrom } from "./errors";
 interface CallOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   json?: unknown;
+  /** A multipart body - an uploaded file. The browser sets its content type and boundary. */
+  form?: FormData;
   /** Offline terminals retry; the services honour this to make a retry harmless. */
   idempotencyKey?: string;
   signal?: AbortSignal;
@@ -18,7 +20,7 @@ interface CallOptions {
 async function call<S extends z.ZodType>(
   url: string,
   schema: S,
-  { method = "GET", json, idempotencyKey, signal }: CallOptions,
+  { method = "GET", json, form, idempotencyKey, signal }: CallOptions,
 ): Promise<z.infer<S>> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (json !== undefined) headers["Content-Type"] = "application/json";
@@ -29,7 +31,7 @@ async function call<S extends z.ZodType>(
     response = await fetch(url, {
       method,
       headers,
-      body: json !== undefined ? JSON.stringify(json) : undefined,
+      body: form ?? (json !== undefined ? JSON.stringify(json) : undefined),
       credentials: "same-origin",
       signal,
     });

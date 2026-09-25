@@ -20,6 +20,11 @@ export interface ReceiptDocument {
   change?: string;
   /** Printed prominently: a sale not yet confirmed by the server, or a copy. */
   notice?: string;
+  /** The branch's own text (Settings): its address and phone, tax PIN, and lines above and below. */
+  branchContact?: string;
+  taxPin?: string;
+  headerLines?: string[];
+  footerLines?: string[];
 }
 
 const LOCAL_TIME = new Intl.DateTimeFormat("en-GB", {

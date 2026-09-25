@@ -49,6 +49,13 @@ spring:
     virtual:
       enabled: true
 
+  # A product image is at most 2 MB (pos.storage.max-image-bytes); the CSV import rides on the same
+  # limits.
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
 server:
   port: ${SERVER_PORT:8082}
   error:
@@ -56,6 +63,14 @@ server:
       enabled: false
 
 pos:
+  storage:
+    endpoint: ${S3_ENDPOINT:}
+    region: ${S3_REGION:af-south-1}
+    bucket: ${S3_BUCKET:}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    path-style: ${S3_PATH_STYLE:false}
+    create-bucket: ${S3_CREATE_BUCKET:false}
   security:
     public-paths:
       - /actuator/health

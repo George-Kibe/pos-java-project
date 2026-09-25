@@ -1,4 +1,9 @@
 [( ${brandName} )]
+[# th:if="${branchAddress != null}"][( ${branchAddress} )]
+[/][# th:if="${branchPhone != null}"]Tel [( ${branchPhone} )]
+[/][# th:if="${taxPin != null}"]PIN [( ${taxPin} )]
+[/][# th:each="line : ${headerLines}"][( ${line} )]
+[/]
 Receipt [( ${receiptNumber} )] - [( ${issuedAt} )]
 [# th:if="${recipientName != null}"]
 Hello [( ${recipientName} )], here is your receipt.
@@ -16,4 +21,6 @@ Total [( ${currency} )]    [( ${grandTotal} )]
 Tax (prices include tax)
 [# th:each="tax : ${taxLines}"]  [( ${tax.taxClass} )] [( ${tax.rate} )]: [( ${tax.tax} )] on [( ${tax.taxable} )]
 [/]
-Keep this email for returns. Questions? [( ${supportEmail} )]
+[# th:each="line : ${footerLines}"][( ${line} )]
+[/]
+[# th:if="${closing != null}"][( ${closing} )] [/]Questions? [( ${supportEmail} )]

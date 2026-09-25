@@ -36,6 +36,8 @@ class ProjectionIT extends ReportingTestBase {
             List<ReportQueries.ProductRow> byProduct,
             List<ReportQueries.CategoryRow> byCategory,
             List<ReportQueries.TenderRow> paymentMix,
+            List<ReportQueries.HourRow> byHour,
+            List<ReportQueries.ShrinkageRow> shrinkage,
             java.math.BigDecimal returns,
             ShiftReportService.ShiftReport zReport,
             ShiftReportService.BranchDay branchDay,
@@ -53,6 +55,8 @@ class ProjectionIT extends ReportingTestBase {
                 reports.salesByProduct(filter),
                 reports.marginByCategory(filter),
                 reports.paymentMix(filter),
+                reports.salesByHour(filter),
+                reports.shrinkage(filter),
                 reports.returnsTotal(filter),
                 shifts.forShift(shift),
                 shifts.forBranchDay(BRANCH, today()),
@@ -121,6 +125,19 @@ class ProjectionIT extends ReportingTestBase {
         assertThat(day.dashboard().deadStockValue()).isEqualByComparingTo("400.00");
         assertThat(day.dashboard().nearExpiryValue()).isEqualByComparingTo("240.00");
         assertThat(day.dashboard().stockValue()).isEqualByComparingTo("2750.00");
+
+        // Shrinkage: only what was lost, largest first; the bar found again is not shrinkage.
+        assertThat(day.shrinkage()).hasSize(2);
+        assertThat(day.shrinkage().getFirst().reasonCode()).isEqualTo("DAMAGE");
+        assertThat(day.shrinkage().getFirst().quantity()).isEqualByComparingTo("2");
+        assertThat(day.shrinkage().getFirst().valueAtCost()).isEqualByComparingTo("160.00");
+        assertThat(day.shrinkage().get(1).reasonCode()).isEqualTo("STOCK_TAKE");
+        assertThat(day.shrinkage().get(1).valueAtCost()).isEqualByComparingTo("90.00");
+
+        // By hour: every basket of the day in some hour, and items per basket from the lines.
+        assertThat(day.byHour().stream().mapToLong(ReportQueries.HourRow::baskets).sum())
+                .isEqualTo(day.daily().stream().mapToLong(ReportQueries.SalesRow::baskets).sum());
+        assertThat(day.byHour()).allSatisfy(row -> assertThat(row.hour()).isBetween(0, 23));
     }
 
     @Test

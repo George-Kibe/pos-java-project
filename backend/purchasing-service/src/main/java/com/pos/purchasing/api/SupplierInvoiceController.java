@@ -6,6 +6,7 @@ import java.util.UUID;
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -45,7 +46,8 @@ public class SupplierInvoiceController {
     @Operation(summary = "Supplier invoices, optionally by match status")
     public PageResponse<PurchasingDtos.SupplierInvoiceResponse> list(
             @RequestParam(required = false) InvoiceMatchStatus status,
-            @PageableDefault(size = 50) Pageable pageable) {
+            @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC)
+                    Pageable pageable) {
 
         return PageResponse.of(
                 invoices.list(status, pageable), PurchasingDtos.SupplierInvoiceResponse::from);

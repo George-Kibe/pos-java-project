@@ -6,6 +6,7 @@ import java.util.UUID;
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -51,7 +52,8 @@ public class PurchaseOrderController {
     public PageResponse<PurchasingDtos.PurchaseOrderResponse> list(
             @RequestParam UUID branchId,
             @RequestParam(required = false) PurchaseOrderStatus status,
-            @PageableDefault(size = 50) Pageable pageable) {
+            @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC)
+                    Pageable pageable) {
 
         branchAccess.requireAccess(branchId);
         return PageResponse.of(

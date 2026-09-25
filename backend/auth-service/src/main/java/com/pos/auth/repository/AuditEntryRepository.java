@@ -13,7 +13,9 @@ import com.pos.auth.domain.AuditEntry;
  * {@code :x IS NULL OR ...} query: PostgreSQL rejects an untyped null parameter, which is what
  * broke user search.
  */
-public interface AuditEntryRepository extends JpaRepository<AuditEntry, UUID> {
+public interface AuditEntryRepository
+        extends JpaRepository<AuditEntry, UUID>,
+                org.springframework.data.jpa.repository.JpaSpecificationExecutor<AuditEntry> {
 
     Page<AuditEntry> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
