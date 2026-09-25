@@ -377,7 +377,7 @@ public class CheckoutService {
 
         sale.setStatus(SaleStatus.VOIDED);
         sale.setVoidedAt(Instant.now());
-        sale.setVoidedBy(currentActor());
+        sale.setVoidedBy(AuthenticatedUser.currentUserId());
         sale.setVoidApprovedBy(approvedBy);
         sale.setVoidReason(reason);
 
@@ -400,12 +400,8 @@ public class CheckoutService {
     }
 
     private static UUID actor(Cart cart) {
-        UUID current = currentActor();
+        UUID current = AuthenticatedUser.currentUserId();
         return current != null ? current : cart.getCashierId();
-    }
-
-    private static UUID currentActor() {
-        return AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
     }
 
     /**

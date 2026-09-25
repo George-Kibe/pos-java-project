@@ -3,7 +3,6 @@ package com.pos.catalog.domain;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Currency;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,7 +15,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
-import com.pos.common.money.Money;
 import com.pos.common.persistence.BaseEntity;
 
 import lombok.Getter;
@@ -100,10 +98,6 @@ public class Promotion extends BaseEntity {
         this.code = code;
         this.name = name;
         this.type = type;
-    }
-
-    public Money valueAsMoney() {
-        return Money.of(value == null ? BigDecimal.ZERO : value, Currency.getInstance(currency));
     }
 
     public boolean runsAt(Instant at) {

@@ -46,7 +46,8 @@ public class RebuildService {
                     "report_shifts",
                     "report_stock_valuations",
                     "report_expiring_batches",
-                    "report_stock_adjustments");
+                    "report_stock_adjustments",
+                    "report_expenses");
 
     private final JdbcClient jdbc;
     private final Projector projector;
@@ -105,9 +106,7 @@ public class RebuildService {
                 .param("started", Timestamp.from(started))
                 .param("finished", Timestamp.from(finished))
                 .param("count", replayed)
-                .param(
-                        "by",
-                        AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null))
+                .param("by", AuthenticatedUser.currentUserId())
                 .update();
         log.info("Rebuilt reporting from {} logged events", replayed);
         return new Result(runId, replayed, started, finished);

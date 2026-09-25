@@ -34,6 +34,23 @@ public class Category extends BaseEntity {
     @Column(nullable = false)
     private boolean active = true;
 
+    /**
+     * What items in this category should earn, as a fraction of the price without tax; null
+     * inherits the parent's. See {@link com.pos.catalog.domain.pricing.MarginCheck}.
+     */
+    @Column(name = "target_margin", precision = 7, scale = 4)
+    private java.math.BigDecimal targetMargin;
+
+    /** This category's target, or the nearest ancestor's; null when none is set anywhere. */
+    public java.math.BigDecimal effectiveTargetMargin() {
+        for (Category at = this; at != null; at = at.getParent()) {
+            if (at.getTargetMargin() != null) {
+                return at.getTargetMargin();
+            }
+        }
+        return null;
+    }
+
     public Category(String code, String name) {
         this.code = code;
         this.name = name;

@@ -92,6 +92,14 @@ public class GoodsReceivedNote extends BaseEntity {
     @Column(name = "landed_total", nullable = false, precision = 19, scale = 4)
     private BigDecimal landedTotal = BigDecimal.ZERO;
 
+    /** Whether the costs were keyed in as invoiced, with VAT; they are stored without it. */
+    @Column(name = "costs_include_tax", nullable = false)
+    private boolean costsIncludeTax;
+
+    /** The VAT on the accepted goods, summed: reclaimable from the tax authority. */
+    @Column(name = "input_tax_total", nullable = false, precision = 19, scale = 4)
+    private BigDecimal inputTaxTotal = BigDecimal.ZERO;
+
     @Column(nullable = false, length = 3)
     private String currency = "KES";
 

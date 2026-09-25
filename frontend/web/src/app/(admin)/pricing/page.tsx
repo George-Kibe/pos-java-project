@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { DataTable, LoadFailure, PageHeader } from "@/components/admin/page-parts";
 import { PriceListCreator } from "@/components/admin/price-list-creator";
+import { PriceReviews, TargetMargins } from "@/components/admin/price-reviews";
 import { Forbidden } from "@/components/forbidden";
 import { buttonVariants } from "@/components/ui/button";
 import { branchChoices } from "@/lib/api/branches";
@@ -25,17 +26,28 @@ export default async function PricingPage({ searchParams }: PageProps<"/pricing"
   const promos = can(user, "promotion:manage");
   if (!lists && !promos) return <Forbidden what="managing prices" />;
   const query = await searchParams;
-  const tab = param(query.tab) === "promotions" && promos ? "promotions" : lists ? "lists" : "promotions";
+  const asked = param(query.tab);
+  const tab = asked === "promotions" && promos ? "promotions" : asked === "reviews" && lists ? "reviews" : asked === "margins" && lists ? "margins" : lists ? "lists" : "promotions";
   const branches = await branchChoices(user);
   const branchName = (id: string | null) => (id ? (branches.find((b) => b.id === id)?.name ?? "Another branch") : "Every branch");
 
   return (
     <div className="grid gap-6">
-      <PageHeader title="Pricing" description="Branch prices that differ from the base price, and promotions with their windows." />
-      <nav aria-label="Pricing" className="flex gap-2">
+      <PageHeader title="Pricing" description="Branch prices, the margins items should earn and the deliveries that fell short, and promotions with their windows." />
+      <nav aria-label="Pricing" className="flex flex-wrap gap-2">
         {lists ? (
           <Link href="/pricing?tab=lists" aria-current={tab === "lists" ? "page" : undefined} className={cn(buttonVariants({ variant: tab === "lists" ? "default" : "outline" }))}>
             Price lists
+          </Link>
+        ) : null}
+        {lists ? (
+          <Link href="/pricing?tab=reviews" aria-current={tab === "reviews" ? "page" : undefined} className={cn(buttonVariants({ variant: tab === "reviews" ? "default" : "outline" }))}>
+            Price reviews
+          </Link>
+        ) : null}
+        {lists ? (
+          <Link href="/pricing?tab=margins" aria-current={tab === "margins" ? "page" : undefined} className={cn(buttonVariants({ variant: tab === "margins" ? "default" : "outline" }))}>
+            Target margins
           </Link>
         ) : null}
         {promos ? (
@@ -44,7 +56,10 @@ export default async function PricingPage({ searchParams }: PageProps<"/pricing"
           </Link>
         ) : null}
       </nav>
-      {tab === "lists" ? <PriceLists branchName={branchName} branches={branches} /> : <Promotions branchName={branchName} />}
+      {tab === "lists" ? <PriceLists branchName={branchName} branches={branches} /> : null}
+      {tab === "reviews" ? <PriceReviews branches={branches} /> : null}
+      {tab === "margins" ? <TargetMargins /> : null}
+      {tab === "promotions" ? <Promotions branchName={branchName} /> : null}
     </div>
   );
 }

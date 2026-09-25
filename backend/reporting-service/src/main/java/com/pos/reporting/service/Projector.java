@@ -62,7 +62,8 @@ public class Projector {
                     Topics.INVENTORY_STOCK_VALUED,
                     Topics.INVENTORY_BATCH_EXPIRING,
                     Topics.INVENTORY_ADJUSTMENT_POSTED,
-                    Topics.CATALOG_PRODUCT_CHANGED);
+                    Topics.CATALOG_PRODUCT_CHANGED,
+                    Topics.PURCHASING_EXPENSE_CHANGED);
 
     public void apply(String topic, String json) {
         switch (topic) {
@@ -86,11 +87,54 @@ public class Projector {
                     batchExpiring(EventJson.readEnvelope(json, BatchExpiringPayload.class));
             case Topics.CATALOG_PRODUCT_CHANGED ->
                     productChanged(EventJson.readEnvelope(json, ProductChangedPayload.class));
+            case Topics.PURCHASING_EXPENSE_CHANGED ->
+                    expenseChanged(
+                            EventJson.readEnvelope(
+                                    json, com.pos.events.purchasing.ExpenseChangedPayload.class));
             default -> log.debug("No projection for {}", topic);
         }
     }
 
     // --- sales ------------------------------------------------------------------
+
+    /**
+     * An expense's latest revision. Replaced only by a higher one, so the row ends the same however
+     * the events are ordered or replayed.
+     */
+    private void expenseChanged(
+            EventEnvelope<com.pos.events.purchasing.ExpenseChangedPayload> event) {
+        var expense = event.payload();
+        jdbc.sql(
+                        """
+                        INSERT INTO report_expenses
+                            (expense_id, expense_number, branch_id, category, description,
+                             incurred_on, amount, tax_amount, currency, status, revision)
+                        VALUES (:id, :number, :branch, :category, :description, :day, :amount,
+                                :tax, :currency, :status, :revision)
+                        ON CONFLICT (expense_id) DO UPDATE SET
+                            branch_id = EXCLUDED.branch_id,
+                            category = EXCLUDED.category,
+                            description = EXCLUDED.description,
+                            incurred_on = EXCLUDED.incurred_on,
+                            amount = EXCLUDED.amount,
+                            tax_amount = EXCLUDED.tax_amount,
+                            status = EXCLUDED.status,
+                            revision = EXCLUDED.revision
+                        WHERE report_expenses.revision < EXCLUDED.revision
+                        """)
+                .param("id", expense.expenseId())
+                .param("number", expense.expenseNumber())
+                .param("branch", expense.branchId())
+                .param("category", expense.category())
+                .param("description", expense.description())
+                .param("day", Date.valueOf(expense.incurredOn()))
+                .param("amount", expense.amount())
+                .param("tax", expense.taxAmount() == null ? BigDecimal.ZERO : expense.taxAmount())
+                .param("currency", expense.currency() == null ? "KES" : expense.currency())
+                .param("status", expense.status())
+                .param("revision", expense.revision())
+                .update();
+    }
 
     /** Each line of a posted adjustment or count, as it was; shrinkage is summed at read time. */
     private void adjustmentPosted(

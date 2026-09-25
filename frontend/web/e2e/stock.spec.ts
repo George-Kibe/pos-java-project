@@ -51,7 +51,10 @@ test("stock is received, watched for expiry, written off, transferred and counte
   await receive.getByRole("button", { name: "Find", exact: true }).click();
   await receive.getByRole("button", { name: new RegExp(biscuits.name) }).click();
   await receive.getByLabel("Quantity").fill("20");
-  await receive.getByLabel("Unit cost").fill("50");
+  // Keyed in as invoiced, with VAT: 58.00 is 50.00 without it, which is what the stock is worth.
+  await expect(receive.getByLabel("Costs include VAT")).toBeChecked();
+  await receive.getByLabel("Unit cost").fill("58");
+  await expect(receive.getByTestId("cost-verdict")).toContainText("50.00 without VAT");
   await receive.getByLabel("Batch").fill(`BISC-${RUN}`);
   await receive.getByLabel("Expiry").fill(soon);
   await receive.getByRole("button", { name: "Receive stock" }).click();

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.pos.common.error.Errors;
 import com.pos.reporting.service.ExportService;
 import com.pos.reporting.service.LagMonitor;
+import com.pos.reporting.service.ProfitAndLoss;
 import com.pos.reporting.service.RebuildService;
 import com.pos.reporting.service.ReportFilter;
 import com.pos.reporting.service.ReportQueries;
@@ -51,6 +52,7 @@ public class ReportController {
     private final RebuildService rebuild;
     private final LagMonitor lag;
     private final ReportAccess access;
+    private final ProfitAndLoss profitAndLoss;
 
     // --- sales ------------------------------------------------------------------------
 
@@ -145,6 +147,33 @@ public class ReportController {
             @RequestParam(required = false) UUID branchId,
             @RequestParam(required = false) UUID categoryId) {
         return reports.shrinkage(filter(from, to, branchId, categoryId));
+    }
+
+    @GetMapping("/profit-and-loss")
+    @PreAuthorize(VIEW)
+    @Operation(
+            summary = "Profit and loss: net sales, cost of sales, losses, expenses, net profit",
+            description =
+                    "Without VAT throughout. Per branch, and for the whole business with head"
+                            + " office's expenses when no branch is named.")
+    public ProfitAndLoss.Report profitAndLoss(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) UUID branchId) {
+        return profitAndLoss.statement(filter(from, to, branchId, null));
+    }
+
+    @GetMapping("/profit-and-loss/products")
+    @PreAuthorize(VIEW)
+    @Operation(
+            summary = "Each product's gross profit less what of it was lost",
+            description = "Expenses are not shared out over products; see the statement for those.")
+    public List<ProfitAndLoss.ProductProfit> profitByProduct(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) UUID categoryId) {
+        return profitAndLoss.byProduct(filter(from, to, branchId, categoryId));
     }
 
     @GetMapping("/payment-mix")

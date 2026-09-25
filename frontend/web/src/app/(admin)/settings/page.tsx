@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/admin/page-parts";
-import { EmailWording, ReceiptTextEditor } from "@/components/admin/settings-editors";
+import { EmailWording, ExpenseApprovalLimit, ReceiptTextEditor } from "@/components/admin/settings-editors";
 import { Forbidden } from "@/components/forbidden";
 import { branchChoices } from "@/lib/api/branches";
 import { can, requireUser } from "@/lib/auth/dal";
@@ -20,9 +20,10 @@ export default async function SettingsPage() {
   const branches = await branchChoices(user);
   return (
     <div className="grid gap-10">
-      <PageHeader title="Settings" description="Receipt text per branch, and the wording of the emails customers and staff receive." />
+      <PageHeader title="Settings" description="Receipt text per branch, the wording of the emails customers and staff receive, and when an expense needs a second person." />
       {receipts ? <ReceiptTextEditor branches={branches} /> : null}
       {emails ? <EmailWording /> : null}
+      {emails ? <ExpenseApprovalLimit /> : null}
     </div>
   );
 }

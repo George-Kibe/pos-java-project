@@ -95,7 +95,7 @@ public class TransferService {
                             .formatted(transfer.getStatus()));
         }
 
-        UUID actor = AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
+        UUID actor = AuthenticatedUser.currentUserId();
 
         for (StockTransferLine line : transfer.getLines()) {
             StockItem item = stock.require(line.getProductId(), transfer.getFromBranchId());
@@ -144,7 +144,7 @@ public class TransferService {
                     "This transfer is %s and cannot be received.".formatted(transfer.getStatus()));
         }
 
-        UUID actor = AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
+        UUID actor = AuthenticatedUser.currentUserId();
 
         for (StockTransferLine line : transfer.getLines()) {
             BigDecimal quantity =

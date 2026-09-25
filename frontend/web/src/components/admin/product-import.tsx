@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { FormError, problemErrors } from "@/components/admin/form-parts";
+import { failureMessage, FormError } from "@/components/admin/form-parts";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { api } from "@/lib/api/client";
@@ -51,7 +51,7 @@ export function ProductImport() {
         router.refresh();
       }
     } catch (failure) {
-      setError(problemErrors(failure, "The file was not loaded.").form ?? "The file was not loaded.");
+      setError(failureMessage(failure, "The file was not loaded."));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = "";

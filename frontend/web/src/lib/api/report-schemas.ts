@@ -67,3 +67,43 @@ export const BranchDay = z.object({
   variance: z.number().nullable(),
   reconciled: z.boolean(),
 });
+
+/** Profit and loss, without VAT throughout. */
+const Amount = z.object({ code: z.string(), amount: n });
+const Statement = z.object({
+  branchId: z.uuid().nullable(),
+  netSales: n,
+  costOfSales: n,
+  grossProfit: n,
+  grossMarginPercent: n,
+  losses: z.array(Amount),
+  lossTotal: n,
+  profitAfterLosses: n,
+  expenses: z.array(Amount),
+  expenseTotal: n,
+  netProfit: n,
+  netMarginPercent: n,
+  uncostedQuantity: n,
+});
+export const ProfitAndLossReport = z.object({
+  from: z.string(),
+  to: z.string(),
+  branches: z.array(Statement),
+  headOfficeExpenses: z.array(Amount),
+  headOfficeTotal: n,
+  total: Statement,
+});
+export const ProductProfitRow = z.object({
+  productId: z.uuid(),
+  sku: s,
+  productName: s,
+  categoryCode: s,
+  quantitySold: n,
+  netSales: n,
+  costOfSales: n,
+  grossProfit: n,
+  losses: n,
+  profitAfterLosses: n,
+  marginPercent: n,
+  uncostedQuantity: n,
+});

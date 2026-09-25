@@ -187,6 +187,10 @@ public class ReorderService {
         for (UUID id : suggestionIds) {
             suggestions
                     .findById(id)
+                    // Only this branch's, and only while open: an order cannot close another
+                    // branch's suggestions, or reopen a dismissed one as ordered.
+                    .filter(s -> s.getStatus() == SuggestionStatus.OPEN)
+                    .filter(s -> s.getBranchId().equals(order.getBranchId()))
                     .ifPresent(
                             suggestion -> {
                                 suggestion.setStatus(SuggestionStatus.ORDERED);

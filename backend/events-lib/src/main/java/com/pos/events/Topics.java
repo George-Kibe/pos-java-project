@@ -37,6 +37,9 @@ public final class Topics {
     public static final String PURCHASING_SUPPLIER_COST_CHANGED =
             "pos.purchasing.supplier-cost-changed.v1";
 
+    /** An expense recorded, approved, rejected or voided; keyed by expense, compacted. */
+    public static final String PURCHASING_EXPENSE_CHANGED = "pos.purchasing.expense-changed.v1";
+
     // --- payments -------------------------------------------------------------
     public static final String PAYMENTS_PAYMENT_REQUESTED = "pos.payments.payment-requested.v1";
     public static final String PAYMENTS_PAYMENT_AUTHORIZED = "pos.payments.payment-authorized.v1";

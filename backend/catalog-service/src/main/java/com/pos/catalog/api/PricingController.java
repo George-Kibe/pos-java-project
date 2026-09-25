@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.pos.catalog.api.dto.CatalogDtos;
 import com.pos.catalog.service.BarcodeScanService;
+import com.pos.catalog.service.CostCheckService;
 import com.pos.catalog.service.PricingRequestSpec;
 import com.pos.catalog.service.PricingService;
 
@@ -37,6 +38,35 @@ public class PricingController {
 
     private final PricingService pricing;
     private final BarcodeScanService scanning;
+    private final CostCheckService costs;
+
+    @PostMapping("/pricing/cost-check")
+    @PreAuthorize("hasAuthority('product:view')")
+    @Operation(
+            summary = "Judge costs against a branch's prices",
+            description =
+                    "Per product: the tax rate, the cost without VAT, the branch's regular price,"
+                            + " the margin it leaves, the target, and a price that would reach it"
+                            + " (rounded up to the shilling). Nothing is saved; purchasing uses it"
+                            + " to take VAT out of costs, and the delivery screen to warn as costs"
+                            + " are typed.")
+    public List<CatalogDtos.CostCheckResponse> costCheck(
+            @Valid @RequestBody CatalogDtos.CostCheckRequest request) {
+        return costs
+                .check(
+                        request.branchId(),
+                        request.at(),
+                        request.includesTax(),
+                        request.lines().stream()
+                                .map(
+                                        line ->
+                                                new CostCheckService.CostLine(
+                                                        line.productId(), line.unitCost()))
+                                .toList())
+                .stream()
+                .map(CatalogDtos.CostCheckResponse::from)
+                .toList();
+    }
 
     @PostMapping("/pricing/resolve")
     @PreAuthorize("hasAuthority('product:view')")

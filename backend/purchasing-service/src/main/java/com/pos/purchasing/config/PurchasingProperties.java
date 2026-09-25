@@ -19,7 +19,14 @@ import com.pos.purchasing.domain.matching.MatchTolerance;
 public record PurchasingProperties(
         int defaultCoverDays,
         BigDecimal matchToleranceAmount,
-        BigDecimal matchTolerancePercentage) {
+        BigDecimal matchTolerancePercentage,
+        /** Where catalog is: it knows each product's tax rate and price. */
+        String catalogUri,
+        java.time.Duration catalogTimeout) {
+
+    public java.time.Duration catalogTimeoutOrDefault() {
+        return catalogTimeout == null ? java.time.Duration.ofSeconds(3) : catalogTimeout;
+    }
 
     public MatchTolerance tolerance() {
         return new MatchTolerance(

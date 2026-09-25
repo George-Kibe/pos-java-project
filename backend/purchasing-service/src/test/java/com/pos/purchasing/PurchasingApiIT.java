@@ -1,5 +1,6 @@
 package com.pos.purchasing;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
@@ -154,6 +155,143 @@ class PurchasingApiIT extends PurchasingTestBase {
                                 .param("q", "sup-find")
                                 .with(at(BRANCH, "purchase:view")))
                 .andExpect(jsonPath("$.content[*].id", containsInAnyOrder(active, held)));
+    }
+
+    @Test
+    @DisplayName(
+            "a delivery keyed in as invoiced keeps its cost without VAT, and the VAT beside it")
+    void deliveriesAreCostedWithoutVat() throws Exception {
+        String supplierId = createSupplier("SUP-VAT");
+        UUID oil = UUID.randomUUID();
+        UUID maize = UUID.randomUUID();
+        CATALOG.rate(oil, "0.16");
+        // Zero-rated: nothing to take out, nothing to reclaim.
+        CATALOG.rate(maize, "0");
+
+        mockMvc.perform(
+                        post("/api/v1/goods-receipts")
+                                .with(at(BRANCH, "purchase:receive"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        EventJson.write(
+                                                Map.of(
+                                                        "supplierId",
+                                                        supplierId,
+                                                        "branchId",
+                                                        BRANCH,
+                                                        "costsIncludeTax",
+                                                        true,
+                                                        "lines",
+                                                        List.of(
+                                                                receiptLine(oil, "10", "2", "174"),
+                                                                receiptLine(
+                                                                        maize, "5", "0", "150"))))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.costsIncludeTax", is(true)))
+                .andExpect(jsonPath("$.lines[0].enteredUnitCost", is(174.0)))
+                .andExpect(jsonPath("$.lines[0].unitCost", is(150.0)))
+                .andExpect(jsonPath("$.lines[0].taxRate", is(0.16)))
+                // Eight bags accepted, two rejected: 8 x 150 x 16%.
+                .andExpect(jsonPath("$.lines[0].inputTax", is(192.0)))
+                .andExpect(jsonPath("$.lines[1].unitCost", is(150.0)))
+                .andExpect(jsonPath("$.lines[1].inputTax", is(0.0)))
+                .andExpect(jsonPath("$.inputTaxTotal", is(192.0)))
+                // Stock is valued without VAT.
+                .andExpect(jsonPath("$.goodsTotal", is(1950.0)));
+        // The caller's own token went to catalog, not a credential of this service's.
+        assertThat(CATALOG.lastAuthorization()).startsWith("Bearer ");
+    }
+
+    @Test
+    @DisplayName("with catalog unreachable a delivery is refused 503 and nothing is recorded")
+    void catalogDownRecordsNothing() throws Exception {
+        String supplierId = createSupplier("SUP-DOWN");
+        CATALOG.goDown();
+        long before = grns.count();
+
+        mockMvc.perform(
+                        post("/api/v1/goods-receipts")
+                                .with(at(BRANCH, "purchase:receive"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        EventJson.write(
+                                                Map.of(
+                                                        "supplierId",
+                                                        supplierId,
+                                                        "branchId",
+                                                        BRANCH,
+                                                        "lines",
+                                                        List.of(
+                                                                receiptLine(
+                                                                        UUID.randomUUID(),
+                                                                        "1",
+                                                                        "0",
+                                                                        "10"))))))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code", is("catalog.unavailable")));
+        assertThat(grns.count()).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("an order's lines take their VAT rate from catalog unless the order names one")
+    void orderLinesTakeCatalogRates() throws Exception {
+        String supplierId = createSupplier("SUP-RATE");
+        UUID soap = UUID.randomUUID();
+        UUID exempt = UUID.randomUUID();
+        CATALOG.rate(soap, "0.16");
+        CATALOG.rate(exempt, "0.16");
+
+        mockMvc.perform(
+                        post("/api/v1/purchase-orders")
+                                .with(at(BRANCH, "purchase:create"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        EventJson.write(
+                                                Map.of(
+                                                        "supplierId",
+                                                        supplierId,
+                                                        "branchId",
+                                                        BRANCH,
+                                                        "lines",
+                                                        List.of(
+                                                                Map.of(
+                                                                        "productId",
+                                                                        soap,
+                                                                        "quantity",
+                                                                        10,
+                                                                        "unitCost",
+                                                                        100),
+                                                                Map.of(
+                                                                        "productId",
+                                                                        exempt,
+                                                                        "quantity",
+                                                                        1,
+                                                                        "unitCost",
+                                                                        50,
+                                                                        "taxRate",
+                                                                        0))))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.lines[0].taxRate", is(0.16)))
+                .andExpect(jsonPath("$.lines[0].taxAmount", is(160.0)))
+                .andExpect(jsonPath("$.lines[1].taxRate", is(0.0)))
+                .andExpect(jsonPath("$.taxTotal", is(160.0)));
+    }
+
+    private static Map<String, Object> receiptLine(
+            UUID product, String received, String rejected, String unitCost) {
+        return Map.of(
+                "productId",
+                product,
+                "sku",
+                "SKU-" + product.toString().substring(0, 6),
+                "quantityReceived",
+                new java.math.BigDecimal(received),
+                "quantityRejected",
+                new java.math.BigDecimal(rejected),
+                "rejectionReason",
+                "Damaged",
+                "unitCost",
+                new java.math.BigDecimal(unitCost));
     }
 
     @Test

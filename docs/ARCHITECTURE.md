@@ -172,6 +172,27 @@ already lives on AWS. Serving through the catalog (not a public bucket URL) keep
 the same sign-in as everything else, and the versioned URL lets browsers cache them for good.
 **Cost:** a second store to back up, and one more service in development.
 
+### ADR-016 — Costs without VAT, price reviews, and net profit
+**Decision:** the business is VAT-registered, so every cost is held **without VAT**: a delivery or
+an order keyed in as invoiced has its VAT taken out by catalog's `POST /pricing/cost-check` (one
+tax engine), and purchasing keeps what was typed, the rate and the input VAT beside the net cost.
+Catalog consumes `goods-received` and compares each line's landed cost with the branch's regular
+price: below the product's target margin (its own, else its category's, else the parent's) or
+below cost, it opens a **price review** suggesting a price rounded up to the shilling; a manager
+with `price:manage` sets it (the branch's list price if a list set it, else the base price) or
+keeps the old one for a reason. Nothing reprices by itself. Expenses live in purchasing - above an
+approval limit they count once someone other than the recorder approves them - and reporting's
+profit and loss is net sales less cost of sales, losses and approved expenses, head office's
+counted once in the business-wide figure.
+**Why:** decided with the user. Margin compares a price net of output VAT with a cost net of input
+VAT, or every standard-rated item looks 16% better than it is. A price is a commercial decision, so
+a delivery proposes and a person decides. The checks happen where the data lives: the price in
+catalog, the money spent in purchasing.
+**Cost:** purchasing calls catalog synchronously when costs are keyed in (a 503 when it is down -
+nothing is recorded), and catalog now consumes an event. A supplier who is not VAT-registered
+charges no VAT, but the input VAT is still worked out from the product's rate; name a rate of zero
+on the order for such a supplier.
+
 ---
 
 ## 2. Event catalogue
@@ -187,7 +208,8 @@ Topic naming: `pos.<domain>.<event>.v<n>`, dead-letter: same + `.dlt`. Key = agg
 | `pos.catalog.product-changed.v1` | catalog | inventory (kept per product in `product_details`, so a first stock row is named), reporting, sales | productId, sku, name, taxClassId, sellByWeight, active |
 | `pos.catalog.price-changed.v1` | catalog | (none yet) | productId, branchId (a price list's branch; null for the base price or a group-wide list), previousPrice, newPrice |
 | `pos.purchasing.po-approved.v1` | purchasing | notification, reporting | poId, supplierId, total, approvedBy |
-| `pos.purchasing.goods-received.v1` | purchasing | inventory, reporting | grnId, branchId, lines[{productId, qty, batchNo, expiry, unitCost — **landed**}] |
+| `pos.purchasing.goods-received.v1` | purchasing | inventory, reporting, catalog | grnId, branchId, lines[{productId, qty, batchNo, expiry, unitCost — **landed, without VAT**}]; catalog opens a price review when it leaves an item below target |
+| `pos.purchasing.expense-changed.v1` | purchasing | reporting | expenseId, expenseNumber, branchId (null = head office), category, incurredOn, amount and taxAmount (without VAT / the VAT), status, **revision** - the whole expense each time; readers keep the highest revision. Compacted |
 | `pos.purchasing.supplier-return-sent.v1` | purchasing | inventory | returnId, returnNumber, supplierId, branchId, reasonCode, lines[{productId, batchNumber?, quantity, unitCost}] - the goods leave the named batch first, then soonest-expiring |
 | `pos.purchasing.supplier-cost-changed.v1` | purchasing | catalog, reporting | supplierId, productId, previousUnitCost, newUnitCost, sourceType |
 | `pos.payments.payment-requested.v1` | sales | payment, customer | paymentIntentId (the dedupe key), saleId, branchId, method, amount, phoneNumber (M-Pesa only), terminalReference (card only), customerId (loyalty only) — one event per tender, taken by whichever service settles that method |
@@ -358,7 +380,7 @@ from the M-Pesa organisation portal is uploaded and reconciled receipt by receip
 | `auth` | auth-service | Reads identity claims from the JWT — never the tables |
 | `catalog` | catalog-service | sales caches product/price via events; inventory caches product metadata |
 | `inventory` | inventory-service | sales sees availability via API; reporting projects from events |
-| `purchasing` | purchasing-service | inventory receives stock via `goods-received` events |
+| `purchasing` | purchasing-service | inventory receives stock via `goods-received` events; catalog checks their cost against price; reporting takes expenses from `expense-changed` |
 | `sales` | sales-service | reporting projects from events; payment correlates by `saleId` |
 | `payment` | payment-service | sales learns outcomes via events only |
 | `customer` | customer-service | sales attaches `customerId`; loyalty resolved via events/API |

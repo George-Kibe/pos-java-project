@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.pos.common.error.Errors;
 import com.pos.common.security.AuthenticatedUser;
+import com.pos.purchasing.client.CatalogCostClient;
 import com.pos.purchasing.domain.GoodsReceivedNote;
 import com.pos.purchasing.domain.GrnLine;
 import com.pos.purchasing.domain.GrnStatus;
@@ -53,6 +54,7 @@ public class GoodsReceiptService {
     private final PurchaseOrderService orders;
     private final DocumentNumberService numbers;
     private final PurchasingEventPublisher events;
+    private final CatalogCostClient catalog;
 
     /** One product on a delivery as keyed in. */
     public record ReceiptLineRequest(
@@ -91,18 +93,31 @@ public class GoodsReceiptService {
             BigDecimal dutyAmount,
             AllocationBasis allocationBasis,
             String notes,
+            boolean costsIncludeTax,
             List<ReceiptLineRequest> lines) {
 
         if (lines == null || lines.isEmpty()) {
             throw new Errors.BusinessRuleException(
                     "grn.no_lines", "A goods receipt needs at least one line");
         }
+        // Asked first, before anything is written: unreachable, nothing is recorded.
+        List<CatalogCostClient.NetCost> netCosts =
+                catalog.netCosts(
+                        branchId,
+                        null,
+                        costsIncludeTax,
+                        lines.stream()
+                                .map(
+                                        line ->
+                                                new CatalogCostClient.CostLine(
+                                                        line.productId(), line.unitCost()))
+                                .toList());
 
         Supplier supplier = suppliers.require(supplierId);
         GoodsReceivedNote grn = new GoodsReceivedNote(numbers.nextGrnNumber(), supplier, branchId);
         grn.setDeliveryNoteRef(deliveryNoteRef);
         grn.setReceivedAt(Instant.now());
-        grn.setReceivedBy(currentActor());
+        grn.setReceivedBy(AuthenticatedUser.currentUserId());
         grn.setNotes(notes);
         if (freightAmount != null) {
             grn.setFreightAmount(freightAmount);
@@ -122,14 +137,18 @@ public class GoodsReceiptService {
             orderLines = linesByProduct(order);
         }
 
-        for (ReceiptLineRequest request : lines) {
+        grn.setCostsIncludeTax(costsIncludeTax);
+        for (int index = 0; index < lines.size(); index++) {
+            ReceiptLineRequest request = lines.get(index);
+            CatalogCostClient.NetCost cost = netCosts.get(index);
             GrnLine line =
                     grn.addLine(
                             request.productId(),
                             request.sku(),
                             request.productName(),
                             request.quantityReceived(),
-                            request.unitCost(),
+                            // Stored without VAT, whichever way it was keyed in.
+                            cost.netUnitCost(),
                             request.batchNumber(),
                             request.expiryDate());
 
@@ -150,7 +169,12 @@ public class GoodsReceiptService {
                 // by comparing two documents later.
                 line.setQuantityOrdered(orderLine.getQuantityOrdered());
             }
+            line.applyTax(cost.taxRate(), request.unitCost());
         }
+        grn.setInputTaxTotal(
+                grn.getLines().stream()
+                        .map(GrnLine::getInputTax)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add));
 
         grn.setGoodsTotal(goodsTotal(grn));
         grn.setLandedTotal(grn.getGoodsTotal().add(grn.totalCharges()));
@@ -183,7 +207,7 @@ public class GoodsReceiptService {
 
         grn.setStatus(GrnStatus.POSTED);
         grn.setPostedAt(Instant.now());
-        grn.setPostedBy(currentActor());
+        grn.setPostedBy(AuthenticatedUser.currentUserId());
 
         if (grn.getPurchaseOrder() != null) {
             applyToOrder(grn);
@@ -209,11 +233,6 @@ public class GoodsReceiptService {
                 posted.getLines().size(),
                 posted.getLandedTotal());
         return posted;
-    }
-
-    /** Who is doing this, taken from the verified token rather than from the request. */
-    private static UUID currentActor() {
-        return AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
     }
 
     /** Abandons a draft receipt. A posted one is corrected with a supplier return instead. */

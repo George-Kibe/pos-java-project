@@ -105,10 +105,11 @@ public class PriceListService {
         Product product =
                 products.findById(productId)
                         .orElseThrow(() -> Errors.NotFoundException.of("Product", productId));
-        PriceListItem item =
-                items.findByPriceListIdAndProductId(listId, productId)
-                        .orElseGet(() -> new PriceListItem(list, product, price));
-        BigDecimal previous = item.getId() == null ? product.getBasePrice() : item.getPrice();
+        var existing = items.findByPriceListIdAndProductId(listId, productId);
+        PriceListItem item = existing.orElseGet(() -> new PriceListItem(list, product, price));
+        // New to the list, it was selling at its base price until now. (Not "item has no id":
+        // every entity gets its id when it is constructed.)
+        BigDecimal previous = existing.map(PriceListItem::getPrice).orElse(product.getBasePrice());
         item.setPrice(price);
         PriceListItem saved = items.save(item);
         events.priceChanged(product, list.getBranchId(), previous, price);

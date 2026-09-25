@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { CheckField, FormError, fromLocalInput, localInput, ProductPicker, problemErrors, Section, SelectInput } from "@/components/admin/form-parts";
+import { CheckField, FormError, fromLocalInput, inputText, localInput, problemErrors, ProductPicker, Section, SelectInput } from "@/components/admin/form-parts";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api/client";
@@ -22,7 +22,6 @@ const TYPE_LABELS: Record<(typeof PROMOTION_TYPES)[number], string> = {
 
 type Rule = { scope: "ALL" | "CATEGORY" | "PRODUCT"; scopeId: string | null; label: string };
 
-const text = (value: number | null | undefined) => (value === null || value === undefined ? "" : String(value));
 
 /**
  * Building a promotion, with the price it produces shown as it is built: the preview prices a
@@ -36,9 +35,9 @@ export function PromotionBuilder({ promotion, categories, branches }: { promotio
     type: (promotion?.type ?? "PERCENTAGE_OFF") as (typeof PROMOTION_TYPES)[number],
     // A percentage is kept as a fraction (0.10) and shown as 10.
     value: promotion?.value === null || promotion?.value === undefined ? "" : String(promotion.type === "PERCENTAGE_OFF" ? +(promotion.value * 100).toFixed(4) : promotion.value),
-    buyQuantity: text(promotion?.buyQuantity),
-    getQuantity: text(promotion?.getQuantity),
-    minQuantity: text(promotion?.minQuantity),
+    buyQuantity: inputText(promotion?.buyQuantity),
+    getQuantity: inputText(promotion?.getQuantity),
+    minQuantity: inputText(promotion?.minQuantity),
     priority: String(promotion?.priority ?? 100),
     branchId: promotion?.branchId ?? "",
     validFrom: localInput(promotion?.validFrom),

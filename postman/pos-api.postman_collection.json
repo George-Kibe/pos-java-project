@@ -1679,8 +1679,211 @@
           ]
         },
         {
+          "name": "Price reviews",
+          "item": [
+            {
+              "name": "A branch's price reviews, newest delivery first; open ones by default",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-reviews?branchId={{branchId}}&page=0&size=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-reviews"
+                  ],
+                  "query": [
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "status",
+                      "value": "OPEN",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "page",
+                      "value": "0",
+                      "disabled": false
+                    },
+                    {
+                      "key": "size",
+                      "value": "20",
+                      "disabled": false
+                    },
+                    {
+                      "key": "sort",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "A branch's price reviews, newest delivery first; open ones by default"
+              }
+            },
+            {
+              "name": "One price review",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-reviews/{{priceReviewId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-reviews",
+                    "{{priceReviewId}}"
+                  ],
+                  "query": []
+                },
+                "description": "One price review"
+              }
+            },
+            {
+              "name": "Set the new price and close the review",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-reviews/{{priceReviewId}}/accept",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-reviews",
+                    "{{priceReviewId}}",
+                    "accept"
+                  ],
+                  "query": []
+                },
+                "description": "Changes the price the branch was charging: its price list's entry when a list set it, the base price otherwise. Omit the price to take the suggestion.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"price\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Keep the price as it is, for a reason, and close the review",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/price-reviews/{{priceReviewId}}/keep",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "price-reviews",
+                    "{{priceReviewId}}",
+                    "keep"
+                  ],
+                  "query": []
+                },
+                "description": "Keep the price as it is, for a reason, and close the review",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Recorded from Postman\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "Pricing",
           "item": [
+            {
+              "name": "Judge costs against a branch's prices",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/pricing/cost-check",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "pricing",
+                    "cost-check"
+                  ],
+                  "query": []
+                },
+                "description": "Per product: the tax rate, the cost without VAT, the branch's regular price, the margin it leaves, the target, and a price that would reach it (rounded up to the shilling). Nothing is saved; purchasing uses it to take VAT out of costs, and the delivery screen to warn as costs are typed.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"at\": \"2026-01-01T09:00:00Z\",\n  \"costIncludesTax\": false,\n  \"lines\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"unitCost\": 100\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
             {
               "name": "Price one or more lines, with the full breakdown",
               "request": {
@@ -2138,6 +2341,46 @@
                 },
                 "description": "Remove the product's picture"
               }
+            },
+            {
+              "name": "Set what this product should earn, overriding its category",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/products/{{productId}}/target-margin",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "products",
+                    "{{productId}}",
+                    "target-margin"
+                  ],
+                  "query": []
+                },
+                "description": "A fraction of the price without VAT; null follows the category again.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"targetMargin\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
             }
           ]
         },
@@ -2546,6 +2789,46 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"\",\n  \"parentId\": \"{{parentId}}\",\n  \"active\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Set what a category's items should earn",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}/target-margin",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "categories",
+                    "{{categoryId}}",
+                    "target-margin"
+                  ],
+                  "query": []
+                },
+                "description": "A fraction of the price without VAT. Sub-categories without their own target follow it; null clears it. A delivery whose cost leaves an item below its target opens a price review.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"targetMargin\": 1\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -3841,6 +4124,310 @@
       "description": "purchasing-service: OpenAPI definition",
       "item": [
         {
+          "name": "Expenses",
+          "item": [
+            {
+              "name": "The amount above which an expense needs a second person's approval",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/expense-settings",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "expense-settings"
+                  ],
+                  "query": []
+                },
+                "description": "The amount above which an expense needs a second person's approval"
+              }
+            },
+            {
+              "name": "Change the approval limit",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/expense-settings",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "expense-settings"
+                  ],
+                  "query": []
+                },
+                "description": "Change the approval limit",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"approvalLimit\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "A branch's expenses in a period, or head office's without a branch",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/expenses?from={{day}}&to={{day}}&page=0&size=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "expenses"
+                  ],
+                  "query": [
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "from",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "status",
+                      "value": "PENDING_APPROVAL",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "page",
+                      "value": "0",
+                      "disabled": false
+                    },
+                    {
+                      "key": "size",
+                      "value": "20",
+                      "disabled": false
+                    },
+                    {
+                      "key": "sort",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "A branch's expenses in a period, or head office's without a branch"
+              }
+            },
+            {
+              "name": "Record an expense",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/expenses",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "expenses"
+                  ],
+                  "query": []
+                },
+                "description": "Counts at once up to the approval limit; above it, only once someone other than the recorder approves it.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"category\": \"RENT\",\n  \"description\": \"\",\n  \"payee\": \"\",\n  \"reference\": \"\",\n  \"incurredOn\": \"{{day}}\",\n  \"amount\": 100,\n  \"taxAmount\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "One expense",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "expenses",
+                    "{{expenseId}}"
+                  ],
+                  "query": []
+                },
+                "description": "One expense"
+              }
+            },
+            {
+              "name": "Approve an expense above the limit; not by whoever recorded it",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/approve",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "expenses",
+                    "{{expenseId}}",
+                    "approve"
+                  ],
+                  "query": []
+                },
+                "description": "Approve an expense above the limit; not by whoever recorded it"
+              }
+            },
+            {
+              "name": "Refuse an expense above the limit, for a reason",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/reject",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "expenses",
+                    "{{expenseId}}",
+                    "reject"
+                  ],
+                  "query": []
+                },
+                "description": "Refuse an expense above the limit, for a reason",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Recorded from Postman\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Void an expense entered in error, for a reason; it is kept",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/expenses/{{expenseId}}/void",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "expenses",
+                    "{{expenseId}}",
+                    "void"
+                  ],
+                  "query": []
+                },
+                "description": "Void an expense entered in error, for a reason; it is kept",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Recorded from Postman\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "Goods receipts",
           "item": [
             {
@@ -3919,7 +4506,7 @@
                 "description": "Key in a delivery",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"purchaseOrderId\": \"{{purchaseOrderId}}\",\n  \"deliveryNoteRef\": \"Recorded from Postman\",\n  \"freightAmount\": 100,\n  \"dutyAmount\": 100,\n  \"allocationBasis\": \"BY_VALUE\",\n  \"notes\": \"Recorded from Postman\",\n  \"lines\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"sku\": \"\",\n      \"productName\": \"\",\n      \"quantityReceived\": 1,\n      \"quantityRejected\": 1,\n      \"rejectionReason\": \"Recorded from Postman\",\n      \"unitCost\": 100,\n      \"batchNumber\": \"\",\n      \"expiryDate\": \"{{day}}\"\n    }\n  ]\n}",
+                  "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"purchaseOrderId\": \"{{purchaseOrderId}}\",\n  \"deliveryNoteRef\": \"Recorded from Postman\",\n  \"freightAmount\": 100,\n  \"dutyAmount\": 100,\n  \"allocationBasis\": \"BY_VALUE\",\n  \"notes\": \"Recorded from Postman\",\n  \"costsIncludeTax\": false,\n  \"lines\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"sku\": \"\",\n      \"productName\": \"\",\n      \"quantityReceived\": 1,\n      \"quantityRejected\": 1,\n      \"rejectionReason\": \"Recorded from Postman\",\n      \"unitCost\": 100,\n      \"batchNumber\": \"\",\n      \"expiryDate\": \"{{day}}\"\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -4095,7 +4682,7 @@
                 "description": "Raise a purchase order",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"expectedDeliveryDate\": \"{{day}}\",\n  \"notes\": \"Recorded from Postman\",\n  \"lines\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"sku\": \"\",\n      \"productName\": \"\",\n      \"quantity\": 1,\n      \"unitCost\": 100,\n      \"taxRate\": 1\n    }\n  ]\n}",
+                  "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"expectedDeliveryDate\": \"{{day}}\",\n  \"notes\": \"Recorded from Postman\",\n  \"costsIncludeTax\": false,\n  \"fromSuggestions\": [\n    \"{{fromSuggestions}}\"\n  ],\n  \"lines\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"sku\": \"\",\n      \"productName\": \"\",\n      \"quantity\": 1,\n      \"unitCost\": 100,\n      \"taxRate\": 1\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -4255,7 +4842,7 @@
                 "description": "Replace a draft order's lines",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"lines\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"sku\": \"\",\n      \"productName\": \"\",\n      \"quantity\": 1,\n      \"unitCost\": 100,\n      \"taxRate\": 1\n    }\n  ]\n}",
+                  "raw": "{\n  \"costsIncludeTax\": false,\n  \"lines\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"sku\": \"\",\n      \"productName\": \"\",\n      \"quantity\": 1,\n      \"unitCost\": 100,\n      \"taxRate\": 1\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -8433,6 +9020,103 @@
                   ]
                 },
                 "description": "Takings by payment method, cash net of change"
+              }
+            },
+            {
+              "name": "Profit and loss: net sales, cost of sales, losses, expenses, net profit",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/reports/profit-and-loss?from={{day}}&to={{day}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "reports",
+                    "profit-and-loss"
+                  ],
+                  "query": [
+                    {
+                      "key": "from",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": true,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "Without VAT throughout. Per branch, and for the whole business with head office's expenses when no branch is named."
+              }
+            },
+            {
+              "name": "Each product's gross profit less what of it was lost",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/reports/profit-and-loss/products?from={{day}}&to={{day}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "reports",
+                    "profit-and-loss",
+                    "products"
+                  ],
+                  "query": [
+                    {
+                      "key": "from",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{day}}",
+                      "disabled": false,
+                      "description": ""
+                    },
+                    {
+                      "key": "branchId",
+                      "value": "{{branchId}}",
+                      "disabled": true,
+                      "description": ""
+                    },
+                    {
+                      "key": "categoryId",
+                      "value": "{{categoryId}}",
+                      "disabled": true,
+                      "description": ""
+                    }
+                  ]
+                },
+                "description": "Expenses are not shared out over products; see the statement for those."
               }
             },
             {

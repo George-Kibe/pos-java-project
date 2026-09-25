@@ -79,6 +79,15 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** Overrides the category's target margin for this one product; null follows the category. */
+    @Column(name = "target_margin", precision = 7, scale = 4)
+    private BigDecimal targetMargin;
+
+    /** The margin this product should earn: its own target, or its category's. */
+    public BigDecimal effectiveTargetMargin() {
+        return targetMargin != null ? targetMargin : category.effectiveTargetMargin();
+    }
+
     @Column(name = "reorder_point", precision = 19, scale = 3)
     private BigDecimal reorderPoint;
 

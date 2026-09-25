@@ -84,6 +84,34 @@ pos:
     # Three-way match tolerance. Both apply and the more generous wins; see MatchTolerance.
     match-tolerance-amount: ${MATCH_TOLERANCE_AMOUNT:50.00}
     match-tolerance-percentage: ${MATCH_TOLERANCE_PERCENTAGE:0.02}
+    # Asked for tax rates when a delivery or an order is keyed in; unreachable, the request is
+    # answered 503 and nothing is recorded.
+    catalog-uri: ${CATALOG_SERVICE_URI:http://localhost:8082}
+    catalog-timeout: ${CATALOG_TIMEOUT:PT3S}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 20
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        # A 4xx is catalog answering, not failing: it must not open the breaker.
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+    instances:
+      catalog-costs:
+        baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        # Above the client's read timeout, so the HTTP timeout fails first with its reason.
+        timeoutDuration: 5s
+    instances:
+      catalog-costs:
+        baseConfig: default
 
 management:
   endpoints:

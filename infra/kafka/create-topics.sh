@@ -26,6 +26,7 @@ pos.purchasing.po-approved.v1|${RETENTION_DEFAULT}|delete
 pos.purchasing.goods-received.v1|${RETENTION_SALES}|delete
 pos.purchasing.supplier-return-sent.v1|${RETENTION_SALES}|delete
 pos.purchasing.supplier-cost-changed.v1|${RETENTION_DEFAULT}|delete
+pos.purchasing.expense-changed.v1|-1|compact
 pos.payments.payment-requested.v1|${RETENTION_DEFAULT}|delete
 pos.payments.payment-authorized.v1|${RETENTION_SALES}|delete
 pos.payments.payment-failed.v1|${RETENTION_DEFAULT}|delete

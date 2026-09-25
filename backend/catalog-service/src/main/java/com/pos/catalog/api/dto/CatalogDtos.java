@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -80,7 +81,9 @@ public final class CatalogDtos {
             BigDecimal reorderPoint,
             BigDecimal reorderQuantity,
             /** Where the product's image is served, or null; versioned, so it can be cached. */
-            String imageUrl) {
+            String imageUrl,
+            /** This product's own target margin, or null when it follows its category's. */
+            BigDecimal targetMargin) {
 
         public static ProductResponse from(Product product) {
             return new ProductResponse(
@@ -104,7 +107,8 @@ public final class CatalogDtos {
                     product.getTaxClass().getId(),
                     product.getReorderPoint(),
                     product.getReorderQuantity(),
-                    product.getImageUrl());
+                    product.getImageUrl(),
+                    product.getTargetMargin());
         }
     }
 
@@ -247,7 +251,22 @@ public final class CatalogDtos {
             UUID parentId) {}
 
     public record CategoryResponse(
-            UUID id, String code, String name, UUID parentId, boolean active) {}
+            UUID id,
+            String code,
+            String name,
+            UUID parentId,
+            boolean active,
+            /** This category's own target margin; null inherits the parent's. */
+            BigDecimal targetMargin) {}
+
+    /**
+     * A target margin as a fraction of the price without tax (0.15 is 15%); null clears it, so the
+     * category's (or the parent's) applies.
+     */
+    public record TargetMarginRequest(
+            @DecimalMin("0.0")
+                    @jakarta.validation.constraints.DecimalMax(value = "1.0", inclusive = false)
+                    BigDecimal targetMargin) {}
 
     public record CategoryUpdateRequest(
             @NotBlank @Size(max = 150) String name, UUID parentId, Boolean active) {
@@ -459,4 +478,124 @@ public final class CatalogDtos {
             @NotNull @Positive BigDecimal quantity,
             UUID branchId,
             Boolean member) {}
+
+    // --- costs against prices ---------------------------------------------------------------
+
+    /**
+     * Costs to judge against a branch's prices.
+     *
+     * @param branchId whose prices; omitted, the base prices
+     * @param at when; omitted, now
+     * @param costIncludesTax whether the costs carry VAT (as a supplier's invoice usually does);
+     *     omitted, they do not
+     */
+    public record CostCheckRequest(
+            UUID branchId,
+            Instant at,
+            Boolean costIncludesTax,
+            @jakarta.validation.constraints.NotEmpty @Valid List<CostCheckLine> lines) {
+
+        public boolean includesTax() {
+            return Boolean.TRUE.equals(costIncludesTax);
+        }
+    }
+
+    public record CostCheckLine(
+            @NotNull UUID productId, @NotNull @DecimalMin("0.0") BigDecimal unitCost) {}
+
+    /**
+     * One product's cost against its price. Every amount "net" is without VAT; {@code price} and
+     * {@code suggestedPrice} are as the catalogue holds the price, with VAT when it includes it.
+     */
+    public record CostCheckResponse(
+            UUID productId,
+            String sku,
+            String name,
+            BigDecimal unitCost,
+            BigDecimal taxRate,
+            BigDecimal netUnitCost,
+            BigDecimal price,
+            boolean priceIncludesTax,
+            String priceSource,
+            BigDecimal netPrice,
+            BigDecimal margin,
+            BigDecimal targetMargin,
+            String status,
+            BigDecimal suggestedPrice) {
+
+        public static CostCheckResponse from(
+                com.pos.catalog.service.CostCheckService.CostCheck check) {
+            var margin = check.margin();
+            return new CostCheckResponse(
+                    check.productId(),
+                    check.sku(),
+                    check.name(),
+                    check.unitCost(),
+                    check.taxRate(),
+                    margin.netCost(),
+                    check.price().unitPrice().amount(),
+                    check.priceIncludesTax(),
+                    check.price().source().name(),
+                    margin.netPrice(),
+                    margin.margin(),
+                    margin.targetMargin(),
+                    margin.status().name(),
+                    margin.suggestedPrice());
+        }
+    }
+
+    public record PriceReviewResponse(
+            UUID id,
+            UUID productId,
+            String sku,
+            String productName,
+            UUID branchId,
+            UUID receiptId,
+            Instant receivedAt,
+            BigDecimal unitCost,
+            BigDecimal price,
+            boolean priceIncludesTax,
+            BigDecimal taxRate,
+            String priceSource,
+            BigDecimal margin,
+            BigDecimal targetMargin,
+            String finding,
+            BigDecimal suggestedPrice,
+            String status,
+            UUID decidedBy,
+            Instant decidedAt,
+            BigDecimal newPrice,
+            String reason) {
+
+        public static PriceReviewResponse from(com.pos.catalog.domain.PriceReview review) {
+            return new PriceReviewResponse(
+                    review.getId(),
+                    review.getProduct().getId(),
+                    review.getProduct().getSku(),
+                    review.getProduct().getName(),
+                    review.getBranchId(),
+                    review.getReceiptId(),
+                    review.getReceivedAt(),
+                    review.getUnitCost(),
+                    review.getPrice(),
+                    review.isPriceIncludesTax(),
+                    review.getTaxRate(),
+                    review.getPriceSource().name(),
+                    review.getMargin(),
+                    review.getTargetMargin(),
+                    review.getFinding().name(),
+                    review.getSuggestedPrice(),
+                    review.getStatus().name(),
+                    review.getDecidedBy(),
+                    review.getDecidedAt(),
+                    review.getNewPrice(),
+                    review.getReason());
+        }
+    }
+
+    /** A different price from the suggestion; omitted, the suggestion is taken. */
+    public record PriceReviewAcceptRequest(
+            @DecimalMin(value = "0.0", inclusive = false) BigDecimal price) {}
+
+    public record PriceReviewKeepRequest(@NotBlank @Size(max = 500) String reason) {}
 }

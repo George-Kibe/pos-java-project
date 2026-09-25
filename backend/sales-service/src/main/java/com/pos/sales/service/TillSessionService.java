@@ -122,7 +122,7 @@ public class TillSessionService {
                                             .formatted(existing.getOpenedAt()));
                         });
 
-        UUID cashier = currentActor();
+        UUID cashier = AuthenticatedUser.currentUserId();
         TillSession session = new TillSession(branchId, registerId, cashier, openingFloat);
         session.setTracksDenominations(counted != null);
         TillSession saved = sessions.save(session);
@@ -377,7 +377,7 @@ public class TillSessionService {
         }
         session.setHandedOverCash(countedCash);
         session.setHandedOverAt(Instant.now());
-        session.setHandedOverTo(currentActor());
+        session.setHandedOverTo(AuthenticatedUser.currentUserId());
         return sessions.save(session);
     }
 
@@ -415,7 +415,7 @@ public class TillSessionService {
         session.setVariance(reconciliation.variance());
         session.setStatus(TillSessionStatus.CLOSED);
         session.setClosedAt(Instant.now());
-        session.setClosedBy(currentActor());
+        session.setClosedBy(AuthenticatedUser.currentUserId());
         if (notes != null && !notes.isBlank()) {
             session.setNotes(notes);
         }
@@ -470,9 +470,5 @@ public class TillSessionService {
                             .formatted(session.getStatus()));
         }
         return session;
-    }
-
-    private static UUID currentActor() {
-        return AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
     }
 }

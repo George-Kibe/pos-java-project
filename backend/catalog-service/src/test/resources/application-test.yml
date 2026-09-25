@@ -7,6 +7,9 @@ spring:
       ddl-auto: validate
   kafka:
     bootstrap-servers: localhost:1
+    # No broker here; PriceReviewIT starts one and turns its listener on.
+    listener:
+      auto-startup: false
 
 pos:
   outbox:

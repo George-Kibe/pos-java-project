@@ -162,6 +162,8 @@ services:
       PURCHASING_DB_PASSWORD: ${PURCHASING_DB_PASSWORD:?required}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       AUTH_JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+      # Tax rates for costs keyed in with VAT; a delivery is answered 503 when it is unreachable.
+      CATALOG_SERVICE_URI: http://catalog-service:8082
     # No published port: reachable only through the gateway.
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://localhost:8084/actuator/health | grep -q UP"]

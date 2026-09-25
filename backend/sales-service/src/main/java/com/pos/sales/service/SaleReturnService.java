@@ -121,7 +121,8 @@ public class SaleReturnService {
         Instant now = Instant.now();
         long days = ReturnPolicy.daysBetween(soldAt, now);
 
-        SaleReturn saleReturn = new SaleReturn(nextReturnNumber(), sale, currentActor(), reason);
+        SaleReturn saleReturn =
+                new SaleReturn(nextReturnNumber(), sale, AuthenticatedUser.currentUserId(), reason);
         // The shift the refund is paid from - where the cash actually leaves a drawer today - not
         // the shift that took the sale, which may have been counted and closed days ago.
         saleReturn.setTillSession(payingShift);
@@ -253,9 +254,5 @@ public class SaleReturnService {
     private String nextReturnNumber() {
         String prefix = "RT-" + LocalDate.now().getYear() + "-";
         return prefix + "%06d".formatted(returns.highestSequenceFor(prefix) + 1);
-    }
-
-    private static UUID currentActor() {
-        return AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
     }
 }

@@ -87,6 +87,18 @@ public class GrnLine extends BaseEntity {
     @Column(nullable = false, length = 3)
     private String currency = "KES";
 
+    /** The cost as keyed in: with VAT when the delivery was entered that way. */
+    @Column(name = "entered_unit_cost", precision = 19, scale = 4)
+    private BigDecimal enteredUnitCost;
+
+    /** The product's VAT rate when the goods arrived, from catalog. */
+    @Column(name = "tax_rate", precision = 9, scale = 6)
+    private BigDecimal taxRate;
+
+    /** VAT on the accepted goods: what can be reclaimed. */
+    @Column(name = "input_tax", nullable = false, precision = 19, scale = 4)
+    private BigDecimal inputTax = BigDecimal.ZERO;
+
     GrnLine(
             GoodsReceivedNote grn,
             int lineNumber,
@@ -126,6 +138,22 @@ public class GrnLine extends BaseEntity {
     /** What the accepted goods cost before delivery charges. */
     public BigDecimal acceptedGoodsValue() {
         return quantityAccepted().multiply(unitCost).setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Records the tax on this line. Worked out on the accepted quantity, so call it once any
+     * rejection is known: goods sent back are not paid for.
+     */
+    public void applyTax(BigDecimal rate, BigDecimal entered) {
+        this.taxRate = rate == null ? null : rate.setScale(6, RoundingMode.HALF_UP);
+        this.enteredUnitCost =
+                entered == null ? null : entered.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+        this.inputTax =
+                rate == null
+                        ? BigDecimal.ZERO
+                        : acceptedGoodsValue()
+                                .multiply(rate)
+                                .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
     /** The difference against what was ordered, or null when this line had no order behind it. */

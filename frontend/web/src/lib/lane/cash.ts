@@ -9,8 +9,6 @@ export const DENOMINATIONS = [...NOTES, ...COINS] as const;
 /** Count per denomination. Absent means none. */
 export type CashCount = Record<number, number>;
 
-export const isNote = (denomination: number) => (NOTES as readonly number[]).includes(denomination);
-
 export function total(count: CashCount): number {
   return Object.entries(count).reduce((sum, [denomination, pieces]) => sum + Number(denomination) * pieces, 0);
 }

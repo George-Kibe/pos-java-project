@@ -48,6 +48,11 @@ public abstract class PurchasingTestBase {
     static final ConfluentKafkaContainer KAFKA =
             new ConfluentKafkaContainer("confluentinc/cp-kafka:8.3.2");
 
+    /**
+     * Catalog's cost check, for the tax on costs keyed in; one for the JVM, like the containers.
+     */
+    static final FakeCatalog CATALOG = new FakeCatalog();
+
     static {
         POSTGRES.start();
         KAFKA.start();
@@ -59,6 +64,7 @@ public abstract class PurchasingTestBase {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
+        registry.add("pos.purchasing.catalog-uri", CATALOG::baseUrl);
     }
 
     @Autowired protected KafkaTemplate<String, String> kafka;
@@ -70,6 +76,7 @@ public abstract class PurchasingTestBase {
 
     @BeforeEach
     void clearPurchasing() {
+        CATALOG.reset();
         // Children before parents.
         jdbc.sql("DELETE FROM purchasing.supplier_return_lines").update();
         jdbc.sql("DELETE FROM purchasing.supplier_returns").update();
@@ -82,6 +89,8 @@ public abstract class PurchasingTestBase {
         jdbc.sql("DELETE FROM purchasing.purchase_orders").update();
         jdbc.sql("DELETE FROM purchasing.supplier_products").update();
         jdbc.sql("DELETE FROM purchasing.suppliers").update();
+        jdbc.sql("DELETE FROM purchasing.expenses").update();
+        jdbc.sql("UPDATE purchasing.expense_settings SET approval_limit = 10000").update();
         jdbc.sql("DELETE FROM purchasing.processed_event").update();
         jdbc.sql("DELETE FROM purchasing.outbox").update();
     }

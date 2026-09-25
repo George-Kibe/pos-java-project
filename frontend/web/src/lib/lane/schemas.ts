@@ -54,7 +54,6 @@ export const CartLineSchema = z.object({
   overrideReason: z.string().nullable(),
   voided: z.boolean(),
 });
-export type CartLine = z.infer<typeof CartLineSchema>;
 
 export const CartSchema = z.object({
   id: Id,
@@ -88,7 +87,6 @@ export const SaleLineSchema = z.object({
   taxAmount: Money,
   lineTotal: Money,
 });
-export type SaleLine = z.infer<typeof SaleLineSchema>;
 
 export const SalePaymentSchema = z.object({
   paymentIntentId: Id,
@@ -235,7 +233,6 @@ export const SyncResultSchema = z.object({
     }),
   ),
 });
-export type SyncResult = z.infer<typeof SyncResultSchema>;
 
 export const ReturnResponseSchema = z.object({
   id: Id,

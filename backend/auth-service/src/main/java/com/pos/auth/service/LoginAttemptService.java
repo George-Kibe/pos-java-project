@@ -112,13 +112,4 @@ public class LoginAttemptService {
                 ? policy.getMaxDuration()
                 : candidate;
     }
-
-    /**
-     * Recent failures for this address, used to decide whether to even attempt a password check.
-     */
-    @Transactional(readOnly = true)
-    public long recentFailures(String emailNormalized) {
-        return attempts.countRecentFailures(
-                emailNormalized, Instant.now().minus(properties.getLockout().getWindow()));
-    }
 }

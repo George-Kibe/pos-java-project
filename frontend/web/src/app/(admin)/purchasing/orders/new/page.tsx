@@ -26,6 +26,7 @@ export default async function NewOrderPage({ searchParams }: PageProps<"/purchas
           branchId={branch}
           initial={{
             supplierId: param(query.supplier),
+            suggestionId: param(query.suggestion),
             line: product?.data ? { productId: product.data.id, sku: product.data.sku, name: product.data.name, quantity: param(query.quantity) ?? "1", unitCost: "" } : undefined,
           }}
         />

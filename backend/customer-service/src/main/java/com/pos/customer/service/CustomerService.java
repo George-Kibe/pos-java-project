@@ -143,8 +143,7 @@ public class CustomerService {
             return customer;
         }
         loyalty.writeOffOnErasure(customer.getId(), reason);
-        customer.erase(
-                AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null), reason);
+        customer.erase(AuthenticatedUser.currentUserId(), reason);
         addresses.deleteAll(addresses.findByCustomerIdOrderByCreatedAt(id));
         return customers.save(customer);
     }

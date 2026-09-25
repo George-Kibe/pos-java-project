@@ -96,6 +96,17 @@ public class ProductController {
         return CatalogDtos.ProductResponse.from(products.setActive(id, active));
     }
 
+    @PutMapping("/{id}/target-margin")
+    @PreAuthorize("hasAuthority('price:manage')")
+    @Operation(
+            summary = "Set what this product should earn, overriding its category",
+            description = "A fraction of the price without VAT; null follows the category again.")
+    public CatalogDtos.ProductResponse setTargetMargin(
+            @PathVariable UUID id, @Valid @RequestBody CatalogDtos.TargetMarginRequest request) {
+        return CatalogDtos.ProductResponse.from(
+                products.setTargetMargin(id, request.targetMargin()));
+    }
+
     @PostMapping(
             value = "/{id}/image",
             consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)

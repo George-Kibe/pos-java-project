@@ -27,6 +27,7 @@ public class DocumentNumberService {
     private final PurchaseOrderRepository orders;
     private final GoodsReceivedNoteRepository grns;
     private final SupplierReturnRepository returns;
+    private final com.pos.purchasing.repository.ExpenseRepository expenses;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public String nextPurchaseOrderNumber() {
@@ -44,6 +45,12 @@ public class DocumentNumberService {
     public String nextReturnNumber() {
         String prefix = "SR-" + year() + "-";
         return prefix + format(returns.highestSequenceFor(prefix) + 1);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public String nextExpenseNumber() {
+        String prefix = "EXP-" + year() + "-";
+        return prefix + format(expenses.highestSequenceFor(prefix) + 1);
     }
 
     private int year() {

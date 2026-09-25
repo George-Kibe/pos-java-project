@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.pos.common.error.Errors;
 import com.pos.common.security.AuthenticatedUser;
+import com.pos.purchasing.client.CatalogCostClient;
 import com.pos.purchasing.domain.PurchaseOrder;
 import com.pos.purchasing.domain.PurchaseOrderStatus;
 import com.pos.purchasing.domain.Supplier;
@@ -38,6 +39,8 @@ public class PurchaseOrderService {
     private final SupplierService suppliers;
     private final DocumentNumberService numbers;
     private final PurchasingEventPublisher events;
+    private final CatalogCostClient catalog;
+    private final ReorderService reorders;
 
     /** One product on a draft order. */
     public record OrderLineRequest(
@@ -65,6 +68,8 @@ public class PurchaseOrderService {
             UUID branchId,
             LocalDate expectedDeliveryDate,
             String notes,
+            boolean costsIncludeTax,
+            List<UUID> fromSuggestions,
             List<OrderLineRequest> lines) {
 
         Supplier supplier = suppliers.require(supplierId);
@@ -79,23 +84,22 @@ public class PurchaseOrderService {
                     "purchase_order.no_lines", "A purchase order needs at least one line");
         }
 
+        List<CatalogCostClient.NetCost> costs = netCosts(branchId, costsIncludeTax, lines);
         PurchaseOrder order =
                 new PurchaseOrder(numbers.nextPurchaseOrderNumber(), supplier, branchId);
+        order.setCostsIncludeTax(costsIncludeTax);
         order.setExpectedDeliveryDate(expectedDeliveryDate);
         order.setNotes(notes);
         order.setOrderDate(LocalDate.now());
 
-        for (OrderLineRequest line : lines) {
-            order.addLine(
-                    line.productId(),
-                    line.sku(),
-                    line.productName(),
-                    line.quantity(),
-                    line.unitCost(),
-                    line.taxRate());
-        }
+        addLines(order, lines, costs);
         order.recalculateTotals();
-        return orders.save(order);
+        PurchaseOrder saved = orders.save(order);
+        if (fromSuggestions != null && !fromSuggestions.isEmpty()) {
+            // The suggestions this order answers stop suggesting it.
+            reorders.markOrdered(fromSuggestions, saved);
+        }
+        return saved;
     }
 
     /**
@@ -105,7 +109,8 @@ public class PurchaseOrderService {
      * moving, or an approver is signing something other than what they read.
      */
     @Transactional
-    public PurchaseOrder replaceLines(UUID id, List<OrderLineRequest> lines) {
+    public PurchaseOrder replaceLines(
+            UUID id, boolean costsIncludeTax, List<OrderLineRequest> lines) {
         PurchaseOrder order = require(id);
         if (!order.getStatus().isEditable()) {
             throw new Errors.BusinessRuleException(
@@ -117,29 +122,63 @@ public class PurchaseOrderService {
                     "purchase_order.no_lines", "A purchase order needs at least one line");
         }
 
+        List<CatalogCostClient.NetCost> costs =
+                netCosts(order.getBranchId(), costsIncludeTax, lines);
+        order.setCostsIncludeTax(costsIncludeTax);
         order.getLines().clear();
         // Flushed before the new lines are added. Hibernate orders inserts before the deletes that
         // orphan removal queues, so line 1 of the replacement hits the unique (order, line_number)
         // index while line 1 of the original is still in the table.
         orders.saveAndFlush(order);
 
-        for (OrderLineRequest line : lines) {
+        addLines(order, lines, costs);
+        order.recalculateTotals();
+        return orders.save(order);
+    }
+
+    /**
+     * Each line's cost without VAT and its rate, from catalog. A rate the request names wins: a
+     * supplier who charges no VAT is ordered from at zero.
+     */
+    private List<CatalogCostClient.NetCost> netCosts(
+            UUID branchId, boolean costsIncludeTax, List<OrderLineRequest> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return List.of();
+        }
+        return catalog.netCosts(
+                branchId,
+                null,
+                costsIncludeTax,
+                lines.stream()
+                        .map(
+                                line ->
+                                        new CatalogCostClient.CostLine(
+                                                line.productId(), line.unitCost()))
+                        .toList());
+    }
+
+    private static void addLines(
+            PurchaseOrder order,
+            List<OrderLineRequest> lines,
+            List<CatalogCostClient.NetCost> costs) {
+        for (int index = 0; index < lines.size(); index++) {
+            OrderLineRequest line = lines.get(index);
+            CatalogCostClient.NetCost cost = costs.get(index);
             order.addLine(
                     line.productId(),
                     line.sku(),
                     line.productName(),
                     line.quantity(),
-                    line.unitCost(),
-                    line.taxRate());
+                    cost.netUnitCost(),
+                    (line.taxRate() != null ? line.taxRate() : cost.taxRate())
+                            .setScale(6, java.math.RoundingMode.HALF_UP));
         }
-        order.recalculateTotals();
-        return orders.save(order);
     }
 
     @Transactional
     public PurchaseOrder submit(UUID id) {
         PurchaseOrder order = transition(require(id), PurchaseOrderStatus.SUBMITTED);
-        order.setSubmittedBy(currentActor());
+        order.setSubmittedBy(AuthenticatedUser.currentUserId());
         order.setSubmittedAt(Instant.now());
         return orders.save(order);
     }
@@ -159,7 +198,7 @@ public class PurchaseOrderService {
     @Transactional
     public PurchaseOrder approve(UUID id) {
         PurchaseOrder order = transition(require(id), PurchaseOrderStatus.APPROVED);
-        order.setApprovedBy(currentActor());
+        order.setApprovedBy(AuthenticatedUser.currentUserId());
         order.setApprovedAt(Instant.now());
         order.setApprovedTotal(order.getGrandTotal());
         PurchaseOrder saved = orders.save(order);
@@ -215,11 +254,6 @@ public class PurchaseOrderService {
             transition(order, PurchaseOrderStatus.PARTIALLY_RECEIVED);
         }
         orders.save(order);
-    }
-
-    /** Who is doing this, taken from the verified token rather than from the request. */
-    private static UUID currentActor() {
-        return AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
     }
 
     /**

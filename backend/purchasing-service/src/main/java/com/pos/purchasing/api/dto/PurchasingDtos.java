@@ -175,9 +175,25 @@ public final class PurchasingDtos {
             @NotNull UUID branchId,
             LocalDate expectedDeliveryDate,
             @Size(max = 1000) String notes,
-            @NotEmpty @Valid List<OrderLineRequest> lines) {}
+            /** Whether the unit costs carry VAT; stored without it. Omitted, they do not. */
+            Boolean costsIncludeTax,
+            /** Reorder suggestions this order answers; they are marked ordered with it. */
+            List<UUID> fromSuggestions,
+            @NotEmpty @Valid List<OrderLineRequest> lines) {
 
-    public record OrderLinesRequest(@NotEmpty @Valid List<OrderLineRequest> lines) {}
+        public boolean includesTax() {
+            return Boolean.TRUE.equals(costsIncludeTax);
+        }
+    }
+
+    public record OrderLinesRequest(
+            /** Whether the unit costs carry VAT; stored without it. Omitted, they do not. */
+            Boolean costsIncludeTax, @NotEmpty @Valid List<OrderLineRequest> lines) {
+
+        public boolean includesTax() {
+            return Boolean.TRUE.equals(costsIncludeTax);
+        }
+    }
 
     public record CancellationRequest(@NotBlank @Size(max = 500) String reason) {}
 
@@ -292,7 +308,17 @@ public final class PurchasingDtos {
             @DecimalMin("0.0") @Digits(integer = 15, fraction = 4) BigDecimal dutyAmount,
             AllocationBasis allocationBasis,
             @Size(max = 1000) String notes,
-            @NotEmpty @Valid List<ReceiptLineRequest> lines) {}
+            /**
+             * Whether the unit costs are as invoiced, with VAT; they are stored without it.
+             * Omitted, they are taken to be without VAT, as costs carried over from an order are.
+             */
+            Boolean costsIncludeTax,
+            @NotEmpty @Valid List<ReceiptLineRequest> lines) {
+
+        public boolean includesTax() {
+            return Boolean.TRUE.equals(costsIncludeTax);
+        }
+    }
 
     public record GrnLineResponse(
             UUID id,
@@ -312,7 +338,11 @@ public final class PurchasingDtos {
             BigDecimal landedUnitCost,
             BigDecimal allocatedCharges,
             BigDecimal lineTotal,
-            String currency) {
+            String currency,
+            /** The cost as keyed in; {@code unitCost} is always without VAT. */
+            BigDecimal enteredUnitCost,
+            BigDecimal taxRate,
+            BigDecimal inputTax) {
 
         public static GrnLineResponse from(GrnLine line) {
             return new GrnLineResponse(
@@ -333,7 +363,10 @@ public final class PurchasingDtos {
                     line.getLandedUnitCost(),
                     line.getAllocatedCharges(),
                     line.getLineTotal(),
-                    line.getCurrency());
+                    line.getCurrency(),
+                    line.getEnteredUnitCost(),
+                    line.getTaxRate(),
+                    line.getInputTax());
         }
     }
 
@@ -358,7 +391,9 @@ public final class PurchasingDtos {
             BigDecimal landedTotal,
             String currency,
             String notes,
-            List<GrnLineResponse> lines) {
+            List<GrnLineResponse> lines,
+            boolean costsIncludeTax,
+            BigDecimal inputTaxTotal) {
 
         public static GoodsReceiptResponse from(GoodsReceivedNote grn) {
             return new GoodsReceiptResponse(
@@ -382,7 +417,9 @@ public final class PurchasingDtos {
                     grn.getLandedTotal(),
                     grn.getCurrency(),
                     grn.getNotes(),
-                    grn.getLines().stream().map(GrnLineResponse::from).toList());
+                    grn.getLines().stream().map(GrnLineResponse::from).toList(),
+                    grn.isCostsIncludeTax(),
+                    grn.getInputTaxTotal());
         }
     }
 

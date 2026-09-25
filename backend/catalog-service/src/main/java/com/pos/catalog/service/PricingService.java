@@ -119,7 +119,22 @@ public class PricingService {
         return PriceResolver.resolve(request);
     }
 
-    private record ResolvedPrice(Money unitPrice, PriceSource source, UUID priceListId) {}
+    /** An item's everyday price at a branch - before promotions - and where it came from. */
+    public record ResolvedPrice(Money unitPrice, PriceSource source, UUID priceListId) {}
+
+    /**
+     * The price a branch charges before any promotion: its price list's, or the product's own. What
+     * a delivery's cost is judged against.
+     */
+    @Transactional(readOnly = true)
+    public ResolvedPrice regularPrice(Product product, UUID branchId, Instant at) {
+        return resolveUnitPrice(product, branchId, at);
+    }
+
+    /** The product's tax rate at {@code at}. */
+    public BigDecimal taxRate(Product product, Instant at) {
+        return resolveTaxRate(product, at);
+    }
 
     /**
      * The branch price if there is one, otherwise the product's own.

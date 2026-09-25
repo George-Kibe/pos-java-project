@@ -1442,6 +1442,62 @@ tests; all 812 backend tests with every coverage gate met; `make api-smoke` with
 
 ---
 
+## Profit and loss (after Phase 15) ✅
+
+**Goal:** know what each item, branch and the business earns - from what the goods cost, through
+what was lost, to net profit.
+
+Agreed first: the business is **VAT-registered** (costs held without VAT); a delivery that squeezes
+the margin **warns and suggests** a price rounded **up to the shilling**, and a person decides;
+**net** profit, with an expenses register whose entries above a limit need **a second person**;
+head office's expenses count **once, business-wide**, never shared out; the till always charges
+the catalogue's price.
+
+Delivered:
+- **Costs without VAT.** Deliveries and orders take a "costs include VAT" switch; catalog's
+  `POST /pricing/cost-check` takes each product's VAT out, and purchasing keeps the typed cost, the
+  rate and the input VAT (V3). Order lines get their rate from catalog instead of zero
+- **Target margins** on categories (sub-categories inherit) and products (`price:manage`,
+  catalog V5), set under Pricing → Target margins and on a product's page
+- **Price reviews.** Catalog consumes `goods-received` - its first consumer - and a landed cost
+  below target or below cost opens a review with a suggested price; Pricing → Price reviews sets it
+  (list price or base price, whichever the branch charged) or keeps the old one with a reason. The
+  delivery and order screens warn as costs are typed
+- **New product from the delivery screen** for whoever holds `product:manage`
+- **Expenses** (purchasing V4, auth V8): record, approve or refuse above the limit (never one's
+  own), void with a reason; head office's for the administrator alone; the limit under Settings.
+  Announced as `expense-changed` with a rising revision
+- **Profit and loss** (reporting V4): net sales, cost of sales, gross profit, losses by reason,
+  expenses by category, net profit - per branch and for the business, and per product down to
+  profit after losses; CSV and PDF. Rebuilt from the event log to the same figures
+- Ordering from a **reorder suggestion** now marks it ordered (it used to stay open)
+
+Tidied on the way (an over-engineering audit):
+- One consumer failure policy in common-lib instead of seven copied configs
+- MapStruct removed: declared and run on every build, used nowhere
+- Test-only HTTP clients removed from the seven modules that never used them (so their tests use
+  the same client as production); `spring-kafka-test` from two
+- Nine methods nothing called, and their query; `AuthenticatedUser.currentUserId()` in place of
+  eighteen copies of the same expression and seven wrappers around it
+- Frontend: a searchable supplier picker, one failure-message helper, one shop-date helper, dead
+  exports removed
+
+**Verified — three consecutive clean browser runs against freshly built images (21 of 21 specs,
+`margins` and `expenses` new); 88 web unit tests; all 838 backend tests with every coverage gate
+met; `make api-smoke` with no 5xx:**
+
+| Check | Result |
+|---|---|
+| A cost with VAT is stored and judged without it | ✅ `PurchasingApiIT`, `CatalogAdminIT`, `stock.spec`, `purchasing.spec` |
+| Margin, suggested price (up to the shilling), below cost with no target | ✅ `MarginCheckTest` |
+| A delivery below target opens one review however often it arrives; accepting sets the list or base price | ✅ `PriceReviewIT`, `margins.spec` |
+| Catalog unreachable: the delivery is refused 503, nothing recorded | ✅ `PurchasingApiIT` |
+| Expenses: the limit, a second person, refusals and voids with reasons, head office for the administrator | ✅ `ExpenseIT`, `AdministratorRightsIT`, `expenses.spec` |
+| Profit and loss worked by hand, out-of-order revisions, a rebuild to the same figures | ✅ `ReportApiIT` |
+| An order from a suggestion marks it ordered, only at its own branch | ✅ `PurchasingLifecycleIT` |
+
+---
+
 ## Phase 16 — Hardening & production deployment
 
 **Goal:** it survives contact with the real world.

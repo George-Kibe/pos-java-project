@@ -110,16 +110,4 @@ public class StockLedgerService {
 
         return movement;
     }
-
-    /**
-     * What the ledger says an item holds.
-     *
-     * <p>Used by the reconciliation check and by anything that would rather be slow and right than
-     * fast and possibly stale.
-     */
-    @Transactional(readOnly = true)
-    public BigDecimal ledgerQuantityFor(UUID stockItemId) {
-        BigDecimal sum = movements.sumQuantityFor(stockItemId);
-        return sum == null ? BigDecimal.ZERO : sum;
-    }
 }

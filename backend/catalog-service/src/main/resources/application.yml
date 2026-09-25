@@ -38,6 +38,16 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    # Catalog consumes deliveries, to check their cost against the price (price reviews).
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:catalog-service}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # From now on, not from the beginning: a review is about a new delivery's cost. Replaying the
+      # history on first start would judge every past delivery against today's prices.
+      auto-offset-reset: latest
+      enable-auto-commit: false
+      max-poll-records: 20
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer

@@ -92,7 +92,7 @@ public class StockTakeService {
         StockTake stockTake = get(stockTakeId);
         requireCountable(stockTake);
 
-        UUID actor = AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
+        UUID actor = AuthenticatedUser.currentUserId();
 
         for (CountLine count : counts) {
             StockTakeLine line =
@@ -153,7 +153,7 @@ public class StockTakeService {
                     "stock_take.cancelled", "A cancelled stock take cannot be posted.");
         }
 
-        UUID actor = AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
+        UUID actor = AuthenticatedUser.currentUserId();
         List<com.pos.events.inventory.AdjustmentPostedPayload.AdjustmentLine> differences =
                 new java.util.ArrayList<>();
 

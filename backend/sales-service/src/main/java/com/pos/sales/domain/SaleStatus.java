@@ -39,9 +39,4 @@ public enum SaleStatus {
     public boolean isSettled() {
         return this == PAID || this == VOIDED;
     }
-
-    /** Whether stock should be considered sold. A voided sale's stock goes back. */
-    public boolean countsAsSold() {
-        return this == PAID;
-    }
 }

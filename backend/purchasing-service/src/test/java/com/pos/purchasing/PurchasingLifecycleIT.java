@@ -214,6 +214,7 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(
                                 new GoodsReceiptService.ReceiptLineRequest(
                                         FLOUR,
@@ -407,6 +408,9 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                         BRANCH,
                         LocalDate.now().plusDays(3),
                         null,
+                        false,
+                        // The order answers the suggestion, and says so as it is raised.
+                        List.of(suggestion.getId()),
                         List.of(
                                 new PurchaseOrderService.OrderLineRequest(
                                         product,
@@ -415,8 +419,6 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                                         money("12"),
                                         money("180.00"),
                                         null)));
-
-        reorders.markOrdered(List.of(suggestion.getId()), order);
 
         ReorderSuggestion reloaded = suggestions.findById(suggestion.getId()).orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(SuggestionStatus.ORDERED);
@@ -436,6 +438,8 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                         BRANCH,
                         null,
                         null,
+                        false,
+                        List.of(),
                         List.of(
                                 new PurchaseOrderService.OrderLineRequest(
                                         FLOUR,
@@ -464,6 +468,8 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                         BRANCH,
                         null,
                         null,
+                        false,
+                        List.of(),
                         List.of(
                                 new PurchaseOrderService.OrderLineRequest(
                                         FLOUR,
@@ -486,6 +492,7 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(
                                 new GoodsReceiptService.ReceiptLineRequest(
                                         FLOUR,
@@ -515,6 +522,8 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                         BRANCH,
                         null,
                         null,
+                        false,
+                        List.of(),
                         List.of(
                                 new PurchaseOrderService.OrderLineRequest(
                                         FLOUR,
@@ -528,6 +537,7 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
         PurchaseOrder rewritten =
                 orderService.replaceLines(
                         order.getId(),
+                        false,
                         List.of(
                                 new PurchaseOrderService.OrderLineRequest(
                                         FLOUR,
@@ -552,6 +562,8 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                         BRANCH,
                         null,
                         null,
+                        false,
+                        List.of(),
                         List.of(
                                 new PurchaseOrderService.OrderLineRequest(
                                         FLOUR,
@@ -575,6 +587,7 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                                         null,
                                         null,
                                         null,
+                                        false,
                                         List.of(
                                                 new GoodsReceiptService.ReceiptLineRequest(
                                                         FLOUR,
@@ -603,6 +616,7 @@ class PurchasingLifecycleIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(
                                 new GoodsReceiptService.ReceiptLineRequest(
                                         FLOUR,

@@ -59,7 +59,9 @@ test("an order is approved and sent, received, invoiced and matched, and damaged
   await page.getByLabel("Supplier", { exact: true }).selectOption(supplier.id);
   await pick(page, "Add a product", flour.name);
   await page.getByLabel("Quantity").fill("10");
-  await page.getByLabel("Unit cost").fill("120");
+  // Typed from the supplier's quote, with VAT: 139.20 is the agreed 120 without it.
+  await page.getByLabel("Unit cost").fill("139.20");
+  await expect(page.getByTestId("cost-verdict")).toContainText("120.00 without VAT");
   await page.getByRole("button", { name: "Save draft order" }).click();
   await expect(page).toHaveURL(/\/purchasing\/orders\/[0-9a-f-]{36}$/);
   await expect(page.getByTestId("order-status")).toHaveText("draft");

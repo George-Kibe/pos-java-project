@@ -74,6 +74,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         () ->
                                 orderService.replaceLines(
                                         order.getId(),
+                                        false,
                                         List.of(
                                                 new PurchaseOrderService.OrderLineRequest(
                                                         FLOUR,
@@ -132,6 +133,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         money("100.00"),
                         AllocationBasis.BY_VALUE,
                         null,
+                        false,
                         List.of(
                                 receiptLine(FLOUR, "FLOUR-2KG", "100", "95.00", "B-FLOUR-1"),
                                 receiptLine(SUGAR, "SUGAR-1KG", "50", "30.00", "B-SUGAR-1")));
@@ -185,6 +187,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(receiptLine(FLOUR, "FLOUR-2KG", "60", "95.00", "B-FLOUR-1")));
         receiptService.post(grn.getId());
 
@@ -212,6 +215,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(
                                 receiptLine(FLOUR, "FLOUR-2KG", "40", "95.00", "B-FLOUR-2"),
                                 receiptLine(SUGAR, "SUGAR-1KG", "50", "30.00", "B-SUGAR-1")));
@@ -236,6 +240,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         null,
                         AllocationBasis.BY_VALUE,
                         null,
+                        false,
                         List.of(
                                 new GoodsReceiptService.ReceiptLineRequest(
                                         FLOUR,
@@ -280,6 +285,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(
                                 new GoodsReceiptService.ReceiptLineRequest(
                                         FLOUR,
@@ -310,6 +316,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(receiptLine(FLOUR, "FLOUR-2KG", "10", "95.00", "B-1")));
         receiptService.post(grn.getId());
 
@@ -333,6 +340,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         null,
                         null,
                         "Turned up unannounced",
+                        false,
                         List.of(receiptLine(FLOUR, "FLOUR-2KG", "20", "95.00", "B-NOPO")));
 
         GoodsReceivedNote posted = receiptService.post(grn.getId());
@@ -356,6 +364,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(receiptLine(FLOUR, "FLOUR-2KG", "10", "95.00", "B-1")));
         receiptService.post(grn.getId());
 
@@ -549,6 +558,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(receiptLine(FLOUR, "FLOUR-2KG", "100", "95.00", "B-1")));
 
         UUID supplierId = order.getSupplier().getId();
@@ -598,6 +608,8 @@ class PurchasingFlowIT extends PurchasingTestBase {
                 BRANCH,
                 LocalDate.now().plusDays(7),
                 "Weekly order",
+                false,
+                List.of(),
                 List.of(
                         new PurchaseOrderService.OrderLineRequest(
                                 FLOUR,
@@ -635,6 +647,7 @@ class PurchasingFlowIT extends PurchasingTestBase {
                         null,
                         null,
                         null,
+                        false,
                         List.of(
                                 receiptLine(FLOUR, "FLOUR-2KG", "100", "95.00", "B-FLOUR-1"),
                                 receiptLine(SUGAR, "SUGAR-1KG", "50", "30.00", "B-SUGAR-1")));
