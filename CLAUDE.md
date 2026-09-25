@@ -73,13 +73,14 @@ com.pos.<service>/
   service/      application services — orchestration and transactions
   messaging/    Kafka producers, consumers, outbox publisher
   config/       Spring configuration
-  mapper/       MapStruct mappers
 src/main/resources/db/migration/   Flyway V<n>__<description>.sql
 ```
 
 Rules:
 - Controllers hold no business logic — validate, delegate, map, return.
-- Entities never leave the service layer. Controllers speak DTOs only.
+- Entities never leave the service layer. Controllers speak DTOs only; a response DTO maps itself
+  with a static `from(entity)`, no mapping framework. It runs after the transaction has closed, so
+  everything it reads must be fetched with the aggregate.
 - `@Transactional` belongs on application services, never on controllers or repositories.
 - Constructor injection only. No field `@Autowired`.
 - No `Optional` as a parameter type; no checked exceptions in signatures.
@@ -456,6 +457,16 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   they had sent the wrong thing.
 - **Every service's OpenAPI spec is routed at the gateway**: `/v3/api-docs/<service>`, listed in
   the gateway's Swagger UI and read by `make postman`. A new service needs its route there too.
+- **An entity's `@Version` moves at the flush, not the setter.** An event that carries it as a
+  revision (`expense-changed`) must `saveAndFlush` first, or an approval goes out with the same
+  revision as the recording and the reader keeps the older state.
+- **A new consumer group on an old topic starts from the beginning** with `auto-offset-reset:
+  earliest`. Catalog's price reviews start at `latest` on purpose: replaying every past delivery
+  would judge old costs against today's prices. Its IT sets `earliest`, because the listener may
+  join after the test's first publish.
+- **Consumers' retry-then-dead-letter policy is common-lib's**
+  (`KafkaErrorHandlingAutoConfiguration`). Seven services had identical copies of it; do not add an
+  eighth. A service with a different policy declares its own `CommonErrorHandler`.
 - **ArchUnit's `layeredArchitecture()` fails on an empty layer.** A service with no `repository`
   package (reporting writes with `JdbcClient` from its services) must leave that layer out of its
   rules, not create an empty package to satisfy it.
@@ -532,6 +543,19 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   message to its end in one test.
 
 ## Traps specific to this codebase
+
+- **Costs are held without VAT; the business reclaims it.** A delivery or an order keyed in as
+  invoiced has its VAT taken out by catalog's `/pricing/cost-check`, and purchasing keeps the typed
+  cost, the rate and the input VAT beside the net one. Margin always compares a price without
+  output VAT with a cost without input VAT.
+- **A price review proposes; nothing reprices by itself.** A delivery that leaves an item below its
+  target margin (product, else category, else parent) or below cost opens one per product and
+  branch; a later delivery replaces it. Accepting changes the price the branch was charging - its
+  list price when a list set it, the base price otherwise.
+- **Expenses count once approved.** Above the approval limit (Settings) an expense waits for
+  someone other than its recorder; head office's need `expense:head-office` (administrator only)
+  and count once, in the business-wide profit and loss - never shared out over branches. A mistake
+  is voided with a reason, never deleted.
 
 - **A read model fed by an event keeps what the event said, not only patches rows that already
   exist.** Inventory refreshed product names on existing stock rows only, so a product's first

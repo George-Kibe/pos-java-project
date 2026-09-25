@@ -91,6 +91,8 @@ public abstract class CatalogTestBase {
         // Reference data comes from the migration and stays; products are per test. Tax classes a
         // test created for itself go too - a test must never mutate the seeded ones, because the
         // rates they carry are shared by every other test in the class.
+        jdbc.sql("DELETE FROM catalog.price_reviews").update();
+        jdbc.sql("UPDATE catalog.categories SET target_margin = NULL").update();
         jdbc.sql("DELETE FROM catalog.price_list_items").update();
         jdbc.sql("DELETE FROM catalog.price_lists").update();
         jdbc.sql("DELETE FROM catalog.promotion_rules").update();

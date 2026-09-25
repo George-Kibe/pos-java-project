@@ -38,7 +38,7 @@ class ArchitectureTest {
                     .whereLayer("Api")
                     .mayNotBeAccessedByAnyLayer()
                     .whereLayer("Service")
-                    .mayOnlyBeAccessedByLayers("Api")
+                    .mayOnlyBeAccessedByLayers("Api", "Messaging")
                     .whereLayer("Repository")
                     .mayOnlyBeAccessedByLayers("Service", "Api");
 

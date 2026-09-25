@@ -5,6 +5,8 @@ import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { CostVerdict, useCostChecks, VatSwitch } from "@/components/admin/cost-check";
+import { NewProductButton } from "@/components/admin/new-product-dialog";
 import { SupplierSelect } from "@/components/admin/supplier-select";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,8 @@ export function AddStock({ branches, defaultBranch }: { branches: { id: string; 
   const [branchId, setBranchId] = useState(defaultBranch ?? branches[0]?.id ?? "");
   const [supplierId, setSupplierId] = useState("");
   const [reference, setReference] = useState("");
+  // As printed on the invoice: stock is valued without VAT, which catalog takes out.
+  const [includesTax, setIncludesTax] = useState(true);
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<z.infer<typeof ProductSchema>[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
@@ -50,7 +54,9 @@ export function AddStock({ branches, defaultBranch }: { branches: { id: string; 
     setFound(page.content.filter((product) => product.active));
   }
 
-  function add(product: z.infer<typeof ProductSchema>) {
+  const checks = useCostChecks(branchId, includesTax, lines);
+
+  function add(product: { id: string; sku: string; name: string }) {
     setLines((current) =>
       current.some((line) => line.productId === product.id)
         ? current
@@ -87,6 +93,7 @@ export function AddStock({ branches, defaultBranch }: { branches: { id: string; 
           supplierId,
           branchId,
           deliveryNoteRef: reference.trim() || undefined,
+          costsIncludeTax: includesTax,
           lines: lines.map((line) => ({
             productId: line.productId,
             sku: line.sku,
@@ -135,12 +142,16 @@ export function AddStock({ branches, defaultBranch }: { branches: { id: string; 
             <SupplierSelect id="add-stock-supplier" value={supplierId} onChange={setSupplierId} />
             <Field id="delivery-ref" label="Delivery note (optional)" value={reference} onChange={(event) => setReference(event.target.value)} />
           </div>
-          <form onSubmit={search} className="flex gap-2">
-            <Input aria-label="Find a product" placeholder="Find a product by name or SKU" value={query} onChange={(event) => setQuery(event.target.value)} />
-            <Button type="submit" variant="outline">
-              Find
-            </Button>
-          </form>
+          <VatSwitch id="add-stock-vat" checked={includesTax} onChange={setIncludesTax} />
+          <div className="flex flex-wrap gap-2">
+            <form onSubmit={search} className="flex flex-1 gap-2">
+              <Input aria-label="Find a product" placeholder="Find a product by name or SKU" value={query} onChange={(event) => setQuery(event.target.value)} />
+              <Button type="submit" variant="outline">
+                Find
+              </Button>
+            </form>
+            <NewProductButton onCreated={add} />
+          </div>
           {found.length > 0 ? (
             <ul className="grid gap-1 rounded-lg border p-1" aria-label="Products found">
               {found.map((product) => (
@@ -158,12 +169,15 @@ export function AddStock({ branches, defaultBranch }: { branches: { id: string; 
               <div key={line.productId} className="grid gap-2 rounded-lg border p-2 sm:grid-cols-[1fr_6rem_7rem_7rem_9rem_auto] sm:items-end" data-testid="stock-line">
                 <span className="font-medium sm:self-center">{line.name}</span>
                 <Field id={`qty-${index}`} label="Quantity" inputMode="decimal" value={line.quantity} onChange={(event) => update(index, { quantity: event.target.value })} />
-                <Field id={`cost-${index}`} label="Unit cost" inputMode="decimal" value={line.unitCost} onChange={(event) => update(index, { unitCost: event.target.value })} />
+                <Field id={`cost-${index}`} label={includesTax ? "Unit cost (with VAT)" : "Unit cost"} inputMode="decimal" value={line.unitCost} onChange={(event) => update(index, { unitCost: event.target.value })} />
                 <Field id={`batch-${index}`} label="Batch" value={line.batch} onChange={(event) => update(index, { batch: event.target.value })} />
                 <Field id={`expiry-${index}`} label="Expiry" type="date" value={line.expiry} onChange={(event) => update(index, { expiry: event.target.value })} />
                 <Button type="button" variant="ghost" onClick={() => setLines((current) => current.filter((_, i) => i !== index))} aria-label={`Remove ${line.name}`}>
                   Remove
                 </Button>
+                <div className="sm:col-span-full">
+                  <CostVerdict check={checks.get(line.productId)} />
+                </div>
               </div>
             ))}
             {error ? (

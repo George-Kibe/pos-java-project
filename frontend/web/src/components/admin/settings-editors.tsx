@@ -11,7 +11,9 @@ import { ReceiptView } from "@/components/lane/receipt-view";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api/client";
+import { ExpenseSettingsSchema } from "@/lib/api/expense-schemas";
 import { BRAND_NAME } from "@/lib/brand";
+import { money } from "@/lib/lane/decimal";
 
 const ReceiptTextSchema = z.object({
   branchId: z.uuid(),
@@ -208,6 +210,54 @@ export function EmailWording() {
           ) : null}
         </div>
       </div>
+    </Section>
+  );
+}
+
+/** The amount above which an expense counts only once someone other than its recorder approves it. */
+export function ExpenseApprovalLimit() {
+  const client = useQueryClient();
+  const current = useQuery({ queryKey: ["expense-settings"], queryFn: () => api("expense-settings", ExpenseSettingsSchema) });
+  const [draft, setDraft] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const value = draft ?? (current.data ? String(current.data.approvalLimit) : "");
+  const save = useMutation({
+    mutationFn: () => api("expense-settings", ExpenseSettingsSchema, { method: "PUT", json: { approvalLimit: value } }),
+    onSuccess: async (saved) => {
+      toast.success(`Expenses above ${money(saved.approvalLimit)} now need a second person.`);
+      setErrors({});
+      setDraft(null);
+      await client.invalidateQueries({ queryKey: ["expense-settings"] });
+    },
+    onError: (failure) => setErrors(problemErrors(failure, "The limit was not saved.")),
+  });
+  return (
+    <Section title="Expenses" id="expense-limit">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          save.mutate();
+        }}
+        className="grid max-w-md gap-4"
+        aria-label="Expense approval limit"
+      >
+        <Field
+          id="expense-limit"
+          label="Approval needed above (without VAT)"
+          inputMode="decimal"
+          value={value}
+          onChange={(event) => setDraft(event.target.value)}
+          error={errors.approvalLimit}
+          disabled={!current.data}
+          hint="Up to this, an expense counts as soon as it is recorded; above it, once someone other than whoever recorded it approves it."
+        />
+        <FormError message={errors.form} />
+        <div>
+          <Button type="submit" disabled={save.isPending || !current.data}>
+            Save limit
+          </Button>
+        </div>
+      </form>
     </Section>
   );
 }

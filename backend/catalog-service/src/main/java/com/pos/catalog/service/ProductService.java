@@ -102,6 +102,46 @@ public class ProductService {
         return product;
     }
 
+    /** Changes only the base price, and announces it. */
+    @Transactional
+    public Product setBasePrice(UUID id, BigDecimal price) {
+        if (price == null || price.signum() < 0) {
+            throw new Errors.BadRequestException(
+                    "product.invalid_price", "A price cannot be negative.");
+        }
+        Product product = get(id);
+        BigDecimal previousPrice = product.getBasePrice();
+        product.setBasePrice(price);
+        products.save(product);
+        if (previousPrice.compareTo(price) != 0) {
+            events.priceChanged(product, previousPrice);
+        }
+        return product;
+    }
+
+    /**
+     * What this product should earn, overriding its category's target; null follows the category.
+     */
+    @Transactional
+    public Product setTargetMargin(UUID id, BigDecimal targetMargin) {
+        Product product = get(id);
+        product.setTargetMargin(checkedTargetMargin(targetMargin));
+        return products.save(product);
+    }
+
+    /** A target margin as stored: a fraction of at least 0 and below 1, or none. */
+    public static BigDecimal checkedTargetMargin(BigDecimal targetMargin) {
+        if (targetMargin != null
+                && (targetMargin.signum() < 0 || targetMargin.compareTo(BigDecimal.ONE) >= 0)) {
+            throw new Errors.BadRequestException(
+                    "margin.invalid_target",
+                    "A target margin is from 0% up to, not including, 100%.");
+        }
+        return targetMargin == null
+                ? null
+                : targetMargin.setScale(4, java.math.RoundingMode.HALF_UP);
+    }
+
     @Transactional
     public Product setActive(UUID id, boolean active) {
         Product product = get(id);

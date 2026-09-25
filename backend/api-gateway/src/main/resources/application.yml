@@ -62,7 +62,7 @@ spring:
             - id: catalog-service
               uri: ${CATALOG_SERVICE_URI:http://localhost:8082}
               predicates:
-                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/brands/**,/api/v1/price-lists/**,/api/v1/promotions/**,/api/v1/tax-classes/**,/api/v1/units-of-measure/**,/api/v1/scale-barcode-rules/**,/api/v1/pricing/**
+                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/brands/**,/api/v1/price-lists/**,/api/v1/promotions/**,/api/v1/tax-classes/**,/api/v1/units-of-measure/**,/api/v1/scale-barcode-rules/**,/api/v1/pricing/**,/api/v1/price-reviews/**
               filters:
                 - name: CircuitBreaker
                   args:
@@ -82,7 +82,7 @@ spring:
             - id: purchasing-service
               uri: ${PURCHASING_SERVICE_URI:http://localhost:8084}
               predicates:
-                - Path=/api/v1/suppliers/**,/api/v1/purchase-orders/**,/api/v1/goods-receipts/**,/api/v1/supplier-invoices/**,/api/v1/supplier-returns/**,/api/v1/reorder-suggestions/**
+                - Path=/api/v1/suppliers/**,/api/v1/purchase-orders/**,/api/v1/goods-receipts/**,/api/v1/supplier-invoices/**,/api/v1/supplier-returns/**,/api/v1/reorder-suggestions/**,/api/v1/expenses/**,/api/v1/expense-settings/**
               filters:
                 - name: CircuitBreaker
                   args:

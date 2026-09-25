@@ -24,10 +24,20 @@ export const CatalogProductSchema = z.object({
   reorderPoint: z.number().nullable(),
   reorderQuantity: z.number().nullable(),
   imageUrl: z.string().nullable(),
+  /** This product's own target margin as a fraction; null follows its category. */
+  targetMargin: z.number().nullable(),
 });
 export type CatalogProduct = z.infer<typeof CatalogProductSchema>;
 
-export const CategorySchema = z.object({ id: z.uuid(), code: z.string(), name: z.string(), parentId: z.uuid().nullable(), active: z.boolean() });
+export const CategorySchema = z.object({
+  id: z.uuid(),
+  code: z.string(),
+  name: z.string(),
+  parentId: z.uuid().nullable(),
+  active: z.boolean(),
+  /** What its items should earn, as a fraction of the price without VAT; null inherits the parent's. */
+  targetMargin: z.number().nullable(),
+});
 export type Category = z.infer<typeof CategorySchema>;
 
 export const BrandSchema = z.object({ id: z.uuid(), code: z.string(), name: z.string(), active: z.boolean() });
@@ -104,4 +114,46 @@ export const PricePreviewSchema = z.object({
   lineTotal: z.number(),
   currency: z.string(),
 });
-export type PricePreview = z.infer<typeof PricePreviewSchema>;
+
+/** A cost judged against a branch's price. "net" amounts are without VAT; prices are as entered. */
+export const CostCheckSchema = z.object({
+  productId: z.uuid(),
+  sku: z.string(),
+  name: z.string(),
+  unitCost: z.number(),
+  taxRate: z.number(),
+  netUnitCost: z.number(),
+  price: z.number(),
+  priceIncludesTax: z.boolean(),
+  priceSource: z.string(),
+  netPrice: z.number(),
+  margin: z.number().nullable(),
+  targetMargin: z.number().nullable(),
+  status: z.enum(["OK", "NO_TARGET", "BELOW_TARGET", "BELOW_COST"]),
+  suggestedPrice: z.number().nullable(),
+});
+export type CostCheck = z.infer<typeof CostCheckSchema>;
+
+export const PriceReviewSchema = z.object({
+  id: z.uuid(),
+  productId: z.uuid(),
+  sku: z.string(),
+  productName: z.string(),
+  branchId: z.uuid(),
+  receiptId: z.uuid(),
+  receivedAt: z.string(),
+  unitCost: z.number(),
+  price: z.number(),
+  priceIncludesTax: z.boolean(),
+  taxRate: z.number(),
+  priceSource: z.enum(["BASE_PRICE", "PRICE_LIST"]),
+  margin: z.number().nullable(),
+  targetMargin: z.number().nullable(),
+  finding: z.enum(["BELOW_TARGET", "BELOW_COST"]),
+  suggestedPrice: z.number(),
+  status: z.enum(["OPEN", "ACCEPTED", "KEPT", "SUPERSEDED"]),
+  decidedAt: z.string().nullable(),
+  newPrice: z.number().nullable(),
+  reason: z.string().nullable(),
+});
+export type PriceReview = z.infer<typeof PriceReviewSchema>;

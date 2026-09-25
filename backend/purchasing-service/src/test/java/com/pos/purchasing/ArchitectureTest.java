@@ -31,6 +31,8 @@ class ArchitectureTest {
                     .definedBy("com.pos.purchasing.service..")
                     .layer("Messaging")
                     .definedBy("com.pos.purchasing.messaging..")
+                    .layer("Client")
+                    .definedBy("com.pos.purchasing.client..")
                     .layer("Repository")
                     .definedBy("com.pos.purchasing.repository..")
                     .layer("Domain")
@@ -39,6 +41,8 @@ class ArchitectureTest {
                     .mayNotBeAccessedByAnyLayer()
                     .whereLayer("Service")
                     .mayOnlyBeAccessedByLayers("Api", "Messaging")
+                    .whereLayer("Client")
+                    .mayOnlyBeAccessedByLayers("Service")
                     .whereLayer("Repository")
                     .mayOnlyBeAccessedByLayers("Service");
 

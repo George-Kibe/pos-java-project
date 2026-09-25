@@ -594,4 +594,58 @@ class CatalogAdminIT extends CatalogTestBase {
         assertThat(reloaded.getBasePrice()).isEqualByComparingTo("101");
         assertThat(products.findByBarcode("5060009990028")).isPresent();
     }
+
+    @Test
+    @DisplayName(
+            "a cost with VAT is judged without it, against the category's target or the"
+                    + " product's own")
+    void costsAreCheckedWithoutVat() throws Exception {
+        Product oil = newProduct(unique("OIL"), "Cooking oil 1L", "STANDARD", "232", true);
+        UUID grocery = categories.findByCode("GROCERY").orElseThrow().getId();
+        send(
+                        put("/api/v1/categories/" + grocery + "/target-margin"),
+                        as("product:manage"),
+                        Map.of("targetMargin", 0.15))
+                .andExpect(status().isForbidden());
+        send(
+                        put("/api/v1/categories/" + grocery + "/target-margin"),
+                        MANAGER,
+                        Map.of("targetMargin", 0.15))
+                .andExpect(status().isOk());
+
+        Map<String, Object> check =
+                Map.of(
+                        "costIncludesTax",
+                        true,
+                        "lines",
+                        List.of(Map.of("productId", oil.getId(), "unitCost", 220.40)));
+        // 220.40 on the invoice is 190 without VAT: 5% on a 200 net price, below 15%.
+        send(post("/api/v1/pricing/cost-check"), as("product:view"), check)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].taxRate", is(0.16)))
+                .andExpect(jsonPath("$[0].netUnitCost", is(190.0)))
+                .andExpect(jsonPath("$[0].netPrice", is(200.0)))
+                .andExpect(jsonPath("$[0].margin", is(0.05)))
+                .andExpect(jsonPath("$[0].status", is("BELOW_TARGET")))
+                .andExpect(jsonPath("$[0].suggestedPrice", is(260.0)));
+
+        // A product's own target overrides the category's; null follows it again.
+        send(
+                        put("/api/v1/products/" + oil.getId() + "/target-margin"),
+                        MANAGER,
+                        Map.of("targetMargin", 0.04))
+                .andExpect(jsonPath("$.targetMargin", is(0.04)));
+        send(post("/api/v1/pricing/cost-check"), as("product:view"), check)
+                .andExpect(jsonPath("$[0].status", is("OK")));
+        send(
+                        put("/api/v1/products/" + oil.getId() + "/target-margin"),
+                        MANAGER,
+                        java.util.Collections.singletonMap("targetMargin", null))
+                .andExpect(jsonPath("$.targetMargin").doesNotExist());
+        send(
+                        put("/api/v1/categories/" + grocery + "/target-margin"),
+                        MANAGER,
+                        Map.of("targetMargin", 1))
+                .andExpect(status().isBadRequest());
+    }
 }

@@ -1,6 +1,7 @@
 package com.pos.reporting;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -12,12 +13,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import com.pos.events.Topics;
 import com.pos.reporting.service.ReportTables;
 
 /** Who may see what, and every report as JSON, CSV and PDF. */
@@ -33,6 +37,89 @@ class ReportApiIT extends ReportingTestBase {
     }
 
     // --- the reports --------------------------------------------------------------------
+
+    private static Published expense(
+            UUID id, UUID branch, String category, String amount, String status, long revision) {
+        return event(
+                Topics.PURCHASING_EXPENSE_CHANGED,
+                id,
+                new com.pos.events.purchasing.ExpenseChangedPayload(
+                        id,
+                        "EXP-" + revision,
+                        branch,
+                        category,
+                        category + " for the day",
+                        today(),
+                        money(amount),
+                        money("0"),
+                        "KES",
+                        status,
+                        revision));
+    }
+
+    @Test
+    @DisplayName(
+            "profit and loss: net sales less cost, losses and approved expenses, head office's"
+                    + " once")
+    void profitAndLoss() throws Exception {
+        UUID voided = UUID.randomUUID();
+        publishAll(
+                List.of(
+                        expense(UUID.randomUUID(), BRANCH, "ELECTRICITY", "50", "APPROVED", 0),
+                        // Waiting for approval: not counted.
+                        expense(UUID.randomUUID(), BRANCH, "RENT", "1000", "PENDING_APPROVAL", 0),
+                        // Head office: in the business's figure, not the branch's.
+                        expense(UUID.randomUUID(), null, "WAGES", "20", "APPROVED", 0),
+                        // Its void arrives before its recording, and still wins.
+                        expense(voided, BRANCH, "TRANSPORT", "7", "VOIDED", 2),
+                        expense(voided, BRANCH, "TRANSPORT", "7", "APPROVED", 1)));
+
+        // Net sales 300 - 100 returned + 210 = 410; cost 240 - 80 + 150 = 310; losses 160 + 90.
+        mockMvc.perform(
+                        range("/api/v1/reports/profit-and-loss")
+                                .param("branchId", BRANCH.toString())
+                                .with(branchManager()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total.netSales", is(410.0)))
+                .andExpect(jsonPath("$.total.costOfSales", is(310.0)))
+                .andExpect(jsonPath("$.total.grossProfit", is(100.0)))
+                .andExpect(jsonPath("$.total.lossTotal", is(250.0)))
+                .andExpect(jsonPath("$.total.profitAfterLosses", is(-150.0)))
+                .andExpect(jsonPath("$.total.expenseTotal", is(50.0)))
+                .andExpect(jsonPath("$.total.netProfit", is(-200.0)))
+                .andExpect(jsonPath("$.headOfficeExpenses", hasSize(0)));
+        mockMvc.perform(range("/api/v1/reports/profit-and-loss").with(branchManager()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(range("/api/v1/reports/profit-and-loss").with(headOffice()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.branches", hasSize(1)))
+                .andExpect(jsonPath("$.headOfficeTotal", is(20.0)))
+                .andExpect(jsonPath("$.total.expenseTotal", is(70.0)))
+                .andExpect(jsonPath("$.total.netProfit", is(-220.0)));
+
+        // By product: soap earned 100 - 80... and lost 160 of it.
+        mockMvc.perform(
+                        range("/api/v1/reports/profit-and-loss/products")
+                                .param("branchId", BRANCH.toString())
+                                .with(headOffice()))
+                .andExpect(
+                        jsonPath("$[?(@.productId == '" + SOAP + "')].grossProfit", contains(40.0)))
+                .andExpect(jsonPath("$[?(@.productId == '" + SOAP + "')].losses", contains(160.0)))
+                .andExpect(
+                        jsonPath(
+                                "$[?(@.productId == '" + SOAP + "')].profitAfterLosses",
+                                contains(-120.0)))
+                .andExpect(
+                        jsonPath(
+                                "$[?(@.productId == '" + FLOUR + "')].profitAfterLosses",
+                                contains(-30.0)));
+
+        // A rebuild from the event log comes to the same figures.
+        mockMvc.perform(post("/api/v1/reports/rebuild").with(headOffice()))
+                .andExpect(status().isOk());
+        mockMvc.perform(range("/api/v1/reports/profit-and-loss").with(headOffice()))
+                .andExpect(jsonPath("$.total.netProfit", is(-220.0)));
+    }
 
     @Test
     void theSalesReportsAnswer() throws Exception {

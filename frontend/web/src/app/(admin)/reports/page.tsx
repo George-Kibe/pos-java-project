@@ -9,10 +9,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { SalesRowSchema } from "@/lib/api/admin-schemas";
 import { branchChoices } from "@/lib/api/branches";
 import { CategorySchema } from "@/lib/api/catalog-schemas";
-import { BranchDay, CategoryRow, DeadLine, ExpiringLine, HourRow, ProductRow, SalesRow, ShrinkageRow, TenderRow, Valuation } from "@/lib/api/report-schemas";
+import { BranchDay, CategoryRow, DeadLine, ExpiringLine, HourRow, ProductProfitRow, ProductRow, ProfitAndLossReport, SalesRow, ShrinkageRow, TenderRow, Valuation } from "@/lib/api/report-schemas";
 import { param, serverRead } from "@/lib/api/server";
 import { can, requireUser } from "@/lib/auth/dal";
-import { formatMoney, formatQuantity, formatWhen } from "@/lib/format";
+import { formatMoney, formatQuantity, formatWhen, shopToday } from "@/lib/format";
 import { amount, money } from "@/lib/lane/decimal";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +31,8 @@ const TABS = [
   { id: "hour", label: "By hour", export: "sales-by-hour", branchRequired: false },
   { id: "product", label: "Products and margin", export: "sales-by-product", branchRequired: false },
   { id: "category", label: "Categories and margin", export: "margin-by-category", branchRequired: false },
+  { id: "pnl", label: "Profit and loss", export: "profit-and-loss", branchRequired: false },
+  { id: "profit", label: "Profit by product", export: "profit-by-product", branchRequired: false },
   { id: "payments", label: "Payment mix", export: "payment-mix", branchRequired: false },
   { id: "valuation", label: "Stock value", export: "stock-valuation", branchRequired: true },
   { id: "dead", label: "Dead stock", export: "dead-stock", branchRequired: true },
@@ -71,7 +73,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
   const query = await searchParams;
   const tab = (TABS.find((t) => t.id === param(query.tab))?.id ?? "period") as TabId;
   const spec = TABS.find((t) => t.id === tab)!;
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Nairobi" });
+  const today = shopToday();
   const from = param(query.from) || `${today.slice(0, 8)}01`;
   const to = param(query.to) || today;
   const period = PERIODS.some((p) => p.value === param(query.period)) ? param(query.period)! : "MONTH";
@@ -120,7 +122,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
           value={branch}
           options={[...(everywhere && !spec.branchRequired ? [{ value: ALL, label: "All branches" }] : []), ...branches.map((b) => ({ value: b.id, label: b.name }))]}
         />
-        {["product", "category", "valuation", "shrinkage"].includes(tab) && categories?.data ? (
+        {["product", "category", "profit", "valuation", "shrinkage"].includes(tab) && categories?.data ? (
           <SelectField name="category" label="Category" value={category} options={[{ value: "", label: "Every category" }, ...categories.data.map((c) => ({ value: c.id, label: c.name }))]} />
         ) : null}
         {tab === "dead" || tab === "expiry" ? <TextField name="days" label={tab === "dead" ? "Unsold for (days)" : "Expiring within (days)"} value={days} /> : null}
@@ -216,6 +218,38 @@ async function render(
         return {
           columns: [c("Category"), c("Net", "money"), c("Cost", "money"), c("Margin", "money"), c("Margin %", "percent"), c("Uncosted", "qty")],
           rows: rows.map((r) => [r.categoryCode, r.netSales, r.cost, r.margin, r.marginPercent, r.uncostedQuantity]),
+        };
+      }
+      case "pnl": {
+        const report = await read(`reports/profit-and-loss?${q}`, ProfitAndLossReport);
+        const t = report.total;
+        const label = (code: string) => code.toLowerCase().replaceAll("_", " ");
+        const rows: Cell[][] = [
+          ["Net sales", t.netSales],
+          ["Cost of sales", t.costOfSales],
+          [`Gross profit (${t.grossMarginPercent.toFixed(1)}%)`, t.grossProfit],
+          ...t.losses.map((l): Cell[] => [`Lost: ${label(l.code)}`, l.amount]),
+          ["Profit after losses", t.profitAfterLosses],
+          ...t.expenses.map((e): Cell[] => [`Expense: ${label(e.code)}`, e.amount]),
+          ...(report.headOfficeExpenses.length ? [["of which head office", report.headOfficeTotal] satisfies Cell[]] : []),
+          [`Net profit (${t.netMarginPercent.toFixed(1)}%)`, t.netProfit],
+          // Every branch's own bottom line, when the whole business is shown.
+          ...(report.branches.length > 1 ? report.branches.map((b): Cell[] => [`${o.branchName(b.branchId)}: net profit`, b.netProfit]) : []),
+        ];
+        return {
+          columns: [c("Line"), c("Amount", "money")],
+          rows,
+          total:
+            t.uncostedQuantity > 0
+              ? `Without VAT throughout. ${formatQuantity(t.uncostedQuantity)} units were sold with no known cost, so the profit is overstated until their deliveries are recorded.`
+              : "Without VAT throughout: sales net of the VAT collected, costs net of the VAT reclaimed.",
+        };
+      }
+      case "profit": {
+        const rows = await read(`reports/profit-and-loss/products?${q}`, z.array(ProductProfitRow));
+        return {
+          columns: [c("Product"), c("Category"), c("Sold", "qty"), c("Net", "money"), c("Cost", "money"), c("Gross profit", "money"), c("Lost", "money"), c("After losses", "money"), c("Margin %", "percent"), c("Uncosted", "qty")],
+          rows: rows.map((r) => [r.productName ?? r.sku, r.categoryCode, r.quantitySold, r.netSales, r.costOfSales, r.grossProfit, r.losses, r.profitAfterLosses, r.marginPercent, r.uncostedQuantity]),
         };
       }
       case "payments": {

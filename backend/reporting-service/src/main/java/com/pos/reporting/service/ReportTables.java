@@ -39,11 +39,14 @@ public class ReportTables {
                     "shrinkage",
                     "stock-valuation",
                     "dead-stock",
-                    "near-expiry");
+                    "near-expiry",
+                    "profit-and-loss",
+                    "profit-by-product");
 
     private final ReportQueries reports;
     private final StockReportService stock;
     private final ShiftReportService shifts;
+    private final ProfitAndLoss profitAndLoss;
 
     public Table build(String report, ReportFilter filter, int days) {
         List<String> subtitle = subtitle(filter);
@@ -61,6 +64,8 @@ public class ReportTables {
             case "stock-valuation" -> valuation(requireBranch(filter), filter.categoryId());
             case "dead-stock" -> deadStock(requireBranch(filter), days, filter.to());
             case "near-expiry" -> nearExpiry(requireBranch(filter), days, filter.to());
+            case "profit-and-loss" -> statement(subtitle, profitAndLoss.statement(filter));
+            case "profit-by-product" -> productProfit(subtitle, profitAndLoss.byProduct(filter));
             default ->
                     throw new Errors.NotFoundException(
                             "report.unknown", "No report called " + report);
@@ -133,6 +138,63 @@ public class ReportTables {
                                                         row.averageBasket(),
                                                         row.items(),
                                                         row.itemsPerBasket()))
+                        .toList());
+    }
+
+    /** The statement, line by line: sales down to net profit, without VAT throughout. */
+    private static Table statement(List<String> subtitle, ProfitAndLoss.Report report) {
+        ProfitAndLoss.Statement total = report.total();
+        List<List<Object>> rows = new ArrayList<>();
+        rows.add(listOf("Net sales", total.netSales()));
+        rows.add(listOf("Cost of sales", total.costOfSales()));
+        rows.add(listOf("Gross profit (" + total.grossMarginPercent() + "%)", total.grossProfit()));
+        total.losses().forEach(loss -> rows.add(listOf("Loss: " + loss.code(), loss.amount())));
+        rows.add(listOf("Profit after losses", total.profitAfterLosses()));
+        total.expenses()
+                .forEach(
+                        expense ->
+                                rows.add(listOf("Expense: " + expense.code(), expense.amount())));
+        if (!report.headOfficeExpenses().isEmpty()) {
+            rows.add(listOf("of which head office", report.headOfficeTotal()));
+        }
+        rows.add(listOf("Net profit (" + total.netMarginPercent() + "%)", total.netProfit()));
+        if (total.uncostedQuantity().signum() > 0) {
+            rows.add(listOf("Units sold with no known cost", total.uncostedQuantity()));
+        }
+        return new Table("Profit and loss", subtitle, List.of("Line", "Amount"), rows);
+    }
+
+    private static Table productProfit(
+            List<String> subtitle, List<ProfitAndLoss.ProductProfit> rows) {
+        return new Table(
+                "Profit by product",
+                subtitle,
+                List.of(
+                        "SKU",
+                        "Product",
+                        "Category",
+                        "Sold",
+                        "Net sales",
+                        "Cost of sales",
+                        "Gross profit",
+                        "Losses",
+                        "Profit after losses",
+                        "Margin %"),
+                rows.stream()
+                        .map(
+                                row ->
+                                        (List<Object>)
+                                                listOf(
+                                                        row.sku(),
+                                                        row.productName(),
+                                                        row.categoryCode(),
+                                                        row.quantitySold(),
+                                                        row.netSales(),
+                                                        row.costOfSales(),
+                                                        row.grossProfit(),
+                                                        row.losses(),
+                                                        row.profitAfterLosses(),
+                                                        row.marginPercent()))
                         .toList());
     }
 

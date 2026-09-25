@@ -170,6 +170,32 @@ class AdministratorRightsIT extends AuthTestBase {
     }
 
     @Test
+    @DisplayName(
+            "alone records head office's expenses; branch managers record and approve their"
+                    + " branches'")
+    void expenses() {
+        assertThat(claims(admin).get("perms").toString()).contains("\"expense:head-office\"");
+        JsonNode roles = json(get("/api/v1/roles", admin));
+        java.util.List<String> headOffice = new java.util.ArrayList<>();
+        roles.forEach(
+                role -> {
+                    String held = role.get("permissions").toString();
+                    if (held.contains("\"expense:head-office\"")) {
+                        headOffice.add(role.get("code").asString());
+                    }
+                    if (role.get("code").asString().equals("BRANCH_MANAGER")) {
+                        assertThat(held).contains("\"expense:record\"", "\"expense:approve\"");
+                    }
+                    if (role.get("code").asString().equals("ACCOUNTANT")) {
+                        assertThat(held)
+                                .contains("\"expense:view\"")
+                                .doesNotContain("expense:record");
+                    }
+                });
+        assertThat(headOffice).isEmpty();
+    }
+
+    @Test
     @DisplayName("builds a role of its own and sees every user and role")
     void managesRoles() {
         String code = "AUDIT_ASSISTANT_" + (System.nanoTime() % 1_000_000);

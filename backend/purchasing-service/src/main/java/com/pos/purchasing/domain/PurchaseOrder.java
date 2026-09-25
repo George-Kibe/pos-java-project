@@ -102,6 +102,10 @@ public class PurchaseOrder extends BaseEntity {
     @Column(length = 1000)
     private String notes;
 
+    /** Whether the costs were keyed in with VAT; the lines hold them without it. */
+    @Column(name = "costs_include_tax", nullable = false)
+    private boolean costsIncludeTax;
+
     @OneToMany(
             mappedBy = "purchaseOrder",
             cascade = CascadeType.ALL,

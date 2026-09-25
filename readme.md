@@ -113,14 +113,14 @@ lookups through the gateway, and they must be circuit-broken.
 |---|---|---|---|
 | `api-gateway` | 8080 | — | Single ingress, route table, JWT validation via JWKS, per-user + per-IP rate limiting, CORS, correlation-ID injection, aggregated OpenAPI |
 | `auth-service` | 8081 | `auth` schema | Users, roles, permissions, branch assignments, registration + email OTP, login, refresh-token rotation with reuse detection, JWKS endpoint, password reset, audit log |
-| `catalog-service` | 8082 | `catalog` schema | Products, categories, brands, units of measure, barcodes (incl. scale/weight-embedded), tax classes and effective-dated rates, price lists per branch, promotions and pricing rules |
+| `catalog-service` | 8082 | `catalog` schema | Products, categories, brands, units of measure, barcodes (incl. scale/weight-embedded), tax classes and effective-dated rates, price lists per branch, promotions and pricing rules, target margins and the price reviews a delivery's cost opens |
 | `inventory-service` | 8083 | `inventory` schema | Stock on hand per branch, batches/lots with expiry, FEFO deduction, stock movements, adjustments, inter-branch transfers, stock takes, low-stock and near-expiry alerts |
-| `purchasing-service` | 8084 | `purchasing` schema | Suppliers, purchase orders and approvals, goods received notes, supplier invoices, returns to supplier, landed cost |
+| `purchasing-service` | 8084 | `purchasing` schema | Suppliers, purchase orders and approvals, goods received notes (costs held without VAT), supplier invoices, returns to supplier, landed cost, the expenses register |
 | `sales-service` | 8085 | `sales` schema | Till sessions/shifts, carts, checkout saga, sales and sale lines, price/tax snapshots, receipts, returns and voids, offline sale sync with idempotency, Z-report data |
 | `payment-service` | 8086 | `payment` schema | Payment intents, cash tendering and change, M-Pesa STK Push + callback reconciliation, card terminal reference capture, refunds, settlement reconciliation |
 | `customer-service` | 8087 | `customer` schema | Customers, membership tiers, loyalty point accrual and redemption, customer-level pricing eligibility |
 | `notification-service` | 8088 | `notification` schema | Kafka-driven email via SMTP (OTP, welcome, receipts, alerts), Thymeleaf templates, delivery log, retry + DLT handling |
-| `reporting-service` | 8089 | `reporting` schema | Read-model projections built from events: sales by day/branch/cashier/product, margins, stock valuation, Z-reports, exports |
+| `reporting-service` | 8089 | `reporting` schema | Read-model projections built from events: sales by day/branch/cashier/product, margins, profit and loss to net profit, stock valuation, Z-reports, exports |
 | `web` | 3000 | — | Next.js cashier lane and back-office admin |
 
 Shared Maven modules: `common-lib` (error model, correlation, resource-server security, auditing,
@@ -137,7 +137,7 @@ business logic and no service-specific entities.**
   Boot 4.0.x; Boot 4.1 has no matching Cloud release yet and we need Cloud Gateway)
 - Spring Security (OAuth2 resource server), Spring Data JPA, Spring for Apache Kafka
 - PostgreSQL 18, Flyway, Redis 8, S3 via the AWS SDK 2.x (RustFS locally)
-- MapStruct 1.6.3, Lombok, Bean Validation, springdoc-openapi 3.1.1
+- Lombok, Bean Validation, springdoc-openapi 3.1.1
 - Maven 3.9.16 via the wrapper (`backend/mvnw`), multi-module, all versions in the parent POM
 
 > Boot 4 renamed several starters. Use `spring-boot-starter-webmvc`,

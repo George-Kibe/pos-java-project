@@ -83,6 +83,7 @@ public class GoodsReceiptController {
                         request.dutyAmount(),
                         request.allocationBasis(),
                         request.notes(),
+                        request.includesTax(),
                         request.lines().stream()
                                 .map(
                                         line ->

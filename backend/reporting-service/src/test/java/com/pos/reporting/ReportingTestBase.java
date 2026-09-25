@@ -104,7 +104,7 @@ public abstract class ReportingTestBase {
                                  report_sale_lines, report_sale_tenders, report_sale_costs,
                                  report_sale_voids, report_returns, report_return_lines,
                                  report_shifts, report_stock_valuations, report_expiring_batches,
-                                 report_stock_adjustments
+                                 report_stock_adjustments, report_expenses
                         """)
                 .update();
     }

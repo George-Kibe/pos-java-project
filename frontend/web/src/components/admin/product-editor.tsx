@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { CheckField, FormError, problemErrors, SelectInput, viaGateway } from "@/components/admin/form-parts";
+import { CheckField, failureMessage, FormError, inputText, problemErrors, SelectInput, viaGateway } from "@/components/admin/form-parts";
 import { Field } from "@/components/field";
+import { useSession } from "@/components/session-provider";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api/client";
 import { type Brand, type CatalogProduct, CatalogProductSchema, type Category, type TaxClass, type Unit } from "@/lib/api/catalog-schemas";
@@ -17,7 +18,6 @@ interface Reference {
   taxClasses: TaxClass[];
 }
 
-const text = (value: number | string | null | undefined) => (value === null || value === undefined ? "" : String(value));
 const optionalNumber = (value: string) => (value.trim() === "" ? undefined : value.trim());
 
 /**
@@ -26,6 +26,9 @@ const optionalNumber = (value: string) => (value.trim() === "" ? undefined : val
  */
 export function ProductEditor({ reference, product }: { reference: Reference; product?: CatalogProduct }) {
   const router = useRouter();
+  // A product's own target margin is pricing policy: price:manage, which the service checks too.
+  const canPrice = useSession().permissions.includes("price:manage");
+  const savedTarget = product?.targetMargin === null || product?.targetMargin === undefined ? "" : String(Number((product.targetMargin * 100).toFixed(2)));
   const [form, setForm] = useState({
     sku: product?.sku ?? "",
     name: product?.name ?? "",
@@ -35,9 +38,10 @@ export function ProductEditor({ reference, product }: { reference: Reference; pr
     unitOfMeasureId: product?.unitOfMeasureId ?? "",
     // A new product starts with the default tax class; the choice is still theirs.
     taxClassId: product?.taxClassId ?? reference.taxClasses.find((t) => t.isDefault)?.id ?? "",
-    basePrice: text(product?.basePrice),
-    reorderPoint: text(product?.reorderPoint),
-    reorderQuantity: text(product?.reorderQuantity),
+    basePrice: inputText(product?.basePrice),
+    reorderPoint: inputText(product?.reorderPoint),
+    reorderQuantity: inputText(product?.reorderQuantity),
+    targetMargin: savedTarget,
   });
   const [flags, setFlags] = useState({
     sellByWeight: product?.sellByWeight ?? false,
@@ -61,6 +65,13 @@ export function ProductEditor({ reference, product }: { reference: Reference; pr
     if (!barcodes.includes(value)) setBarcodes([...barcodes, value]);
     setBarcode("");
     setErrors({});
+  }
+
+  /** Only when it changed, and only for someone who may set it. */
+  async function saveTarget(id: string) {
+    if (!canPrice || form.targetMargin.trim() === savedTarget) return;
+    const value = form.targetMargin.trim();
+    await api(`products/${id}/target-margin`, CatalogProductSchema, { method: "PUT", json: { targetMargin: value === "" ? null : Number(value) / 100 } });
   }
 
   async function save(event: FormEvent) {
@@ -88,10 +99,12 @@ export function ProductEditor({ reference, product }: { reference: Reference; pr
       if (product) {
         await api(`products/${product.id}`, CatalogProductSchema, { method: "PUT", json: body });
         await api(`products/${product.id}/barcodes`, CatalogProductSchema, { method: "PUT", json: { barcodes } });
+        await saveTarget(product.id);
         toast.success(`${body.name} saved.`);
         router.refresh();
       } else {
         const created = await api("products", CatalogProductSchema, { method: "POST", json: body });
+        await saveTarget(created.id);
         toast.success(`${created.name} created. Add a picture if it has one.`);
         router.push(`/products/${created.id}`);
       }
@@ -122,6 +135,9 @@ export function ProductEditor({ reference, product }: { reference: Reference; pr
           <Field id="product-price" label="Base price" inputMode="decimal" value={form.basePrice} onChange={set("basePrice")} error={errors.basePrice} required />
           <Field id="product-reorder-point" label="Reorder at (optional)" inputMode="decimal" value={form.reorderPoint} onChange={set("reorderPoint")} error={errors.reorderPoint} />
           <Field id="product-reorder-quantity" label="Reorder quantity (optional)" inputMode="decimal" value={form.reorderQuantity} onChange={set("reorderQuantity")} error={errors.reorderQuantity} />
+          {canPrice ? (
+            <Field id="product-target-margin" label="Target margin % (optional)" inputMode="decimal" value={form.targetMargin} onChange={set("targetMargin")} error={errors.targetMargin} hint="On the price without VAT. Empty follows the category's." />
+          ) : null}
         </div>
         <div className="grid gap-1">
           <CheckField id="product-weighed" label="Sold by weight" hint="Priced per unit of measure, weighed at the till." checked={flags.sellByWeight} onChange={(checked) => setFlags({ ...flags, sellByWeight: checked })} />
@@ -199,7 +215,7 @@ function ProductPicture({ product }: { product: CatalogProduct }) {
       toast.success("Picture saved.");
       router.refresh();
     } catch (failure) {
-      setError(problemErrors(failure, "The picture was not saved.").form ?? "The picture was not saved.");
+      setError(failureMessage(failure, "The picture was not saved."));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = "";

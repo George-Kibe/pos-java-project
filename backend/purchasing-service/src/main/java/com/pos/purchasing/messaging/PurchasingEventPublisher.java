@@ -82,6 +82,35 @@ public class PurchasingEventPublisher {
      * the stock is worth once freight and duty are counted. Rejected quantities are excluded: goods
      * refused at the door never become sellable stock.
      */
+    /**
+     * An expense as it now stands. Its version is the revision: it goes up with every change, so
+     * reporting keeps the latest whatever order the events arrive in.
+     */
+    public void expenseChanged(com.pos.purchasing.domain.Expense expense) {
+        outbox.record(
+                Topics.PURCHASING_EXPENSE_CHANGED,
+                "Expense",
+                expense.getId(),
+                EventEnvelope.<com.pos.events.purchasing.ExpenseChangedPayload>builder()
+                        .topic(Topics.PURCHASING_EXPENSE_CHANGED)
+                        .correlationId(CorrelationId.get())
+                        .branchId(expense.getBranchId())
+                        .payload(
+                                new com.pos.events.purchasing.ExpenseChangedPayload(
+                                        expense.getId(),
+                                        expense.getExpenseNumber(),
+                                        expense.getBranchId(),
+                                        expense.getCategory().name(),
+                                        expense.getDescription(),
+                                        expense.getIncurredOn(),
+                                        expense.getAmount(),
+                                        expense.getTaxAmount(),
+                                        expense.getCurrency(),
+                                        expense.getStatus().name(),
+                                        expense.getVersion()))
+                        .build());
+    }
+
     public void goodsReceived(GoodsReceivedNote grn) {
         List<GoodsReceivedPayload.ReceivedLine> lines =
                 grn.getLines().stream()

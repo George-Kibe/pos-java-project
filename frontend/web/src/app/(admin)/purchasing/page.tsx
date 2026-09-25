@@ -277,7 +277,7 @@ async function Reorder({ branch, user }: { branch: string; user: Me }) {
                   <div className="flex justify-end gap-2">
                     {suggestion.supplierId ? (
                       <Link
-                        href={`/purchasing/orders/new?${new URLSearchParams({ branch, supplier: suggestion.supplierId, product: suggestion.productId, quantity: String(suggestion.suggestedQuantity) })}`}
+                        href={`/purchasing/orders/new?${new URLSearchParams({ branch, supplier: suggestion.supplierId, product: suggestion.productId, quantity: String(suggestion.suggestedQuantity), suggestion: suggestion.id })}`}
                         className={buttonVariants({ size: "sm" })}
                       >
                         Order

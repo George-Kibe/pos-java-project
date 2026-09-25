@@ -81,6 +81,14 @@ public class ReferenceDataService {
         return category;
     }
 
+    /** What items in a category should earn; null leaves it to the parent category. */
+    @Transactional
+    public Category setCategoryTargetMargin(UUID id, java.math.BigDecimal targetMargin) {
+        Category category = requireCategory(id);
+        category.setTargetMargin(ProductService.checkedTargetMargin(targetMargin));
+        return category;
+    }
+
     // --- brands -------------------------------------------------------------------------------
 
     public List<Brand> brands() {

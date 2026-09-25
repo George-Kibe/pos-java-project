@@ -50,4 +50,10 @@ describe("navigation by permission", () => {
     // Alt+C, L, V, R, X, P and Y belong to the checkout.
     expect(shortcuts.filter((key) => "clvrxpy".includes(key))).toEqual([]);
   });
+
+  it("shows expenses to whoever records, approves or reads them", () => {
+    for (const permission of ["expense:record", "expense:approve", "expense:view"]) {
+      expect(labels([permission])).toEqual(["Expenses", "Account"]);
+    }
+  });
 });

@@ -71,6 +71,19 @@ public class ReferenceDataController {
                         id, request.name(), request.parentId(), request.isActive()));
     }
 
+    @PutMapping("/categories/{id}/target-margin")
+    @PreAuthorize("hasAuthority('price:manage')")
+    @Operation(
+            summary = "Set what a category's items should earn",
+            description =
+                    "A fraction of the price without VAT. Sub-categories without their own target"
+                            + " follow it; null clears it. A delivery whose cost leaves an item"
+                            + " below its target opens a price review.")
+    public CatalogDtos.CategoryResponse setCategoryTargetMargin(
+            @PathVariable UUID id, @Valid @RequestBody CatalogDtos.TargetMarginRequest request) {
+        return toResponse(reference.setCategoryTargetMargin(id, request.targetMargin()));
+    }
+
     // --- brands -------------------------------------------------------------------------------
 
     @GetMapping("/brands")
@@ -201,7 +214,8 @@ public class ReferenceDataController {
                 category.getCode(),
                 category.getName(),
                 category.getParent() == null ? null : category.getParent().getId(),
-                category.isActive());
+                category.isActive(),
+                category.getTargetMargin());
     }
 
     private static CatalogDtos.BrandResponse toResponse(Brand brand) {

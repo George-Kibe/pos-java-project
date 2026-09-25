@@ -83,6 +83,8 @@ public class PurchaseOrderController {
                         request.branchId(),
                         request.expectedDeliveryDate(),
                         request.notes(),
+                        request.includesTax(),
+                        request.fromSuggestions(),
                         request.lines().stream()
                                 .map(
                                         line ->
@@ -109,6 +111,7 @@ public class PurchaseOrderController {
         return PurchasingDtos.PurchaseOrderResponse.from(
                 orders.replaceLines(
                         id,
+                        request.includesTax(),
                         request.lines().stream()
                                 .map(
                                         line ->

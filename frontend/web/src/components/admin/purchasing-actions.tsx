@@ -2,11 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, Fragment, type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { CheckField, FormError, ProductPicker, problemErrors, SelectInput } from "@/components/admin/form-parts";
+import { CheckField, failureMessage, FormError, problemErrors, ProductPicker, SelectInput } from "@/components/admin/form-parts";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -26,12 +26,14 @@ import {
   SupplierReturnSchema,
   words,
 } from "@/lib/api/purchasing-schemas";
+import type { CostCheck } from "@/lib/api/catalog-schemas";
 import { formatMoney } from "@/lib/format";
 import { amount, amountString, extend, money, quantity } from "@/lib/lane/decimal";
+import { CostVerdict, useCostChecks, VatSwitch } from "@/components/admin/cost-check";
+import { NewProductButton } from "@/components/admin/new-product-dialog";
 import { SupplierSelect } from "@/components/admin/supplier-select";
 
 const key = () => crypto.randomUUID();
-const fail = (failure: unknown, fallback: string) => problemErrors(failure, fallback).form ?? fallback;
 
 /** A button that asks for a reason first - a cancellation, a dispute, an exception accepted. */
 function ReasonButton({ label, title, description, variant = "outline", onConfirm }: { label: string; title: string; description: string; variant?: "outline" | "destructive" | "default"; onConfirm: (reason: string) => Promise<void> }) {
@@ -58,7 +60,7 @@ function ReasonButton({ label, title, description, variant = "outline", onConfir
                 await onConfirm(reason.trim());
                 setOpen(false);
               } catch (failure) {
-                setError(fail(failure, "That did not go through."));
+                setError(failureMessage(failure, "That did not go through."));
               } finally {
                 setBusy(false);
               }
@@ -108,7 +110,7 @@ export function DismissSuggestion({ id }: { id: string }) {
 
 type OrderLine = { productId: string; sku: string; name: string; quantity: string; unitCost: string };
 
-function OrderLines({ lines, onChange }: { lines: OrderLine[]; onChange: (lines: OrderLine[]) => void }) {
+function OrderLines({ lines, onChange, checks }: { lines: OrderLine[]; onChange: (lines: OrderLine[]) => void; checks: Map<string, CostCheck> }) {
   const set = (productId: string, patch: Partial<OrderLine>) => onChange(lines.map((line) => (line.productId === productId ? { ...line, ...patch } : line)));
   return (
     <div className="grid gap-3">
@@ -123,6 +125,9 @@ function OrderLines({ lines, onChange }: { lines: OrderLine[]; onChange: (lines:
             <Button type="button" variant="ghost" aria-label={`Remove ${line.name}`} onClick={() => onChange(lines.filter((l) => l.productId !== line.productId))}>
               ×
             </Button>
+            <div className="col-span-full">
+              <CostVerdict check={checks.get(line.productId)} />
+            </div>
           </li>
         ))}
       </ul>
@@ -134,12 +139,15 @@ function OrderLines({ lines, onChange }: { lines: OrderLine[]; onChange: (lines:
 const toLines = (lines: OrderLine[]) => lines.map((line) => ({ productId: line.productId, sku: line.sku, productName: line.name, quantity: line.quantity, unitCost: line.unitCost || "0" }));
 
 /** A new purchase order: a draft until it is submitted for approval. */
-export function OrderCreator({ branchId, initial }: { branchId: string; initial?: { supplierId?: string; line?: OrderLine } }) {
+export function OrderCreator({ branchId, initial }: { branchId: string; initial?: { supplierId?: string; suggestionId?: string; line?: OrderLine } }) {
   const router = useRouter();
   const [supplierId, setSupplierId] = useState(initial?.supplierId ?? "");
   const [expected, setExpected] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<OrderLine[]>(initial?.line ? [initial.line] : []);
+  // Typed from the supplier's invoice or quote, as printed.
+  const [includesTax, setIncludesTax] = useState(true);
+  const checks = useCostChecks(branchId, includesTax, lines);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
@@ -154,7 +162,7 @@ export function OrderCreator({ branchId, initial }: { branchId: string; initial?
     try {
       const order = await api("purchase-orders", PurchaseOrderDetailSchema, {
         method: "POST",
-        json: { supplierId, branchId, expectedDeliveryDate: expected || undefined, notes: notes.trim() || undefined, lines: toLines(lines) },
+        json: { supplierId, branchId, expectedDeliveryDate: expected || undefined, notes: notes.trim() || undefined, costsIncludeTax: includesTax, fromSuggestions: initial?.suggestionId ? [initial.suggestionId] : undefined, lines: toLines(lines) },
         idempotencyKey: key(),
       });
       toast.success(`Order ${order.orderNumber} drafted.`);
@@ -172,7 +180,8 @@ export function OrderCreator({ branchId, initial }: { branchId: string; initial?
         <SupplierSelect id="order-supplier" value={supplierId} onChange={setSupplierId} error={errors.supplierId} />
         <Field id="order-expected" label="Expected delivery (optional)" type="date" value={expected} onChange={(event) => setExpected(event.target.value)} />
       </div>
-      <OrderLines lines={lines} onChange={setLines} />
+      <VatSwitch id="order-vat" checked={includesTax} onChange={setIncludesTax} />
+      <OrderLines lines={lines} onChange={setLines} checks={checks} />
       <Field id="order-notes" label="Notes (optional)" value={notes} onChange={(event) => setNotes(event.target.value)} />
       <FormError message={errors.form ?? errors.lines} />
       <div>
@@ -190,6 +199,8 @@ export function OrderActions({ order, can }: { order: PurchaseOrderDetail; can: 
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  // The order's costs are held without VAT; retyping them from an invoice turns this on.
+  const [includesTax, setIncludesTax] = useState(false);
   const [lines, setLines] = useState<OrderLine[]>(
     order.lines.map((line) => ({ productId: line.productId, sku: line.sku ?? "", name: line.productName ?? line.sku ?? "", quantity: String(line.quantityOrdered), unitCost: String(line.unitCost) })),
   );
@@ -203,12 +214,13 @@ export function OrderActions({ order, can }: { order: PurchaseOrderDetail; can: 
       setEditing(false);
       router.refresh();
     } catch (failure) {
-      setError(fail(failure, "That did not go through."));
+      setError(failureMessage(failure, "That did not go through."));
     } finally {
       setBusy(false);
     }
   }
 
+  const editChecks = useCostChecks(order.branchId, includesTax, editing ? lines : []);
   const open = !["CLOSED", "CANCELLED", "RECEIVED"].includes(order.status);
   return (
     <div className="grid gap-4">
@@ -216,11 +228,12 @@ export function OrderActions({ order, can }: { order: PurchaseOrderDetail; can: 
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void act("lines", "Lines saved.", { lines: toLines(lines) });
+            void act("lines", "Lines saved.", { costsIncludeTax: includesTax, lines: toLines(lines) });
           }}
           className="grid max-w-3xl gap-4"
         >
-          <OrderLines lines={lines} onChange={setLines} />
+          <VatSwitch id="order-edit-vat" checked={includesTax} onChange={setIncludesTax} />
+          <OrderLines lines={lines} onChange={setLines} checks={editChecks} />
           <div className="flex gap-2">
             <Button type="submit" disabled={busy}>
               Save lines
@@ -296,6 +309,8 @@ export function ReceiptCreator({ branchId, order }: { branchId: string; order?: 
   const [freight, setFreight] = useState("");
   const [duty, setDuty] = useState("");
   const [basis, setBasis] = useState("BY_VALUE");
+  // Against an order the costs come from it, without VAT; typed from an invoice, they carry it.
+  const [includesTax, setIncludesTax] = useState(!order);
   const [lines, setLines] = useState<ReceiptLine[]>(
     (order?.lines ?? [])
       .filter((line) => line.quantityOutstanding > 0)
@@ -304,6 +319,9 @@ export function ReceiptCreator({ branchId, order }: { branchId: string; order?: 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const set = (productId: string, patch: Partial<ReceiptLine>) => setLines(lines.map((line) => (line.productId === productId ? { ...line, ...patch } : line)));
+  const checks = useCostChecks(branchId, includesTax, lines);
+  const addLine = (product: { id: string; sku: string; name: string }) =>
+    setLines((current) => (current.some((l) => l.productId === product.id) ? current : [...current, { productId: product.id, sku: product.sku, name: product.name, ordered: null, received: "1", rejected: "", reason: "", unitCost: "", batch: "", expiry: "" }]));
 
   async function save(event: FormEvent, post: boolean) {
     event.preventDefault();
@@ -324,6 +342,7 @@ export function ReceiptCreator({ branchId, order }: { branchId: string; order?: 
           freightAmount: freight || undefined,
           dutyAmount: duty || undefined,
           allocationBasis: basis,
+          costsIncludeTax: includesTax,
           lines: lines.map((line) => ({
             productId: line.productId,
             sku: line.sku,
@@ -360,11 +379,12 @@ export function ReceiptCreator({ branchId, order }: { branchId: string; order?: 
         )}
         <Field id="receipt-note" label="Delivery note (optional)" value={note} onChange={(event) => setNote(event.target.value)} />
       </div>
+      <VatSwitch id="receipt-vat" checked={includesTax} onChange={setIncludesTax} />
       <div className="overflow-x-auto rounded-xl border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left">
             <tr>
-              {["Product", "Expected", "Received", "Refused", "Why refused", "Unit cost", "Batch", "Expiry", ""].map((h) => (
+              {["Product", "Expected", "Received", "Refused", "Why refused", includesTax ? "Unit cost (with VAT)" : "Unit cost", "Batch", "Expiry", ""].map((h) => (
                 <th key={h} className="px-2 py-2 font-medium">
                   {h}
                 </th>
@@ -373,7 +393,8 @@ export function ReceiptCreator({ branchId, order }: { branchId: string; order?: 
           </thead>
           <tbody>
             {lines.map((line, index) => (
-              <tr key={line.productId} className="border-t" data-testid="receipt-line">
+              <Fragment key={line.productId}>
+              <tr className="border-t" data-testid="receipt-line">
                 <td className="px-2 py-1">
                   {line.name}
                   <span className="block text-xs text-muted-foreground">{line.sku}</span>
@@ -391,17 +412,23 @@ export function ReceiptCreator({ branchId, order }: { branchId: string; order?: 
                   </Button>
                 </td>
               </tr>
+              {checks.get(line.productId) ? (
+                <tr>
+                  <td colSpan={9} className="px-2 pb-2">
+                    <CostVerdict check={checks.get(line.productId)} />
+                  </td>
+                </tr>
+              ) : null}
+              </Fragment>
             ))}
           </tbody>
         </table>
       </div>
-      <div className="max-w-md">
-        <ProductPicker
-          id="receipt-product"
-          label="Add a product not on the order"
-          exclude={lines.map((l) => l.productId)}
-          onPick={(product) => setLines([...lines, { productId: product.id, sku: product.sku, name: product.name, ordered: null, received: "1", rejected: "", reason: "", unitCost: "", batch: "", expiry: "" }])}
-        />
+      <div className="flex max-w-3xl flex-wrap items-end gap-2">
+        <div className="min-w-72 flex-1">
+          <ProductPicker id="receipt-product" label="Add a product not on the order" exclude={lines.map((l) => l.productId)} onPick={addLine} />
+        </div>
+        <NewProductButton onCreated={addLine} />
       </div>
       <fieldset className="grid max-w-3xl gap-4 sm:grid-cols-3">
         <legend className="mb-2 text-base font-medium">Landed cost: charges spread over the lines</legend>
@@ -434,7 +461,7 @@ export function ReceiptActions({ id, status }: { id: string; status: string }) {
       toast.success(path === "post" ? "Posted: the stock is on the shelf." : "Delivery cancelled.");
       router.refresh();
     } catch (failure) {
-      setError(fail(failure, "That did not go through."));
+      setError(failureMessage(failure, "That did not go through."));
     } finally {
       setBusy(false);
     }
@@ -577,7 +604,7 @@ export function InvoiceActions({ id, status, canManage }: { id: string; status: 
       toast.success(done);
       router.refresh();
     } catch (failure) {
-      setError(fail(failure, "That did not go through."));
+      setError(failureMessage(failure, "That did not go through."));
       throw failure;
     }
   }
@@ -679,7 +706,7 @@ export function ReturnActions({ id, status, can }: { id: string; status: string;
       toast.success(done);
       router.refresh();
     } catch (failure) {
-      setError(fail(failure, "That did not go through."));
+      setError(failureMessage(failure, "That did not go through."));
       throw failure;
     } finally {
       setBusy(false);
@@ -765,7 +792,7 @@ export function SupplierEditor({ supplier, canManage }: { supplier: SupplierDeta
       toast.success(`${supplier.name} is ${words(next)}.`);
       router.refresh();
     } catch (failure) {
-      setErrors({ form: fail(failure, "The status was not changed.") });
+      setErrors({ form: failureMessage(failure, "The status was not changed.") });
     }
   }
 
@@ -782,7 +809,7 @@ export function SupplierEditor({ supplier, canManage }: { supplier: SupplierDeta
       setCost("");
       await products.refetch();
     } catch (failure) {
-      setErrors({ product: fail(failure, "The product was not added.") });
+      setErrors({ product: failureMessage(failure, "The product was not added.") });
     }
   }
 
@@ -868,7 +895,7 @@ export function SupplierEditor({ supplier, canManage }: { supplier: SupplierDeta
           adding ? (
             <form onSubmit={addProduct} className="grid max-w-3xl items-end gap-3 sm:grid-cols-[1fr_10rem_auto_auto]">
               <p className="pb-2">{adding.name}</p>
-              <Field id="supplied-cost" label="Agreed unit cost" inputMode="decimal" value={cost} onChange={(event) => setCost(event.target.value)} />
+              <Field id="supplied-cost" label="Agreed unit cost (without VAT)" inputMode="decimal" value={cost} onChange={(event) => setCost(event.target.value)} />
               <CheckField id="supplied-preferred" label="Preferred" checked={preferred} onChange={setPreferred} />
               <Button type="submit">Add</Button>
             </form>
