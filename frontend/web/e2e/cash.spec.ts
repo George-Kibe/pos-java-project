@@ -81,6 +81,7 @@ test("an administrator adds stock at a branch, and a sale takes it off", async (
   await page.getByRole("button", { name: "Add stock" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Branch", { exact: true }).selectOption(branchId);
+  await dialog.getByLabel("Find a supplier").fill(supplier.name);
   await dialog.getByLabel("Supplier", { exact: true }).selectOption(supplier.id);
   await dialog.getByLabel("Find a product").fill(milk.name);
   await dialog.getByRole("button", { name: "Find", exact: true }).click();

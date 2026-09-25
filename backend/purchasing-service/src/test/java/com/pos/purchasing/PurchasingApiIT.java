@@ -1,5 +1,7 @@
 package com.pos.purchasing;
 
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -110,6 +112,48 @@ class PurchasingApiIT extends PurchasingTestBase {
                                 .with(at(BRANCH, "purchase:view")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code", is("branch.access_denied")));
+    }
+
+    @Test
+    @DisplayName("orders list newest first, so the one just raised is on the first page")
+    void ordersListNewestFirst() throws Exception {
+        String supplierId = createSupplier("SUP-ORDER");
+        String older = createOrder(supplierId);
+        String newer = createOrder(supplierId);
+
+        mockMvc.perform(
+                        get("/api/v1/purchase-orders")
+                                .param("branchId", BRANCH.toString())
+                                .with(at(BRANCH, "purchase:view")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id", is(newer)))
+                .andExpect(jsonPath("$.content[1].id", is(older)));
+    }
+
+    @Test
+    @DisplayName("a search among active suppliers leaves out one on hold")
+    void searchingActiveSuppliersLeavesOutOnesOnHold() throws Exception {
+        String active = createSupplier("SUP-FIND-A");
+        String held = createSupplier("SUP-FIND-H");
+        mockMvc.perform(
+                        put("/api/v1/suppliers/" + held + "/status")
+                                .with(at(BRANCH, "supplier:manage"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(EventJson.write(Map.of("status", "ON_HOLD"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(
+                        get("/api/v1/suppliers")
+                                .param("q", "SUP-FIND")
+                                .param("status", "ACTIVE")
+                                .with(at(BRANCH, "purchase:view")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].id", contains(active)));
+        mockMvc.perform(
+                        get("/api/v1/suppliers")
+                                .param("q", "sup-find")
+                                .with(at(BRANCH, "purchase:view")))
+                .andExpect(jsonPath("$.content[*].id", containsInAnyOrder(active, held)));
     }
 
     @Test

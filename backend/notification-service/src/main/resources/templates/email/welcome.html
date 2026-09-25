@@ -27,13 +27,13 @@
                 Welcome, <span th:text="${recipientName}">there</span>.
               </td>
             </tr>
-            <tr>
-              <td style="font-size:16px;color:#374151;padding-bottom:24px;">
+            <tr th:if="${intro != null}">
+              <td style="font-size:16px;color:#374151;padding-bottom:24px;" th:text="${intro}">
                 Your email is verified and your account is active.
               </td>
             </tr>
-            <tr>
-              <td style="font-size:15px;color:#374151;padding-bottom:24px;">
+            <tr th:if="${closing != null}">
+              <td style="font-size:15px;color:#374151;padding-bottom:24px;" th:text="${closing}">
                 A manager needs to assign your role before you can start work. Until then you can
                 sign in, but you will not see anything yet - that is expected.
               </td>

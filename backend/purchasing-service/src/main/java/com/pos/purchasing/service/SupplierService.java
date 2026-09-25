@@ -35,8 +35,11 @@ public class SupplierService {
                 : suppliers.findByStatus(status, pageable);
     }
 
-    public Page<Supplier> search(String term, Pageable pageable) {
-        return suppliers.search("%" + term + "%", pageable);
+    public Page<Supplier> search(String term, SupplierStatus status, Pageable pageable) {
+        String pattern = "%" + term.strip() + "%";
+        return status == null
+                ? suppliers.search(pattern, pageable)
+                : suppliers.searchInStatus(pattern, status, pageable);
     }
 
     public Supplier require(UUID id) {

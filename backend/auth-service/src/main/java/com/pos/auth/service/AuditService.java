@@ -38,6 +38,7 @@ public class AuditService {
     public static final String USER_ROLES_CHANGED = "user.roles_changed";
     public static final String USER_BRANCHES_CHANGED = "user.branches_changed";
     public static final String USER_STATUS_CHANGED = "user.status_changed";
+    public static final String USER_PASSWORD_RESET_FORCED = "user.password_reset_forced";
     public static final String PASSWORD_RESET_REQUESTED = "password.reset_requested";
     public static final String PASSWORD_RESET_COMPLETED = "password.reset_completed";
     public static final String REFRESH_TOKEN_REUSE_DETECTED = "token.reuse_detected";

@@ -13,6 +13,13 @@ export function ReceiptView({ receipt }: { receipt: ReceiptDocument }) {
         <BrandLogo size={56} className="mb-1" />
         <p className="font-bold">{receipt.brand}</p>
         <p>{receipt.branchName}</p>
+        {receipt.branchContact ? <p>{receipt.branchContact}</p> : null}
+        {receipt.taxPin ? <p>PIN {receipt.taxPin}</p> : null}
+        {(receipt.headerLines ?? []).map((line, index) => (
+          <p key={index} data-testid="receipt-header-line">
+            {line}
+          </p>
+        ))}
         {receipt.notice ? <p className="my-1 font-bold">{receipt.notice}</p> : null}
         <p>Receipt {receipt.receiptNumber}</p>
         <p>{receipt.issuedAt}</p>
@@ -59,7 +66,14 @@ export function ReceiptView({ receipt }: { receipt: ReceiptDocument }) {
           ))}
         </>
       ) : null}
-      <p className="mt-3 text-center">Keep this receipt for returns</p>
+      <div className="mt-3 text-center">
+        {(receipt.footerLines ?? []).map((line, index) => (
+          <p key={index} data-testid="receipt-footer-line">
+            {line}
+          </p>
+        ))}
+        <p>Keep this receipt for returns</p>
+      </div>
     </div>
   );
 }

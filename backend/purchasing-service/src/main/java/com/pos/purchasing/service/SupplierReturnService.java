@@ -36,6 +36,7 @@ public class SupplierReturnService {
     private final SupplierService suppliers;
     private final GoodsReceiptService receipts;
     private final DocumentNumberService numbers;
+    private final com.pos.purchasing.messaging.PurchasingEventPublisher events;
 
     /** One product going back. A null unit cost is taken from the referenced receipt. */
     public record ReturnLineRequest(
@@ -111,7 +112,10 @@ public class SupplierReturnService {
     public SupplierReturn markSent(UUID id) {
         SupplierReturn supplierReturn = transition(require(id), SupplierReturnStatus.SENT);
         supplierReturn.setSentAt(Instant.now());
-        return returns.save(supplierReturn);
+        SupplierReturn saved = returns.save(supplierReturn);
+        // In the same transaction: the goods leave the shelf exactly when the return is sent.
+        events.supplierReturnSent(saved);
+        return saved;
     }
 
     /** The supplier's credit note has arrived; the return is settled. */

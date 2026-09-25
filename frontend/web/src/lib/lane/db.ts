@@ -151,6 +151,8 @@ export const META = {
   printerWidth: "printerWidth",
   /** The drawer as last known, kept up to date by offline cash sales. */
   drawer: "drawer",
+  /** The branch's receipt text, per branch, so offline receipts carry it too. */
+  receiptText: "receiptText",
 } as const;
 
 export type ScaleRules = ScaleRule[];

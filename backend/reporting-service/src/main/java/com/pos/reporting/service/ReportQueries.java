@@ -13,6 +13,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.pos.reporting.domain.policy.BusinessDates;
+
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -78,6 +80,32 @@ public class ReportQueries {
             BigDecimal uncostedQuantity) {}
 
     public record TenderRow(String method, long tenders, BigDecimal amount, BigDecimal share) {}
+
+    /**
+     * An hour of the shop's day, across the range: how busy it was and how big the baskets were.
+     *
+     * @param hour 0-23 in the shop's time zone
+     * @param items units sold, weighed goods by weight
+     */
+    public record HourRow(
+            int hour,
+            long baskets,
+            BigDecimal netSales,
+            BigDecimal averageBasket,
+            BigDecimal items,
+            BigDecimal itemsPerBasket) {}
+
+    /**
+     * Stock lost, by reason and product: written off, or found missing by a count. Quantity and
+     * value are positive figures of what was lost.
+     */
+    public record ShrinkageRow(
+            String reasonCode,
+            UUID productId,
+            String sku,
+            String productName,
+            BigDecimal quantity,
+            BigDecimal valueAtCost) {}
 
     // --- sales ------------------------------------------------------------------------
 
@@ -166,6 +194,92 @@ public class ReportQueries {
                                                     4,
                                                     RoundingMode.HALF_UP));
                         })
+                .list();
+    }
+
+    /**
+     * Sales by hour of the shop's day, voids excluded. Items per basket counts every unit, so a
+     * kilo of bananas is one.
+     */
+    public List<HourRow> salesByHour(ReportFilter filter) {
+        ReportFilter.Where where = filter.where("s.business_date", "s.branch_id");
+        where.params.put("zone", BusinessDates.SHOP_ZONE.getId());
+        return jdbc.sql(
+                        """
+                        SELECT EXTRACT(HOUR FROM s.completed_at AT TIME ZONE :zone)::int AS hour,
+                               count(*) AS baskets,
+                               COALESCE(SUM(s.net_total), 0) AS net,
+                               COALESCE(SUM(s.grand_total), 0) AS gross,
+                               COALESCE(SUM(l.items), 0) AS items
+                        FROM report_sales s
+                        LEFT JOIN report_sale_voids v ON v.sale_id = s.sale_id
+                        LEFT JOIN (SELECT sale_id, SUM(quantity) AS items
+                                   FROM report_sale_lines GROUP BY sale_id) l
+                               ON l.sale_id = s.sale_id
+                        WHERE v.sale_id IS NULL AND %s
+                        GROUP BY 1
+                        ORDER BY 1
+                        """
+                                .formatted(where.sql()))
+                .params(where.params)
+                .query(
+                        (rs, row) -> {
+                            long baskets = rs.getLong("baskets");
+                            BigDecimal items = rs.getBigDecimal("items");
+                            return new HourRow(
+                                    rs.getInt("hour"),
+                                    baskets,
+                                    money(rs.getBigDecimal("net")),
+                                    baskets == 0
+                                            ? money(BigDecimal.ZERO)
+                                            : rs.getBigDecimal("gross")
+                                                    .divide(
+                                                            BigDecimal.valueOf(baskets),
+                                                            4,
+                                                            RoundingMode.HALF_UP),
+                                    items.setScale(3, RoundingMode.HALF_UP),
+                                    baskets == 0
+                                            ? BigDecimal.ZERO.setScale(3)
+                                            : items.divide(
+                                                    BigDecimal.valueOf(baskets),
+                                                    3,
+                                                    RoundingMode.HALF_UP));
+                        })
+                .list();
+    }
+
+    /**
+     * What went missing: stock taken off by a write-off or found short by a count, by reason and
+     * product, largest loss first. Stock put back on is not shrinkage and is left out.
+     */
+    public List<ShrinkageRow> shrinkage(ReportFilter filter) {
+        ReportFilter.Where where = filter.where("a.business_date", "a.branch_id");
+        if (filter.categoryId() != null) {
+            where.add("p.category_id = :category", "category", filter.categoryId());
+        }
+        return jdbc.sql(
+                        """
+                        SELECT a.reason_code, a.product_id, max(a.sku) AS sku, max(p.name) AS name,
+                               -SUM(a.quantity_delta) AS quantity,
+                               -SUM(a.value_at_cost) AS value
+                        FROM report_stock_adjustments a
+                        LEFT JOIN report_products p ON p.product_id = a.product_id
+                        WHERE a.quantity_delta < 0 AND %s
+                        GROUP BY a.reason_code, a.product_id
+                        ORDER BY value DESC, a.reason_code
+                        """
+                                .formatted(where.sql()))
+                .params(where.params)
+                .query(
+                        (rs, row) ->
+                                new ShrinkageRow(
+                                        rs.getString("reason_code"),
+                                        rs.getObject("product_id", UUID.class),
+                                        rs.getString("sku"),
+                                        rs.getString("name"),
+                                        rs.getBigDecimal("quantity")
+                                                .setScale(3, RoundingMode.HALF_UP),
+                                        money(rs.getBigDecimal("value"))))
                 .list();
     }
 

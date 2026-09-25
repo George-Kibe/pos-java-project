@@ -23,6 +23,11 @@ describe("navigation by permission", () => {
     expect(labels(["supplier:create"])).toEqual(["Suppliers", "Account"]);
   });
 
+  it("shows a stock controller the catalogue to manage, and not the prices", () => {
+    expect(labels(["product:view", "product:manage", "inventory:view"])).toEqual(["Products", "Catalog setup", "Stock", "Account"]);
+    expect(labels(["price:manage"])).toEqual(["Pricing", "Account"]);
+  });
+
   it("shows someone with no role only their account", () => {
     expect(labels([])).toEqual(["Account"]);
   });

@@ -53,7 +53,7 @@ public class SupplierController {
         return PageResponse.of(
                 q == null || q.isBlank()
                         ? suppliers.list(status, pageable)
-                        : suppliers.search(q, pageable),
+                        : suppliers.search(q, status, pageable),
                 PurchasingDtos.SupplierResponse::from);
     }
 

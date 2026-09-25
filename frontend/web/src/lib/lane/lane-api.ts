@@ -27,6 +27,15 @@ import {
 
 const idempotent = () => crypto.randomUUID();
 
+const ReceiptTextSchema = z.object({
+  branchId: z.uuid(),
+  header: z.string().nullable(),
+  footer: z.string().nullable(),
+  address: z.string().nullable(),
+  phone: z.string().nullable(),
+  taxPin: z.string().nullable(),
+});
+
 export const laneApi = {
   currentShift: async (registerId: string) => {
     try {
@@ -43,6 +52,8 @@ export const laneApi = {
       idempotencyKey: idempotent(),
     }),
   drawer: (sessionId: string) => api(`till-sessions/${sessionId}/drawer`, DrawerSchema),
+  /** What the branch prints around the sale: set in the back office under Settings. */
+  receiptText: (branchId: string) => api(`receipt-settings/${branchId}`, ReceiptTextSchema),
   shift: (id: string) => api(`till-sessions/${id}`, TillSessionSchema),
   beginClose: (id: string) =>
     api(`till-sessions/${id}/begin-close`, TillSessionSchema, { method: "POST", idempotencyKey: idempotent() }),

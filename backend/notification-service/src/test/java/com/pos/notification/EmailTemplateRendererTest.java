@@ -128,6 +128,12 @@ class EmailTemplateRendererTest {
                     .contains("Change from")
                     .contains("300.00")
                     .contains("81.80")
+                    // The branch's own text, above and below the sale.
+                    .contains("Open every day, 7am to 10pm")
+                    .contains("Goods may be returned within 7 days with this receipt.")
+                    .contains("Thank you for shopping with us.")
+                    .contains("Moi Avenue, Nairobi")
+                    .contains("P000000000X")
                     // No discount was given, so none is shown; no name, so no greeting.
                     .doesNotContain("Discounts")
                     .doesNotContain("Hello");
@@ -155,6 +161,7 @@ class EmailTemplateRendererTest {
                                 new java.math.BigDecimal("0.0000"),
                                 new java.math.BigDecimal("1.0050"),
                                 new java.math.BigDecimal("1234.5650"),
+                                null,
                                 null,
                                 null),
                         java.time.ZoneOffset.UTC);

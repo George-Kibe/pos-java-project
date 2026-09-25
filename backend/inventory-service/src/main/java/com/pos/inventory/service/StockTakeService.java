@@ -36,12 +36,19 @@ public class StockTakeService {
     private final StockTakeRepository stockTakes;
     private final StockItemRepository items;
     private final BatchConsumer batchConsumer;
+    private final com.pos.messaging.outbox.OutboxRecorder outbox;
 
     public record CountLine(UUID stockItemId, BigDecimal countedQuantity, String notes) {}
 
+    /**
+     * A branch's counts, their lines loaded here: a list shows how many were counted and how many
+     * differ, and the transaction is over by the time the response is built.
+     */
     @Transactional(readOnly = true)
     public Page<StockTake> list(UUID branchId, Pageable pageable) {
-        return stockTakes.findByBranchIdOrderByCreatedAtDesc(branchId, pageable);
+        Page<StockTake> page = stockTakes.findByBranchIdOrderByCreatedAtDesc(branchId, pageable);
+        page.forEach(stockTake -> org.hibernate.Hibernate.initialize(stockTake.getLines()));
+        return page;
     }
 
     @Transactional(readOnly = true)
@@ -147,6 +154,8 @@ public class StockTakeService {
         }
 
         UUID actor = AuthenticatedUser.current().map(AuthenticatedUser::userId).orElse(null);
+        List<com.pos.events.inventory.AdjustmentPostedPayload.AdjustmentLine> differences =
+                new java.util.ArrayList<>();
 
         for (StockTakeLine line : stockTake.getLines()) {
             if (!line.hasVariance()) {
@@ -165,10 +174,15 @@ public class StockTakeService {
                             actor,
                             Instant.now());
 
+            BigDecimal value = BigDecimal.ZERO;
             if (variance.signum() < 0) {
                 // Less on the shelf than believed: take it out oldest-dated first, like any other
                 // depletion, so the batches that remain are the ones actually there.
-                batchConsumer.consume(item, variance.abs(), context);
+                value =
+                        batchConsumer
+                                .consumeValued(item, variance.abs(), context)
+                                .valueAtCost()
+                                .negate();
             } else {
                 // More than believed. Given a batch of its own so it can be sold and shows up in
                 // the expiry order, rather than floating as an unattributed quantity.
@@ -180,12 +194,40 @@ public class StockTakeService {
                         BigDecimal.ZERO,
                         context);
             }
+            differences.add(
+                    new com.pos.events.inventory.AdjustmentPostedPayload.AdjustmentLine(
+                            item.getProductId(), item.getSku(), variance, null, value, "KES"));
         }
 
         stockTake.setStatus(StockTake.Status.POSTED);
         stockTake.setPostedAt(Instant.now());
         stockTake.setPostedBy(actor);
-        return stockTakes.save(stockTake);
+        StockTake posted = stockTakes.save(stockTake);
+
+        // Announced like an adjustment, so shrinkage reports count what a count found missing.
+        if (!differences.isEmpty()) {
+            outbox.record(
+                    com.pos.events.Topics.INVENTORY_ADJUSTMENT_POSTED,
+                    "StockTake",
+                    posted.getId(),
+                    com.pos.events.EventEnvelope
+                            .<com.pos.events.inventory.AdjustmentPostedPayload>builder()
+                            .topic(com.pos.events.Topics.INVENTORY_ADJUSTMENT_POSTED)
+                            .correlationId(com.pos.common.correlation.CorrelationId.get())
+                            .branchId(posted.getBranchId())
+                            .actorId(actor)
+                            .payload(
+                                    new com.pos.events.inventory.AdjustmentPostedPayload(
+                                            posted.getId(),
+                                            posted.getBranchId(),
+                                            "STOCK_TAKE",
+                                            actor,
+                                            posted.getPostedAt(),
+                                            "Stock take " + posted.getReference(),
+                                            differences))
+                            .build());
+        }
+        return posted;
     }
 
     @Transactional

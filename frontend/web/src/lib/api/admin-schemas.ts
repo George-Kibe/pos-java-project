@@ -82,6 +82,7 @@ export const SalesRowSchema = z.object({
 
 export const StockItemSchema = z.object({
   id: z.uuid(),
+  productId: z.uuid().optional(),
   sku: z.string().nullable(),
   productName: z.string().nullable(),
   unitOfMeasure: z.string().nullable(),

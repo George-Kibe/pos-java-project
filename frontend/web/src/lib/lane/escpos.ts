@@ -133,6 +133,9 @@ export function encodeReceipt(
   out.align("center");
   if (options.logo !== false) out.raster(receiptLogo());
   out.bold(true).line(receipt.brand).bold(false).line(receipt.branchName);
+  if (receipt.branchContact) out.line(receipt.branchContact);
+  if (receipt.taxPin) out.line(`PIN ${receipt.taxPin}`);
+  for (const line of receipt.headerLines ?? []) out.line(line);
   if (receipt.notice) out.bold(true).line(receipt.notice).bold(false);
   out.line(`Receipt ${receipt.receiptNumber}`).line(receipt.issuedAt).line(`${receipt.till ? `${receipt.till} - ` : ""}Served by ${receipt.cashier}`);
   out.align("left").rule();
@@ -153,7 +156,9 @@ export function encodeReceipt(
     out.rule().line("Prices include tax");
     for (const tax of receipt.taxLines) out.columns(tax.label, tax.tax);
   }
-  out.align("center").feed(1).line("Keep this receipt for returns").feed(3).cut();
+  out.align("center").feed(1);
+  for (const line of receipt.footerLines ?? []) out.line(line);
+  out.line("Keep this receipt for returns").feed(3).cut();
   return out.build();
 }
 

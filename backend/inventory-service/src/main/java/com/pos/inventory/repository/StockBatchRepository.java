@@ -43,4 +43,18 @@ public interface StockBatchRepository extends JpaRepository<StockBatch, UUID> {
     List<StockBatch> findExpiringOnOrBefore(@Param("cutoff") LocalDate cutoff);
 
     List<StockBatch> findByStockItemId(UUID stockItemId);
+
+    /** A branch's active batches expiring on or before a date, soonest first, with their items. */
+    @Query(
+            """
+            SELECT b FROM StockBatch b JOIN FETCH b.stockItem i
+            WHERE i.branchId = :branchId
+              AND b.status = com.pos.inventory.domain.BatchStatus.ACTIVE
+              AND b.quantity > 0
+              AND b.expiryDate IS NOT NULL
+              AND b.expiryDate <= :cutoff
+            ORDER BY b.expiryDate ASC, i.productName ASC
+            """)
+    List<StockBatch> findExpiringAtBranch(
+            @Param("branchId") UUID branchId, @Param("cutoff") LocalDate cutoff);
 }

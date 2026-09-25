@@ -121,6 +121,32 @@ public class ReportController {
         return reports.marginByCategory(filter(from, to, branchId, categoryId));
     }
 
+    @GetMapping("/sales/by-hour")
+    @PreAuthorize(VIEW)
+    @Operation(
+            summary =
+                    "Sales by hour of the shop's day: baskets, average basket and items per basket")
+    public List<ReportQueries.HourRow> salesByHour(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) UUID branchId) {
+        return reports.salesByHour(filter(from, to, branchId, null));
+    }
+
+    @GetMapping("/stock/shrinkage")
+    @PreAuthorize(VIEW)
+    @Operation(
+            summary =
+                    "Stock lost - written off or found short by a count - by reason and product,"
+                            + " valued at cost")
+    public List<ReportQueries.ShrinkageRow> shrinkage(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) UUID categoryId) {
+        return reports.shrinkage(filter(from, to, branchId, categoryId));
+    }
+
     @GetMapping("/payment-mix")
     @PreAuthorize(VIEW)
     @Operation(summary = "Takings by payment method, cash net of change")

@@ -121,6 +121,44 @@ public class PurchasingEventPublisher {
                         .build());
     }
 
+    /**
+     * Goods went back to their supplier: inventory takes them off the shelf, out of the batch each
+     * line names where it names one.
+     */
+    public void supplierReturnSent(com.pos.purchasing.domain.SupplierReturn supplierReturn) {
+        List<com.pos.events.purchasing.SupplierReturnSentPayload.ReturnedLine> lines =
+                supplierReturn.getLines().stream()
+                        .map(
+                                line ->
+                                        new com.pos.events.purchasing.SupplierReturnSentPayload
+                                                .ReturnedLine(
+                                                line.getProductId(),
+                                                line.getSku(),
+                                                line.getBatchNumber(),
+                                                line.getQuantity(),
+                                                line.getUnitCost(),
+                                                line.getCurrency()))
+                        .toList();
+        outbox.record(
+                Topics.PURCHASING_SUPPLIER_RETURN_SENT,
+                "SupplierReturn",
+                supplierReturn.getId(),
+                EventEnvelope.<com.pos.events.purchasing.SupplierReturnSentPayload>builder()
+                        .topic(Topics.PURCHASING_SUPPLIER_RETURN_SENT)
+                        .correlationId(CorrelationId.get())
+                        .branchId(supplierReturn.getBranchId())
+                        .payload(
+                                new com.pos.events.purchasing.SupplierReturnSentPayload(
+                                        supplierReturn.getId(),
+                                        supplierReturn.getReturnNumber(),
+                                        supplierReturn.getSupplier().getId(),
+                                        supplierReturn.getBranchId(),
+                                        supplierReturn.getReasonCode().name(),
+                                        supplierReturn.getSentAt(),
+                                        lines))
+                        .build());
+    }
+
     public void supplierCostChanged(
             SupplierProduct product, BigDecimal previous, String sourceType, UUID sourceId) {
 

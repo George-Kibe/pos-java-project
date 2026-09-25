@@ -29,6 +29,11 @@ public final class Topics {
     // --- purchasing -----------------------------------------------------------
     public static final String PURCHASING_PO_APPROVED = "pos.purchasing.po-approved.v1";
     public static final String PURCHASING_GOODS_RECEIVED = "pos.purchasing.goods-received.v1";
+
+    /** Goods sent back to a supplier; inventory takes them off the shelf. */
+    public static final String PURCHASING_SUPPLIER_RETURN_SENT =
+            "pos.purchasing.supplier-return-sent.v1";
+
     public static final String PURCHASING_SUPPLIER_COST_CHANGED =
             "pos.purchasing.supplier-cost-changed.v1";
 

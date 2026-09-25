@@ -419,6 +419,19 @@ public final class PurchasingDtos {
             BigDecimal amountEffect,
             String description) {
 
+        /** A finding as kept with the invoice. */
+        public static VarianceResponse from(com.pos.purchasing.domain.InvoiceVariance variance) {
+            return new VarianceResponse(
+                    variance.getProductId(),
+                    variance.getSku(),
+                    variance.getType(),
+                    variance.getExpected(),
+                    variance.getActual(),
+                    variance.getDifference(),
+                    variance.getAmountEffect(),
+                    variance.getDescription());
+        }
+
         public static VarianceResponse from(LineVariance variance) {
             return new VarianceResponse(
                     variance.productId(),
@@ -480,9 +493,9 @@ public final class PurchasingDtos {
                     invoice.getOverrideReason(),
                     invoice.getApprovedForPaymentAt(),
                     invoice.getApprovedForPaymentBy(),
-                    result == null ? null : result.justifiedTotal(),
+                    result == null ? invoice.getJustifiedTotal() : result.justifiedTotal(),
                     result == null
-                            ? List.of()
+                            ? invoice.getVariances().stream().map(VarianceResponse::from).toList()
                             : result.variances().stream().map(VarianceResponse::from).toList());
         }
 

@@ -88,6 +88,25 @@ public class StockController {
                 InventoryDtos.MovementResponse::from);
     }
 
+    @GetMapping("/expiring")
+    @PreAuthorize("hasAuthority('inventory:view')")
+    @Operation(
+            summary =
+                    "Batches at a branch expiring within the next days, soonest first - already"
+                            + " expired included - with their value at cost")
+    public List<InventoryDtos.ExpiringBatchResponse> expiring(
+            @RequestParam UUID branchId,
+            @RequestParam(defaultValue = "30")
+                    @jakarta.validation.constraints.Min(0)
+                    @jakarta.validation.constraints.Max(365)
+                    int days) {
+        branchAccess.requireAccess(branchId);
+        java.time.LocalDate today = query.today();
+        return query.expiringAt(branchId, days).stream()
+                .map(batch -> InventoryDtos.ExpiringBatchResponse.from(batch, today))
+                .toList();
+    }
+
     @GetMapping("/low")
     @PreAuthorize("hasAuthority('inventory:view')")
     @Operation(summary = "Products at or below their reorder point")

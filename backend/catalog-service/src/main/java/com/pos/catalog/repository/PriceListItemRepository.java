@@ -24,4 +24,13 @@ public interface PriceListItemRepository extends JpaRepository<PriceListItem, UU
             @Param("productId") UUID productId, @Param("priceListIds") List<UUID> priceListIds);
 
     List<PriceListItem> findByPriceListId(UUID priceListId);
+
+    /** A list's prices, with the products they are for, a page at a time. */
+    @org.springframework.data.jpa.repository.EntityGraph(
+            type = org.springframework.data.jpa.repository.EntityGraph.EntityGraphType.LOAD,
+            attributePaths = "product")
+    org.springframework.data.domain.Page<PriceListItem> findWithProductByPriceListId(
+            UUID priceListId, org.springframework.data.domain.Pageable pageable);
+
+    long countByPriceListId(UUID priceListId);
 }

@@ -177,7 +177,11 @@ public class ProductService {
         product.setBasePrice(request.basePrice());
         product.setReorderPoint(request.reorderPoint());
         product.setReorderQuantity(request.reorderQuantity());
-        product.setImageUrl(request.imageUrl());
+        // An uploaded picture is managed by ProductImageService; a URL sent with the product's
+        // details (the older way, or a stale form) must not replace the one it serves.
+        if (product.getImageKey() == null) {
+            product.setImageUrl(request.imageUrl());
+        }
         if (request.active() != null) {
             product.setActive(request.active());
         }

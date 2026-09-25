@@ -62,7 +62,7 @@ spring:
             - id: catalog-service
               uri: ${CATALOG_SERVICE_URI:http://localhost:8082}
               predicates:
-                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/price-lists/**,/api/v1/promotions/**,/api/v1/tax-classes/**,/api/v1/units-of-measure/**,/api/v1/scale-barcode-rules/**,/api/v1/pricing/**
+                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/brands/**,/api/v1/price-lists/**,/api/v1/promotions/**,/api/v1/tax-classes/**,/api/v1/units-of-measure/**,/api/v1/scale-barcode-rules/**,/api/v1/pricing/**
               filters:
                 - name: CircuitBreaker
                   args:
@@ -92,7 +92,7 @@ spring:
             - id: sales-service
               uri: ${SALES_SERVICE_URI:http://localhost:8085}
               predicates:
-                - Path=/api/v1/sales/**,/api/v1/carts/**,/api/v1/till-sessions/**,/api/v1/returns/**,/api/v1/registers/**,/api/v1/intraday/**,/api/v1/cash-limits/**,/api/v1/cash-positions/**
+                - Path=/api/v1/sales/**,/api/v1/carts/**,/api/v1/till-sessions/**,/api/v1/returns/**,/api/v1/registers/**,/api/v1/intraday/**,/api/v1/cash-limits/**,/api/v1/cash-positions/**,/api/v1/receipt-settings/**
               filters:
                 - name: CircuitBreaker
                   args:
@@ -122,7 +122,7 @@ spring:
             - id: notification-service
               uri: ${NOTIFICATION_SERVICE_URI:http://localhost:8088}
               predicates:
-                - Path=/api/v1/notifications/**
+                - Path=/api/v1/notifications/**,/api/v1/notification-templates/**
               filters:
                 - name: CircuitBreaker
                   args:

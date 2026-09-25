@@ -19,7 +19,7 @@ import { amount, amountString, cents, money, quantity, quantityString } from "@/
 import { approved, laneApi } from "@/lib/lane/lane-api";
 import { enqueueSale } from "@/lib/lane/queue";
 import type { ReceiptDocument } from "@/lib/lane/receipt";
-import { offlineReceipt, type ReceiptContext, saleReceipt } from "@/lib/lane/receipt-builders";
+import { type BranchReceiptText, offlineReceipt, type ReceiptContext, saleReceipt } from "@/lib/lane/receipt-builders";
 import { type CashCount, describe as describeCash, fromLines, lines as cashLines, minus as minusCash, plus as plusCash, total as cashTotal } from "@/lib/lane/cash";
 import { type Cart, CartSchema, type Drawer, type Receipt, type Sale, SaleSchema, type TillSession, TillSessionSchema } from "@/lib/lane/schemas";
 import { useLaneStore } from "@/lib/lane/store";
@@ -149,7 +149,28 @@ export function Checkout({
   const offline = connectivity === "offline" || offlineLines.length > 0;
   const view = offline ? offlineView(offlineLines) : cart ? cartView(cart) : EMPTY;
   const selectedLine = view.lines[Math.min(selected, view.lines.length - 1)];
-  const context: ReceiptContext = { brand, branchName: branch.name, cashier, till: shift.tillLabel ?? undefined };
+  // The branch's receipt text: as last cached (so offline receipts carry it), then fresh.
+  const [receiptText, setReceiptText] = useState<BranchReceiptText | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const key = `${META.receiptText}:${branch.id}`;
+    void (async () => {
+      const cached = await getMeta<BranchReceiptText>(key);
+      if (!cancelled && cached) setReceiptText(cached);
+      try {
+        const fresh = await laneApi.receiptText(branch.id);
+        if (cancelled) return;
+        setReceiptText(fresh);
+        await setMeta(key, fresh);
+      } catch {
+        // Offline, or not reachable: the cached text stands.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [branch.id]);
+  const context: ReceiptContext = { brand, branchName: branch.name, cashier, till: shift.tillLabel ?? undefined, text: receiptText };
 
   /** The drawer from the server, kept on the device for when the network goes. */
   const reloadDrawer = useCallback(async () => {

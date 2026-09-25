@@ -32,4 +32,14 @@ public interface SupplierRepository extends JpaRepository<Supplier, UUID> {
             WHERE lower(s.name) LIKE lower(:term) OR lower(s.code) LIKE lower(:term)
             """)
     Page<Supplier> search(@Param("term") String term, Pageable pageable);
+
+    /** The same search, among suppliers in one status - an order is placed with active ones. */
+    @Query(
+            """
+            SELECT s FROM Supplier s
+            WHERE s.status = :status
+              AND (lower(s.name) LIKE lower(:term) OR lower(s.code) LIKE lower(:term))
+            """)
+    Page<Supplier> searchInStatus(
+            @Param("term") String term, @Param("status") SupplierStatus status, Pageable pageable);
 }

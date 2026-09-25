@@ -2,12 +2,12 @@
 
 Hello [( ${recipientName} )],
 
-Use this code to verify your email address:
+[# th:if="${intro != null}"][( ${intro} )][/]
 
     [( ${otpCode} )]
 
 It expires in [( ${expiresInMinutes} )] minutes and can be used once.
 
-If you did not request this, you can ignore this email - nobody can use the code without it.
+[# th:if="${closing != null}"][( ${closing} )][/]
 
 Questions? [( ${supportEmail} )]

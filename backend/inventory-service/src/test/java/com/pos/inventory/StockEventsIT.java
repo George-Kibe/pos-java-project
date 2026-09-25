@@ -69,6 +69,175 @@ class StockEventsIT extends InventoryTestBase {
         assertThat(sellable.get(0).getUnitCost()).isEqualByComparingTo("72.00");
     }
 
+    @Test
+    @DisplayName(
+            "a product announced before it is ever stocked still has its name on its first stock"
+                    + " row, and a redelivered announcement changes nothing")
+    void aProductsFirstStockCarriesItsName() {
+        UUID product = UUID.randomUUID();
+        EventEnvelope<com.pos.events.catalog.ProductChangedPayload> announced =
+                EventEnvelope.<com.pos.events.catalog.ProductChangedPayload>builder()
+                        .topic(Topics.CATALOG_PRODUCT_CHANGED)
+                        .correlationId("catalog-correlation")
+                        .payload(
+                                new com.pos.events.catalog.ProductChangedPayload(
+                                        product,
+                                        "OATS-500",
+                                        "Rolled oats 500g",
+                                        UUID.randomUUID(),
+                                        "GROCERY",
+                                        "EA",
+                                        "STANDARD",
+                                        false,
+                                        true,
+                                        new java.math.BigDecimal("210.00"),
+                                        "KES"))
+                        .build();
+        publish(Topics.CATALOG_PRODUCT_CHANGED, announced, product);
+        eventually(
+                Duration.ofSeconds(30),
+                "the product's details to be kept",
+                () ->
+                        jdbc.sql(
+                                                "SELECT count(*) FROM inventory.product_details WHERE product_id = ?")
+                                        .param(product)
+                                        .query(Long.class)
+                                        .single()
+                                == 1);
+        publish(Topics.CATALOG_PRODUCT_CHANGED, announced, product);
+
+        publish(
+                Topics.PURCHASING_GOODS_RECEIVED,
+                goodsReceived(
+                        product,
+                        "OATS-500",
+                        "6",
+                        "OATS-B1",
+                        LocalDate.parse("2027-01-31"),
+                        "150.00"),
+                product);
+        eventually(
+                Duration.ofSeconds(30),
+                "the delivery to be received",
+                () -> onHand(product, BRANCH) != null);
+
+        StockItem item = items.findByProductIdAndBranchId(product, BRANCH).orElseThrow();
+        assertThat(item.getProductName()).isEqualTo("Rolled oats 500g");
+        assertThat(item.getUnitOfMeasure()).isEqualTo("EA");
+        assertThat(
+                        jdbc.sql(
+                                        "SELECT count(*) FROM inventory.product_details WHERE product_id = ?")
+                                .param(product)
+                                .query(Long.class)
+                                .single())
+                .isEqualTo(1);
+    }
+
+    private static EventEnvelope<com.pos.events.purchasing.SupplierReturnSentPayload>
+            supplierReturn(UUID product, String sku, String batch, String quantity) {
+        return EventEnvelope.<com.pos.events.purchasing.SupplierReturnSentPayload>builder()
+                .topic(Topics.PURCHASING_SUPPLIER_RETURN_SENT)
+                .correlationId("return-correlation")
+                .branchId(BRANCH)
+                .payload(
+                        new com.pos.events.purchasing.SupplierReturnSentPayload(
+                                UUID.randomUUID(),
+                                "SR-TEST",
+                                UUID.randomUUID(),
+                                BRANCH,
+                                "DAMAGED_IN_TRANSIT",
+                                Instant.now(),
+                                List.of(
+                                        new com.pos.events.purchasing.SupplierReturnSentPayload
+                                                .ReturnedLine(
+                                                product,
+                                                sku,
+                                                batch,
+                                                new java.math.BigDecimal(quantity),
+                                                new java.math.BigDecimal("80.00"),
+                                                "KES"))))
+                .build();
+    }
+
+    @Test
+    @DisplayName(
+            "goods sent back to a supplier leave their own batch first, then soonest-expiring;"
+                    + " a redelivered return takes nothing twice")
+    void aSupplierReturnTakesStockOffTheShelf() {
+        UUID product = UUID.randomUUID();
+        receive(product, "RICE-5KG", "10", "LATE", "2027-12-31", "80.00");
+        receive(product, "RICE-5KG", "10", "SOON", "2027-01-31", "80.00");
+        eventually(
+                Duration.ofSeconds(30),
+                "both deliveries",
+                () ->
+                        onHand(product, BRANCH) != null
+                                && onHand(product, BRANCH).compareTo(new java.math.BigDecimal("20"))
+                                        == 0);
+        StockItem item = items.findByProductIdAndBranchId(product, BRANCH).orElseThrow();
+
+        // Three bags from the later batch, which is the one that came damaged.
+        var named = supplierReturn(product, "RICE-5KG", "LATE", "3");
+        publish(Topics.PURCHASING_SUPPLIER_RETURN_SENT, named, product);
+        eventually(
+                Duration.ofSeconds(30),
+                "the return to leave the shelf",
+                () -> onHand(product, BRANCH).compareTo(new java.math.BigDecimal("17")) == 0);
+        assertThat(
+                        batches.findByStockItemIdAndBatchNumber(item.getId(), "LATE")
+                                .orElseThrow()
+                                .getQuantity())
+                .isEqualByComparingTo("7");
+        assertThat(
+                        batches.findByStockItemIdAndBatchNumber(item.getId(), "SOON")
+                                .orElseThrow()
+                                .getQuantity())
+                .isEqualByComparingTo("10");
+
+        // Two more with no batch named: soonest-expiring first.
+        publish(
+                Topics.PURCHASING_SUPPLIER_RETURN_SENT,
+                supplierReturn(product, "RICE-5KG", null, "2"),
+                product);
+        eventually(
+                Duration.ofSeconds(30),
+                "the second return",
+                () -> onHand(product, BRANCH).compareTo(new java.math.BigDecimal("15")) == 0);
+        assertThat(
+                        batches.findByStockItemIdAndBatchNumber(item.getId(), "SOON")
+                                .orElseThrow()
+                                .getQuantity())
+                .isEqualByComparingTo("8");
+
+        // The first return again: nothing moves.
+        long movementsBefore = movementCount(product, BRANCH);
+        publish(Topics.PURCHASING_SUPPLIER_RETURN_SENT, named, product);
+        eventually(
+                Duration.ofSeconds(20),
+                "the duplicate to be seen and skipped",
+                () -> {
+                    Long processed =
+                            jdbc.sql(
+                                            "SELECT count(*) FROM inventory.processed_event WHERE event_id = :id")
+                                    .param("id", named.eventId())
+                                    .query(Long.class)
+                                    .single();
+                    return processed != null && processed >= 1;
+                });
+        assertThat(onHand(product, BRANCH)).isEqualByComparingTo("15");
+        assertThat(movementCount(product, BRANCH)).isEqualTo(movementsBefore);
+        assertThat(
+                        jdbc.sql(
+                                        "SELECT count(*) FROM inventory.stock_movements m JOIN inventory.stock_items i"
+                                                + " ON i.id = m.stock_item_id WHERE i.product_id = :product"
+                                                + " AND m.type = 'SUPPLIER_RETURN'")
+                                .param("product", product)
+                                .query(Long.class)
+                                .single())
+                .isEqualTo(2);
+        assertThat(ledgerTotal(product, BRANCH)).isEqualByComparingTo(onHand(product, BRANCH));
+    }
+
     // --- the main event: FEFO deduction -----------------------------------------
 
     @Test

@@ -74,7 +74,13 @@ public final class CatalogDtos {
             BigDecimal basePrice,
             String currency,
             boolean active,
-            List<String> barcodes) {
+            List<String> barcodes,
+            UUID unitOfMeasureId,
+            UUID taxClassId,
+            BigDecimal reorderPoint,
+            BigDecimal reorderQuantity,
+            /** Where the product's image is served, or null; versioned, so it can be cached. */
+            String imageUrl) {
 
         public static ProductResponse from(Product product) {
             return new ProductResponse(
@@ -93,7 +99,12 @@ public final class CatalogDtos {
                     product.getBasePrice(),
                     product.getCurrency(),
                     product.isActive(),
-                    product.getBarcodes().stream().map(ProductBarcode::getBarcode).toList());
+                    product.getBarcodes().stream().map(ProductBarcode::getBarcode).toList(),
+                    product.getUnitOfMeasure().getId(),
+                    product.getTaxClass().getId(),
+                    product.getReorderPoint(),
+                    product.getReorderQuantity(),
+                    product.getImageUrl());
         }
     }
 
@@ -238,8 +249,214 @@ public final class CatalogDtos {
     public record CategoryResponse(
             UUID id, String code, String name, UUID parentId, boolean active) {}
 
+    public record CategoryUpdateRequest(
+            @NotBlank @Size(max = 150) String name, UUID parentId, Boolean active) {
+        public boolean isActive() {
+            return active == null || active;
+        }
+    }
+
+    public record BrandRequest(
+            @NotBlank @Size(max = 50) String code, @NotBlank @Size(max = 150) String name) {}
+
+    public record BrandUpdateRequest(@NotBlank @Size(max = 150) String name, Boolean active) {
+        public boolean isActive() {
+            return active == null || active;
+        }
+    }
+
+    public record BrandResponse(UUID id, String code, String name, boolean active) {}
+
+    public record UnitRequest(
+            @NotBlank @Size(max = 20) String code,
+            @NotBlank @Size(max = 100) String name,
+            Boolean allowsDecimal,
+            Integer decimalPlaces) {
+        public boolean fractional() {
+            return Boolean.TRUE.equals(allowsDecimal);
+        }
+    }
+
+    public record UnitUpdateRequest(@NotBlank @Size(max = 100) String name) {}
+
+    public record UnitResponse(
+            UUID id, String code, String name, boolean allowsDecimal, int decimalPlaces) {}
+
     public record TaxRateResponse(BigDecimal rate, Instant validFrom, Instant validTo) {}
 
     public record TaxClassResponse(
-            UUID id, String code, String name, String description, List<TaxRateResponse> rates) {}
+            UUID id,
+            String code,
+            String name,
+            String description,
+            List<TaxRateResponse> rates,
+            boolean active,
+            boolean isDefault) {}
+
+    /** A tax class and the rate it starts at: 0.16 for 16%. */
+    public record TaxClassRequest(
+            @NotBlank @Size(max = 50) String code,
+            @NotBlank @Size(max = 150) String name,
+            @Size(max = 255) String description,
+            @NotNull @DecimalMin("0.0") BigDecimal rate,
+            Instant validFrom) {}
+
+    public record TaxClassUpdateRequest(
+            @NotBlank @Size(max = 150) String name,
+            @Size(max = 255) String description,
+            Boolean active) {
+        public boolean isActive() {
+            return active == null || active;
+        }
+    }
+
+    /** A new rate from {@code validFrom} (now, if omitted); never in the past. */
+    public record TaxRateRequest(@NotNull @DecimalMin("0.0") BigDecimal rate, Instant validFrom) {}
+
+    // --- price lists ----------------------------------------------------------
+
+    public record PriceListRequest(
+            @NotBlank @Size(max = 50) String code,
+            @NotBlank @Size(max = 150) String name,
+            /** Null for a list that applies at every branch. */
+            UUID branchId,
+            Integer priority,
+            Instant validFrom,
+            Instant validTo,
+            Boolean active) {
+        public int priorityOrDefault() {
+            return priority == null ? 0 : priority;
+        }
+
+        public boolean isActive() {
+            return active == null || active;
+        }
+    }
+
+    public record PriceListResponse(
+            UUID id,
+            String code,
+            String name,
+            UUID branchId,
+            int priority,
+            Instant validFrom,
+            Instant validTo,
+            boolean active,
+            long items) {}
+
+    public record PriceListItemRequest(@NotNull @DecimalMin("0.0") BigDecimal price) {}
+
+    public record PriceListItemResponse(
+            UUID productId,
+            String sku,
+            String productName,
+            BigDecimal basePrice,
+            BigDecimal price,
+            String currency) {}
+
+    // --- promotions -----------------------------------------------------------
+
+    public record PromotionRuleRequest(
+            @NotNull com.pos.catalog.domain.PromotionScope scope, UUID scopeId) {}
+
+    /**
+     * A promotion. {@code value} is a fraction for PERCENTAGE_OFF (0.10 is 10%), an amount per unit
+     * for AMOUNT_OFF, the bundle's price for BUNDLE.
+     */
+    public record PromotionRequest(
+            @NotBlank @Size(max = 50) String code,
+            @NotBlank @Size(max = 150) String name,
+            @NotNull com.pos.catalog.domain.PromotionType type,
+            BigDecimal value,
+            BigDecimal buyQuantity,
+            BigDecimal getQuantity,
+            BigDecimal minQuantity,
+            Integer priority,
+            Boolean stackable,
+            Boolean memberOnly,
+            UUID branchId,
+            Instant validFrom,
+            Instant validTo,
+            Boolean active,
+            @NotNull @jakarta.validation.Valid List<PromotionRuleRequest> rules) {
+
+        public com.pos.catalog.service.PromotionService.Definition definition() {
+            return new com.pos.catalog.service.PromotionService.Definition(
+                    name,
+                    type,
+                    value,
+                    buyQuantity,
+                    getQuantity,
+                    minQuantity,
+                    priority == null ? 100 : priority,
+                    Boolean.TRUE.equals(stackable),
+                    Boolean.TRUE.equals(memberOnly),
+                    branchId,
+                    validFrom,
+                    validTo,
+                    active == null || active,
+                    rules.stream()
+                            .map(
+                                    rule ->
+                                            new com.pos.catalog.service.PromotionService.Rule(
+                                                    rule.scope(), rule.scopeId()))
+                            .toList());
+        }
+    }
+
+    public record PromotionRuleResponse(
+            com.pos.catalog.domain.PromotionScope scope, UUID scopeId) {}
+
+    public record PromotionResponse(
+            UUID id,
+            String code,
+            String name,
+            com.pos.catalog.domain.PromotionType type,
+            BigDecimal value,
+            BigDecimal buyQuantity,
+            BigDecimal getQuantity,
+            BigDecimal minQuantity,
+            int priority,
+            boolean stackable,
+            boolean memberOnly,
+            UUID branchId,
+            Instant validFrom,
+            Instant validTo,
+            boolean active,
+            List<PromotionRuleResponse> rules) {
+
+        public static PromotionResponse from(com.pos.catalog.domain.Promotion promotion) {
+            return new PromotionResponse(
+                    promotion.getId(),
+                    promotion.getCode(),
+                    promotion.getName(),
+                    promotion.getType(),
+                    promotion.getValue(),
+                    promotion.getBuyQuantity(),
+                    promotion.getGetQuantity(),
+                    promotion.getMinQuantity(),
+                    promotion.getPriority(),
+                    promotion.isStackable(),
+                    promotion.isMemberOnly(),
+                    promotion.getBranchId(),
+                    promotion.getValidFrom(),
+                    promotion.getValidTo(),
+                    promotion.isActive(),
+                    promotion.getRules().stream()
+                            .map(
+                                    rule ->
+                                            new PromotionRuleResponse(
+                                                    rule.getScopeType(), rule.getScopeId()))
+                            .toList());
+        }
+    }
+
+    /** A draft (or an edit of {@code promotionId}) priced for one product, nothing saved. */
+    public record PromotionPreviewRequest(
+            @NotNull @jakarta.validation.Valid PromotionRequest promotion,
+            UUID promotionId,
+            @NotNull UUID productId,
+            @NotNull @Positive BigDecimal quantity,
+            UUID branchId,
+            Boolean member) {}
 }

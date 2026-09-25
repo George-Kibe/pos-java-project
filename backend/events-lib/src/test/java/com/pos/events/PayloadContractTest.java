@@ -226,7 +226,13 @@ class PayloadContractTest {
                             BigDecimal.ZERO,
                             new BigDecimal("88.2000"),
                             null,
-                            null);
+                            null,
+                            new ReceiptEmailRequestedPayload.ReceiptText(
+                                    "Open 7am to 10pm",
+                                    "Returns within 7 days",
+                                    null,
+                                    null,
+                                    "P051234567X"));
 
             String json = EventJson.write(payload);
             assertThat(json)

@@ -400,6 +400,79 @@ class AdministratorRightsIT extends AuthTestBase {
         assertThat(me.get("permissions").toString()).contains("till:manage", "cash:intraday");
     }
 
+    @Test
+    @DisplayName(
+            "forces a password reset: the person's tokens stop working and a reset link is sent;"
+                    + " a manager cannot do it to an administrator")
+    void forcesAPasswordReset() {
+        String email = "reset-" + System.nanoTime() + "@pos.test";
+        String id =
+                json(post(
+                                "/api/v1/users",
+                                Map.of(
+                                        "email",
+                                        email,
+                                        "temporaryPassword",
+                                        TEMPORARY,
+                                        "fullName",
+                                        "Person Reset",
+                                        "roles",
+                                        List.of("CASHIER")),
+                                admin))
+                        .get("id")
+                        .asString();
+        String versionBefore = publishedTokenVersion(java.util.UUID.fromString(id));
+        long resetsBefore = outboxCount("pos.auth.password-reset-requested.v1");
+
+        assertThat(post("/api/v1/users/" + id + "/password-reset", Map.of(), admin).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(publishedTokenVersion(java.util.UUID.fromString(id)))
+                .isNotEqualTo(versionBefore);
+        assertThat(outboxCount("pos.auth.password-reset-requested.v1")).isEqualTo(resetsBefore + 1);
+        assertThat(latestPasswordResetTokenFor(email)).isNotBlank();
+
+        // On the record, and found by the audit filters - by action and by time.
+        String from = java.time.Instant.now().minusSeconds(3600).toString();
+        String to = java.time.Instant.now().plusSeconds(3600).toString();
+        assertThat(
+                        json(get(
+                                        "/api/v1/audit?action=user.password_reset_forced&from="
+                                                + from
+                                                + "&to="
+                                                + to,
+                                        admin))
+                                .get("content")
+                                .findValuesAsString("resourceId"))
+                .contains(id);
+        assertThat(
+                        json(get(
+                                        "/api/v1/audit?action=user.password_reset_forced&from="
+                                                + java.time.Instant.now().plusSeconds(60),
+                                        admin))
+                                .get("content"))
+                .isEmpty();
+
+        // A branch manager manages people, but never an administrator.
+        String managerEmail = "mgr-" + System.nanoTime() + "@pos.test";
+        post(
+                "/api/v1/users",
+                Map.of(
+                        "email",
+                        managerEmail,
+                        "temporaryPassword",
+                        TEMPORARY,
+                        "fullName",
+                        "Person Manager",
+                        "roles",
+                        List.of("BRANCH_MANAGER")),
+                admin);
+        String manager = loginForAccessToken(managerEmail, TEMPORARY);
+        assertThat(
+                        post("/api/v1/users/" + adminId + "/password-reset", Map.of(), manager)
+                                .getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
     private String person(String role, String label) {
         return json(post(
                         "/api/v1/users",

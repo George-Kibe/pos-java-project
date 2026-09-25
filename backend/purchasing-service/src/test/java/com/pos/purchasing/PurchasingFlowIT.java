@@ -394,6 +394,20 @@ class PurchasingFlowIT extends PurchasingTestBase {
         assertThat(matched.invoice().getMatchNotes()).contains("PRICE_VARIANCE");
         // Due date comes from the supplier's payment terms, not from the request.
         assertThat(matched.invoice().getDueDate()).isEqualTo(LocalDate.now().plusDays(30));
+
+        // Reopened later, the invoice still says which product was over-billed, and by how much.
+        var reopened =
+                com.pos.purchasing.api.dto.PurchasingDtos.SupplierInvoiceResponse.from(
+                        invoiceService.require(matched.invoice().getId()));
+        assertThat(reopened.variances()).isNotEmpty();
+        assertThat(reopened.variances())
+                .anySatisfy(
+                        finding -> {
+                            assertThat(finding.type()).isEqualTo("PRICE_VARIANCE");
+                            assertThat(finding.sku()).isEqualTo("FLOUR-2KG");
+                            assertThat(finding.amountEffect()).isEqualByComparingTo("500.00");
+                        });
+        assertThat(reopened.justifiedTotal()).isNotNull();
     }
 
     @Test

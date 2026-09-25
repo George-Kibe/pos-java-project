@@ -36,6 +36,7 @@ public class UserAdminService {
     private final AuditService audit;
     private final PasswordEncoder passwordEncoder;
     private final com.pos.auth.security.AccessTokenIssuer tokens;
+    private final PasswordResetService passwordResets;
 
     @Transactional(readOnly = true)
     public Page<User> search(String query, boolean excludeAdministrators, Pageable pageable) {
@@ -220,6 +221,29 @@ public class UserAdminService {
                 "User",
                 id,
                 Map.of("before", before.name(), "after", status.name()));
+        return user;
+    }
+
+    /**
+     * Makes someone choose a new password: every session they have is ended, every access token
+     * stops working, and they are emailed a single-use link. For a password that may be known to
+     * someone else - shared, written down, or taken with a phone.
+     */
+    @Transactional
+    public User forcePasswordReset(UUID id) {
+        User user = get(id);
+        requireMayManage(user);
+        if (!user.canAuthenticate()) {
+            throw new Errors.ConflictException(
+                    "user.not_active",
+                    "This account cannot sign in, so there is no password to reset.");
+        }
+        user.bumpTokenVersion();
+        users.save(user);
+        tokenVersions.publish(user);
+        authenticationService.revokeAllSessions(id, "password_reset_forced");
+        passwordResets.issueReset(user);
+        audit.record(AuditService.USER_PASSWORD_RESET_FORCED, "User", id, null);
         return user;
     }
 

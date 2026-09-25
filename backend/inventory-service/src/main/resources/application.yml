@@ -78,6 +78,8 @@ pos:
       - /swagger-ui.html
 
   inventory:
+    # Expiry dates are the shops' dates, so "today" is taken in their time zone.
+    shop-time-zone: ${SHOP_TIME_ZONE:Africa/Nairobi}
     # Far enough ahead that stock can be marked down or moved rather than written off.
     expiry-warning-days: ${EXPIRY_WARNING_DAYS:14}
     expiry-scan-cron: ${EXPIRY_SCAN_CRON:0 0 6 * * *}

@@ -88,6 +88,7 @@ public class InventoryOperationsController {
     @PreAuthorize("hasAuthority('inventory:adjust')")
     @Operation(summary = "Post an adjustment, writing its movements")
     public InventoryDtos.AdjustmentResponse postAdjustment(@PathVariable UUID id) {
+        branchAccess.requireAccess(adjustments.get(id).getBranchId());
         return InventoryDtos.AdjustmentResponse.from(adjustments.post(id));
     }
 
@@ -95,6 +96,7 @@ public class InventoryOperationsController {
     @PreAuthorize("hasAuthority('inventory:adjust')")
     @Operation(summary = "Cancel a drafted adjustment")
     public InventoryDtos.AdjustmentResponse cancelAdjustment(@PathVariable UUID id) {
+        branchAccess.requireAccess(adjustments.get(id).getBranchId());
         return InventoryDtos.AdjustmentResponse.from(adjustments.cancel(id));
     }
 
@@ -112,11 +114,32 @@ public class InventoryOperationsController {
         return ResponseEntity.created(URI.create("/api/v1/stock-takes/" + body.id())).body(body);
     }
 
+    @GetMapping("/stock-takes")
+    @PreAuthorize("hasAuthority('stocktake:manage')")
+    @Operation(summary = "Counts at a branch, newest first")
+    public PageResponse<InventoryDtos.StockTakeResponse> listStockTakes(
+            @RequestParam UUID branchId, @PageableDefault(size = 25) Pageable pageable) {
+        branchAccess.requireAccess(branchId);
+        return PageResponse.of(
+                stockTakes.list(branchId, pageable),
+                stockTake -> InventoryDtos.StockTakeResponse.from(stockTake, false));
+    }
+
     @GetMapping("/stock-takes/{id}")
     @PreAuthorize("hasAuthority('stocktake:manage')")
     @Operation(summary = "A count sheet with its variances")
     public InventoryDtos.StockTakeResponse getStockTake(@PathVariable UUID id) {
-        return InventoryDtos.StockTakeResponse.from(stockTakes.get(id), true);
+        var stockTake = stockTakes.get(id);
+        branchAccess.requireAccess(stockTake.getBranchId());
+        return InventoryDtos.StockTakeResponse.from(stockTake, true);
+    }
+
+    @PostMapping("/stock-takes/{id}/cancel")
+    @PreAuthorize("hasAuthority('stocktake:manage')")
+    @Operation(summary = "Abandon a count that has not been posted")
+    public InventoryDtos.StockTakeResponse cancelStockTake(@PathVariable UUID id) {
+        branchAccess.requireAccess(stockTakes.get(id).getBranchId());
+        return InventoryDtos.StockTakeResponse.from(stockTakes.cancel(id), true);
     }
 
     @PostMapping("/stock-takes/{id}/counts")
@@ -125,6 +148,7 @@ public class InventoryOperationsController {
     public InventoryDtos.StockTakeResponse recordCounts(
             @PathVariable UUID id, @Valid @RequestBody InventoryDtos.CountRequest request) {
 
+        branchAccess.requireAccess(stockTakes.get(id).getBranchId());
         var counted =
                 stockTakes.count(
                         id,
@@ -143,6 +167,7 @@ public class InventoryOperationsController {
     @PreAuthorize("hasAuthority('stocktake:manage')")
     @Operation(summary = "Submit a count for review before posting")
     public InventoryDtos.StockTakeResponse submitForReview(@PathVariable UUID id) {
+        branchAccess.requireAccess(stockTakes.get(id).getBranchId());
         return InventoryDtos.StockTakeResponse.from(stockTakes.submitForReview(id), true);
     }
 
@@ -150,10 +175,30 @@ public class InventoryOperationsController {
     @PreAuthorize("hasAuthority('stocktake:manage')")
     @Operation(summary = "Post the variances as stock movements")
     public InventoryDtos.StockTakeResponse postStockTake(@PathVariable UUID id) {
+        branchAccess.requireAccess(stockTakes.get(id).getBranchId());
         return InventoryDtos.StockTakeResponse.from(stockTakes.post(id), true);
     }
 
     // --- transfers --------------------------------------------------------------
+
+    @GetMapping("/transfers")
+    @PreAuthorize("hasAnyAuthority('transfer:manage', 'inventory:view')")
+    @Operation(summary = "Transfers into or out of a branch, newest first")
+    public PageResponse<InventoryDtos.TransferSummaryResponse> listTransfers(
+            @RequestParam UUID branchId, @PageableDefault(size = 25) Pageable pageable) {
+        branchAccess.requireAccess(branchId);
+        return PageResponse.of(
+                transfers.list(branchId, pageable), InventoryDtos.TransferSummaryResponse::from);
+    }
+
+    @GetMapping("/transfers/{id}")
+    @PreAuthorize("hasAnyAuthority('transfer:manage', 'inventory:view')")
+    @Operation(summary = "One transfer, line by line")
+    public InventoryDtos.TransferResponse getTransfer(@PathVariable UUID id) {
+        var transfer = transfers.get(id);
+        requireEitherEnd(transfer.getFromBranchId(), transfer.getToBranchId());
+        return InventoryDtos.TransferResponse.from(transfer);
+    }
 
     @PostMapping("/transfers")
     @PreAuthorize("hasAuthority('transfer:manage')")
@@ -185,6 +230,8 @@ public class InventoryOperationsController {
     @PreAuthorize("hasAuthority('transfer:manage')")
     @Operation(summary = "Send a transfer: deducts from the sender, now in transit")
     public InventoryDtos.TransferResponse dispatchTransfer(@PathVariable UUID id) {
+        // The sending branch sends.
+        branchAccess.requireAccess(transfers.get(id).getFromBranchId());
         return InventoryDtos.TransferResponse.from(transfers.dispatch(id));
     }
 
@@ -194,6 +241,8 @@ public class InventoryOperationsController {
     public InventoryDtos.TransferResponse receiveTransfer(
             @PathVariable UUID id,
             @RequestBody(required = false) InventoryDtos.ReceiveRequest request) {
+        // The receiving branch counts what arrived.
+        branchAccess.requireAccess(transfers.get(id).getToBranchId());
 
         List<TransferService.ReceiptLineRequest> lines =
                 request == null || request.lines() == null
@@ -205,6 +254,14 @@ public class InventoryOperationsController {
                                                         line.lineId(), line.quantityReceived()))
                                 .toList();
         return InventoryDtos.TransferResponse.from(transfers.receive(id, lines));
+    }
+
+    /** Either end of a transfer may look at it. */
+    private void requireEitherEnd(UUID from, UUID to) {
+        var caller = com.pos.common.security.AuthenticatedUser.require();
+        if (!caller.canAccessBranch(from) && !caller.canAccessBranch(to)) {
+            branchAccess.requireAccess(from);
+        }
     }
 
     // --- reservations -----------------------------------------------------------

@@ -224,6 +224,12 @@ function ManageDialog({ user, roles, branches, onClose }: { user: User; roles: R
     onError: (error) => toast.error(failure(error, "The changes were not saved.")),
   });
 
+  const reset = useMutation({
+    mutationFn: () => api(`users/${user.id}/password-reset`, UserSchema, { method: "POST" }),
+    onSuccess: () => toast.success(`${user.fullName} is signed out everywhere and has been sent a reset link.`),
+    onError: (error) => toast.error(failure(error, "The reset was not sent.")),
+  });
+
   return (
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
@@ -254,6 +260,14 @@ function ManageDialog({ user, roles, branches, onClose }: { user: User; roles: R
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </form>
+        <div className="grid gap-2 border-t pt-4">
+          <p className="text-sm text-muted-foreground">
+            If their password may be known to someone else: every session ends now and they are emailed a link to choose a new one.
+          </p>
+          <Button variant="outline" disabled={reset.isPending} onClick={() => reset.mutate()}>
+            Force a password reset
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

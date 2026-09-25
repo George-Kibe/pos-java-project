@@ -47,44 +47,49 @@ public class PasswordResetService {
         String normalized = User.normalizeEmail(email);
         users.findByEmailNormalized(normalized)
                 .filter(User::canAuthenticate)
-                .ifPresent(
-                        user -> {
-                            tokens.consumeOutstanding(user.getId(), Instant.now());
+                .ifPresent(this::issueReset);
+    }
 
-                            String raw = SecureTokens.generate();
-                            Instant expiresAt =
-                                    Instant.now().plus(properties.getPasswordReset().getTtl());
+    /**
+     * Sends {@code user} a single-use reset link, voiding any sent before. Also how an
+     * administrator forces a reset, from {@code UserAdminService}.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void issueReset(User user) {
+        tokens.consumeOutstanding(user.getId(), Instant.now());
 
-                            PasswordResetToken token = new PasswordResetToken();
-                            token.setUserId(user.getId());
-                            token.setTokenHash(SecureTokens.hash(raw));
-                            token.setExpiresAt(expiresAt);
-                            tokens.save(token);
+        String raw = SecureTokens.generate();
+        Instant expiresAt = Instant.now().plus(properties.getPasswordReset().getTtl());
 
-                            audit.recordFor(
-                                    user.getId(),
-                                    user.getEmail(),
-                                    AuditService.PASSWORD_RESET_REQUESTED,
-                                    user.getId(),
-                                    null);
+        PasswordResetToken token = new PasswordResetToken();
+        token.setUserId(user.getId());
+        token.setTokenHash(SecureTokens.hash(raw));
+        token.setExpiresAt(expiresAt);
+        tokens.save(token);
 
-                            outbox.record(
-                                    Topics.AUTH_PASSWORD_RESET_REQUESTED,
-                                    "User",
-                                    user.getId(),
-                                    EventEnvelope.<PasswordResetRequestedPayload>builder()
-                                            .topic(Topics.AUTH_PASSWORD_RESET_REQUESTED)
-                                            .correlationId(CorrelationId.get())
-                                            .actorId(user.getId())
-                                            .payload(
-                                                    new PasswordResetRequestedPayload(
-                                                            user.getId(),
-                                                            user.getEmail(),
-                                                            user.getFullName(),
-                                                            raw,
-                                                            expiresAt))
-                                            .build());
-                        });
+        audit.recordFor(
+                user.getId(),
+                user.getEmail(),
+                AuditService.PASSWORD_RESET_REQUESTED,
+                user.getId(),
+                null);
+
+        outbox.record(
+                Topics.AUTH_PASSWORD_RESET_REQUESTED,
+                "User",
+                user.getId(),
+                EventEnvelope.<PasswordResetRequestedPayload>builder()
+                        .topic(Topics.AUTH_PASSWORD_RESET_REQUESTED)
+                        .correlationId(CorrelationId.get())
+                        .actorId(user.getId())
+                        .payload(
+                                new PasswordResetRequestedPayload(
+                                        user.getId(),
+                                        user.getEmail(),
+                                        user.getFullName(),
+                                        raw,
+                                        expiresAt))
+                        .build());
     }
 
     /**

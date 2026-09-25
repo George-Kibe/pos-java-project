@@ -138,6 +138,41 @@ class SalesApiIT extends SalesTestBase {
             "a receipt is emailed by event, carrying what was charged, and only while it stands")
     void aReceiptIsEmailedByEvent() throws Exception {
         UUID branch = UUID.randomUUID();
+
+        // The branch's receipt text: set by whoever runs branches, read by its lanes.
+        mockMvc.perform(
+                        put("/api/v1/receipt-settings/" + branch)
+                                .with(atBranches(List.of(branch), "shift:open"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json(Map.of("footer", "Nope"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(
+                        put("/api/v1/receipt-settings/" + branch)
+                                .with(atBranches(List.of(branch), "branch:manage"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json(Map.of("footer", "1\n2\n3\n4\n5\n6\n7"))))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(
+                        put("/api/v1/receipt-settings/" + branch)
+                                .with(atBranches(List.of(branch), "branch:manage"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        json(
+                                                Map.of(
+                                                        "header", "Open 7am to 10pm",
+                                                        "footer", "Returns within 7 days",
+                                                        "taxPin", "P051234567X"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(
+                        get("/api/v1/receipt-settings/" + branch)
+                                .with(atBranches(List.of(branch), "shift:open")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.footer", is("Returns within 7 days")));
+        mockMvc.perform(
+                        get("/api/v1/receipt-settings/" + UUID.randomUUID())
+                                .with(atBranches(List.of(branch), "shift:open")))
+                .andExpect(status().isForbidden());
+
         actingAs(CASHIER, CASHIER_PERMISSIONS);
         Sale sale = paidSaleAt(branch);
         long before = outboxCount(com.pos.events.Topics.SALES_RECEIPT_EMAIL_REQUESTED);
@@ -169,6 +204,9 @@ class SalesApiIT extends SalesTestBase {
         assertThat(payload.grandTotal()).isEqualByComparingTo(sale.getGrandTotal());
         assertThat(payload.taxBreakdown()).isNotEmpty();
         assertThat(payload.payments()).extracting("method").containsExactly(PaymentMethod.CASH);
+        // Emailed with the branch's own text, as a printed receipt carries it.
+        assertThat(payload.receiptText().header()).isEqualTo("Open 7am to 10pm");
+        assertThat(payload.receiptText().taxPin()).isEqualTo("P051234567X");
 
         // Someone at another branch cannot have this branch's receipts sent anywhere.
         mockMvc.perform(

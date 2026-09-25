@@ -2,10 +2,9 @@
 
 Welcome, [( ${recipientName} )].
 
-Your email is verified and your account is active.
+[# th:if="${intro != null}"][( ${intro} )][/]
 
-A manager needs to assign your role before you can start work. Until then you can sign in, but you
-will not see anything yet - that is expected.
+[# th:if="${closing != null}"][( ${closing} )][/]
 
 Sign in: [( ${appBaseUrl} )]
 

@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.pos.notification.config.NotificationProperties;
 import com.pos.notification.domain.NotificationType;
 import com.pos.notification.service.EmailMessage;
 import com.pos.notification.service.EmailTemplateRenderer;
@@ -41,7 +40,7 @@ import lombok.RequiredArgsConstructor;
 public class TemplatePreviewController {
 
     private final EmailTemplateRenderer renderer;
-    private final NotificationProperties properties;
+    private final com.pos.notification.service.TemplateSamples samples;
 
     @GetMapping
     @Operation(summary = "List the templates that can be previewed")
@@ -61,7 +60,8 @@ public class TemplatePreviewController {
                     String format) {
 
         EmailMessage message =
-                renderer.render(type, "someone@example.com", "Ada Lovelace", sampleModel(type));
+                renderer.render(
+                        type, "someone@example.com", "Ada Lovelace", samples.modelFor(type));
 
         if ("text".equalsIgnoreCase(format)) {
             // Wrapped so a browser shows the plain-text body verbatim rather than collapsing it.
@@ -74,23 +74,5 @@ public class TemplatePreviewController {
                 .replace(
                         "cid:" + com.pos.notification.service.SmtpEmailSender.LOGO_CONTENT_ID,
                         com.pos.notification.service.BrandLogo.dataUri());
-    }
-
-    private Map<String, Object> sampleModel(NotificationType type) {
-        return switch (type) {
-            case OTP_CODE ->
-                    Map.of("otpCode", "000000", "expiresInMinutes", 10L, "purpose", "REGISTRATION");
-            case WELCOME -> Map.of("roles", List.of("CASHIER"));
-            case PASSWORD_RESET ->
-                    Map.of(
-                            "resetUrl",
-                            properties.getAppBaseUrl() + "/reset-password?token=sample-token",
-                            "expiresInMinutes",
-                            30L);
-            case RECEIPT ->
-                    com.pos.notification.service.ReceiptEmailModel.from(
-                            com.pos.notification.service.ReceiptEmailModel.sample(),
-                            properties.getDisplayTimeZone());
-        };
     }
 }

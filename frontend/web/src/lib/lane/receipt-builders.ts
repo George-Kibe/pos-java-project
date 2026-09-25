@@ -9,6 +9,35 @@ export interface ReceiptContext {
   cashier: string;
   /** "Till 3" */
   till?: string;
+  /** What the branch prints around the sale, as set in the back office; cached for offline use. */
+  text?: BranchReceiptText | null;
+}
+
+export interface BranchReceiptText {
+  header: string | null;
+  footer: string | null;
+  address: string | null;
+  phone: string | null;
+  taxPin: string | null;
+}
+
+const linesOf = (text: string | null | undefined) =>
+  (text ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+/** The branch's text, as the receipt document carries it. */
+function branchText(context: ReceiptContext) {
+  const text = context.text;
+  if (!text) return {};
+  const contact = [text.address, text.phone].filter(Boolean).join(" · ");
+  return {
+    branchContact: contact || undefined,
+    taxPin: text.taxPin ?? undefined,
+    headerLines: linesOf(text.header),
+    footerLines: linesOf(text.footer),
+  };
 }
 
 /** A receipt the server issued, as it is printed. */
@@ -16,6 +45,7 @@ export function saleReceipt(sale: Sale, receipt: Receipt | undefined, context: R
   return {
     brand: context.brand,
     branchName: context.branchName,
+    ...branchText(context),
     receiptNumber: receipt?.receiptNumber ?? sale.receiptNumber ?? "",
     issuedAt: receiptTime(receipt?.issuedAt ?? sale.completedAt ?? sale.occurredAt),
     cashier: context.cashier,
@@ -47,6 +77,7 @@ export function offlineReceipt(sale: QueuedSale, context: ReceiptContext): Recei
   return {
     brand: context.brand,
     branchName: context.branchName,
+    ...branchText(context),
     receiptNumber: sale.provisionalNumber,
     issuedAt: receiptTime(sale.occurredAt),
     cashier: context.cashier,

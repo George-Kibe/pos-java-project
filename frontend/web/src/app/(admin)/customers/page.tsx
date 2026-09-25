@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+
+import { CustomerCreator } from "@/components/admin/customer-editor";
 
 import { FilterForm, TextField } from "@/components/admin/filters";
 import { DataTable, LoadFailure, PageHeader, Pager } from "@/components/admin/page-parts";
@@ -18,7 +21,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
   const customers = await serverRead(`customers?${new URLSearchParams({ page: String(page), size: "50", ...(q ? { q } : {}) })}`, PageOf(CustomerRowSchema));
   return (
     <div className="grid gap-6">
-      <PageHeader title="Customers" description="Loyalty members." />
+      <PageHeader title="Customers" description="Loyalty members: find one by phone, card or name." actions={<CustomerCreator />} />
       <FilterForm>
         <TextField name="q" label="Phone, card or name" value={q} />
       </FilterForm>
@@ -27,8 +30,12 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
         <>
           <DataTable headings={["Member", "Number", "Phone", "Email", "Status"]} empty={customers.data.content.length === 0}>
             {customers.data.content.map((customer) => (
-              <tr key={customer.id} className="border-t">
-                <td className="px-3 py-2 font-medium">{customer.displayName ?? [customer.firstName, customer.lastName].filter(Boolean).join(" ")}</td>
+              <tr key={customer.id} className="border-t" data-testid="customer-row">
+                <td className="px-3 py-2 font-medium">
+                  <Link href={`/customers/${customer.id}`} className="underline-offset-4 hover:underline">
+                    {customer.displayName ?? [customer.firstName, customer.lastName].filter(Boolean).join(" ")}
+                  </Link>
+                </td>
                 <td className="px-3 py-2">{customer.customerNumber}</td>
                 <td className="px-3 py-2">{customer.phone ?? "-"}</td>
                 <td className="px-3 py-2">{customer.email ?? "-"}</td>

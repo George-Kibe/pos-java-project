@@ -41,8 +41,24 @@ public abstract class CatalogTestBase {
                     .withUsername("test")
                     .withPassword("test");
 
+    /**
+     * Product images: the S3-compatible store development runs, so the tests talk S3 exactly as the
+     * service does. Started once, like the database, and shared by every catalog test so they share
+     * one Spring context.
+     */
+    @SuppressWarnings("resource")
+    static final org.testcontainers.containers.GenericContainer<?> OBJECT_STORE =
+            new org.testcontainers.containers.GenericContainer<>("rustfs/rustfs:1.0.0")
+                    .withEnv("RUSTFS_ACCESS_KEY", "catalog-test")
+                    .withEnv("RUSTFS_SECRET_KEY", "catalog-test-secret")
+                    .withExposedPorts(9000)
+                    .waitingFor(
+                            org.testcontainers.containers.wait.strategy.Wait.forHttp("/health")
+                                    .forPort(9000));
+
     static {
         POSTGRES.start();
+        OBJECT_STORE.start();
     }
 
     @DynamicPropertySource
@@ -50,6 +66,18 @@ public abstract class CatalogTestBase {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add(
+                "pos.storage.endpoint",
+                () ->
+                        "http://%s:%d"
+                                .formatted(
+                                        OBJECT_STORE.getHost(), OBJECT_STORE.getMappedPort(9000)));
+        registry.add("pos.storage.bucket", () -> "catalog-test-images");
+        registry.add("pos.storage.access-key", () -> "catalog-test");
+        registry.add("pos.storage.secret-key", () -> "catalog-test-secret");
+        registry.add("pos.storage.path-style", () -> "true");
+        registry.add("pos.storage.create-bucket", () -> "true");
+        registry.add("pos.storage.region", () -> "us-east-1");
     }
 
     @Autowired protected ProductRepository products;

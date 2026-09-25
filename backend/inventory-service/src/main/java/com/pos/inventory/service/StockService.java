@@ -37,6 +37,7 @@ public class StockService {
     private final StockBatchRepository batches;
     private final StockLedgerService ledger;
     private final InventoryEventPublisher events;
+    private final com.pos.inventory.repository.ProductDetailsRepository productDetails;
 
     /** One product's worth of a delivery. */
     public record ReceiptLine(
@@ -186,6 +187,75 @@ public class StockService {
         events.stockDeducted(saleId, branchId, deducted);
     }
 
+    // --- returns to suppliers ----------------------------------------------------
+
+    /** One product going back to its supplier; the batch where the branch knows it. */
+    public record SupplierReturnLine(
+            UUID productId, String sku, String batchNumber, BigDecimal quantity) {}
+
+    /**
+     * Takes goods sent back to a supplier off the shelf: out of the batch a line names first, then
+     * soonest-expiring for whatever that batch does not cover. As with a sale, the goods have gone
+     * whether or not the books knew of them, so a shortfall is still recorded, and flagged.
+     */
+    @Transactional
+    public void returnToSupplier(UUID returnId, UUID branchId, List<SupplierReturnLine> lines) {
+        for (SupplierReturnLine line : lines) {
+            StockItem item = findOrCreateItem(line.productId(), branchId, line.sku());
+            StockLedgerService.MovementContext context =
+                    StockLedgerService.MovementContext.of(
+                                    MovementType.SUPPLIER_RETURN, "SupplierReturn", returnId)
+                            .withReason("SUPPLIER_RETURN");
+            BigDecimal remaining = line.quantity();
+
+            if (line.batchNumber() != null && !line.batchNumber().isBlank()) {
+                StockBatch named =
+                        batches.findByStockItemIdAndBatchNumber(item.getId(), line.batchNumber())
+                                .orElse(null);
+                if (named != null && named.getQuantity().signum() > 0) {
+                    BigDecimal taken = named.getQuantity().min(remaining);
+                    named.consume(taken);
+                    batches.save(named);
+                    ledger.record(item, named, taken.negate(), context);
+                    remaining = remaining.subtract(taken);
+                }
+            }
+
+            if (remaining.signum() > 0) {
+                List<StockBatch> sellable = batches.findSellable(item.getId());
+                AllocationResult allocation =
+                        FefoAllocator.allocate(
+                                sellable.stream().map(StockBatch::toAvailable).toList(), remaining);
+                for (Allocation part : allocation.allocations()) {
+                    StockBatch batch =
+                            sellable.stream()
+                                    .filter(candidate -> candidate.getId().equals(part.batchId()))
+                                    .findFirst()
+                                    .orElseThrow();
+                    batch.consume(part.quantity());
+                    batches.save(batch);
+                    ledger.record(item, batch, part.quantity().negate(), context);
+                }
+                if (allocation.isShort()) {
+                    ledger.record(
+                            item,
+                            null,
+                            allocation.shortfall().negate(),
+                            context.withReason("UNTRACKED_SHORTFALL"));
+                    log.warn(
+                            "Supplier return {} sent {} of product {} at branch {} that inventory"
+                                    + " did not have",
+                            returnId,
+                            allocation.shortfall(),
+                            line.productId(),
+                            branchId);
+                    events.negativeStock(item, line.quantity(), "SUPPLIER_RETURN", returnId);
+                }
+            }
+            raiseLowStockIfNeeded(item);
+        }
+    }
+
     // --- returns ----------------------------------------------------------------
 
     /**
@@ -268,6 +338,17 @@ public class StockService {
                         () -> {
                             StockItem created = new StockItem(productId, branchId);
                             created.setSku(sku);
+                            productDetails
+                                    .findByProductId(productId)
+                                    .ifPresent(
+                                            details -> {
+                                                if (details.getSku() != null) {
+                                                    created.setSku(details.getSku());
+                                                }
+                                                created.setProductName(details.getName());
+                                                created.setUnitOfMeasure(
+                                                        details.getUnitOfMeasure());
+                                            });
                             return items.save(created);
                         });
     }
@@ -283,6 +364,15 @@ public class StockService {
     @Transactional
     public int refreshProductDetails(
             UUID productId, String sku, String name, String unitOfMeasure) {
+        com.pos.inventory.domain.ProductDetails details =
+                productDetails
+                        .findByProductId(productId)
+                        .orElseGet(() -> new com.pos.inventory.domain.ProductDetails(productId));
+        details.setSku(sku);
+        details.setName(name);
+        details.setUnitOfMeasure(unitOfMeasure);
+        productDetails.save(details);
+
         List<StockItem> affected = items.findByProductId(productId);
         for (StockItem item : affected) {
             item.setSku(sku);

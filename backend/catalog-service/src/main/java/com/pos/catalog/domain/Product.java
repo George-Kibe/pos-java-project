@@ -88,6 +88,10 @@ public class Product extends BaseEntity {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    /** The image's object key in storage; null when the product has no uploaded image. */
+    @Column(name = "image_key", length = 300)
+    private String imageKey;
+
     @OneToMany(
             mappedBy = "product",
             cascade = CascadeType.ALL,

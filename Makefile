@@ -54,6 +54,7 @@ env-sync: check-env ## Add generated secrets that a newer .env.example introduce
 		if grep -qE "^$${key}=$$" $(ENV_FILE); then \
 			sed -i "s|^$${key}=$$|$${key}=$${secret}|" $(ENV_FILE); \
 		else \
+			[ -z "$$(tail -c 1 $(ENV_FILE))" ] || echo >> $(ENV_FILE); \
 			printf '%s=%s\n' "$${key}" "$${secret}" >> $(ENV_FILE); \
 		fi; \
 		echo "Generated $${key}"; \

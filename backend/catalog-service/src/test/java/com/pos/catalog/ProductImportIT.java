@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -94,6 +95,49 @@ class ProductImportIT extends CatalogTestBase {
                 .isEqualTo("Corrected name");
         assertThat(products.findBySku("RERUN-1").orElseThrow().getBasePrice())
                 .isEqualByComparingTo("150.00");
+    }
+
+    @Test
+    @DisplayName("re-importing a product's own barcodes in another order makes the first primary")
+    void reimportReordersBarcodes() {
+        importer.importFrom(
+                stream(
+                        HEADER
+                                + "REORDER-1,Soap,GROCERY,EA,STANDARD,80.00,no,yes,5060007770011|5060007770028\n"));
+
+        ProductImportService.ImportReport second =
+                importer.importFrom(
+                        stream(
+                                HEADER
+                                        + "REORDER-1,Soap,GROCERY,EA,STANDARD,80.00,no,yes,5060007770028|5060007770011\n"));
+
+        assertThat(second.failed()).isZero();
+        List<String> held =
+                jdbc.sql(
+                                "SELECT b.barcode FROM product_barcodes b JOIN products p"
+                                        + " ON p.id = b.product_id WHERE p.sku = 'REORDER-1'"
+                                        + " ORDER BY b.is_primary DESC, b.barcode")
+                        .query(String.class)
+                        .list();
+        assertThat(held).containsExactly("5060007770028", "5060007770011");
+    }
+
+    @Test
+    @DisplayName("a barcode another product holds is refused in words, not in SQL")
+    void aBarcodeHeldElsewhereIsExplained() {
+        importer.importFrom(
+                stream(HEADER + "OWNER-1,Milk,GROCERY,EA,STANDARD,60.00,no,yes,5060006660011\n"));
+
+        ProductImportService.ImportReport report =
+                importer.importFrom(
+                        stream(
+                                HEADER
+                                        + "TAKER-1,Juice,GROCERY,EA,STANDARD,90.00,no,yes,5060006660011\n"));
+
+        assertThat(report.failed()).isEqualTo(1);
+        assertThat(report.errors().get(0).message())
+                .isEqualTo("A barcode on this row already belongs to another product");
+        assertThat(products.findBySku("TAKER-1")).isEmpty();
     }
 
     @Test
