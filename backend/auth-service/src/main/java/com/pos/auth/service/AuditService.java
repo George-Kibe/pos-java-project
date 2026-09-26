@@ -50,6 +50,9 @@ public class AuditService {
     public static final String PIN_FAILED = "pin.failed";
     public static final String PIN_LOCKED = "pin.locked";
     public static final String APPROVAL_GRANTED = "approval.granted";
+    public static final String DEVICE_REGISTERED = "device.registered";
+    public static final String DEVICE_ENROLLED = "device.enrolled";
+    public static final String DEVICE_REVOKED = "device.revoked";
 
     private final AuditEntryRepository repository;
     private final ObjectMapper objectMapper;

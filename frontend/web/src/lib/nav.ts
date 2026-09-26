@@ -33,6 +33,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/branches", label: "Branches", permissions: ["branch:view"], shortcut: "b" },
   { href: "/settings", label: "Settings", permissions: ["branch:manage", "settings:manage"], shortcut: "z" },
   { href: "/audit", label: "Audit", permissions: ["audit:view"], shortcut: "i" },
+  { href: "/devices", label: "Devices", permissions: ["device:view", "device:manage"], shortcut: "3" },
   { href: "/manual", label: "Manual", permissions: [], shortcut: "2" },
   { href: "/account", label: "Account", permissions: [], shortcut: "a" },
 ];

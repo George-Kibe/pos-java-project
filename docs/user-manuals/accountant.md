@@ -21,7 +21,7 @@ New to the system? Read [Getting started](getting-started.md) first.
 ## What your role covers
 
 Your menu: **Dashboard**, **Reports**, **Stock**, **Purchasing**, **Expenses**, **Suppliers**,
-**Audit**, **Account**.
+**Audit**, **Manual**, **Account**.
 
 **Reports** cover every branch; stock and deliveries show the branches you are assigned to. You
 record and clear supplier invoices, record suppliers' credit notes,

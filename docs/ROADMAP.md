@@ -1519,6 +1519,55 @@ lists the reader's own manual first, and the dashboard links straight to it. The
 it at `MANUALS_DIR` - so the screen and the repository cannot disagree. `manual.spec` follows both
 ways in.
 
+Each manual also downloads as a PDF (`/api/manuals/<slug>`, signed-in users only), drawn by pdfmake
+from the same Markdown, so a printed copy is the current text with its print date. pdfmake is a
+server external package so its Roboto fonts ship in the standalone image; it may read no URL and no
+file but those fonts. Rendering the PDFs caught a wrapped line in the cashier manual that Markdown
+had turned into a list item.
+
+---
+
+## Site access: staff work only from branches and head office ✅
+
+The POS is reachable only from the business's own premises, so a password used at home or on a
+personal phone gets nobody in.
+
+- **The network.** Production runs behind Traefik (`docker-compose.prod.yml`, `make prod-up`),
+  brought forward from Phase 16 for this: TLS by Let's Encrypt, and an `ipAllowList` of the
+  branches' and head office's static router addresses (`ALLOWED_CLIENT_NETWORKS`) on the
+  connection's own address, which a client cannot forge. Routes come from a file, so Traefik never
+  needs the Docker socket. The gateway re-checks the same list (`ClientNetworkFilter`, a 403
+  `access.network_denied` before any token is read); M-Pesa's callbacks are the one open path, and
+  payment-service still authenticates them by their secret token. The web app forwards the
+  browser's address on every gateway call, not only on sign-in. `ClientNetworkIT` covers a branch,
+  a home, a forged header, a malformed one and the callbacks; Traefik and the whole chain were
+  checked by hand against the running stack.
+- **Development** binds every published port to `127.0.0.1`.
+- **Deploying:** [DEPLOYMENT.md](DEPLOYMENT.md) runs from a bare VPS to each branch's acceptance
+  test. Writing it found two gaps in the production overlay, now closed: auth-service had no
+  signing keystore (a new key at every start, so a restart broke every signed-in session) - it
+  now reads `secrets/jwt-keystore.p12` as a Compose secret, and refuses to start without
+  `JWT_KEYSTORE_PASSWORD`; and email links pointed at `localhost` - `APP_BASE_URL` is now
+  `https://POS_DOMAIN`.
+- **Registered devices.** In production (`DEVICE_REGISTRATION_REQUIRED`) a sign-in must come from a
+  till or computer a manager has registered, so a password on a personal phone on the shop's wifi
+  is refused too. **Devices** (`device:manage`, branch managers) registers one and shows an
+  eight-character code once; typed on the device's **Register this device** page, it makes the
+  device active and the BFF keeps its secret in an encrypted httpOnly cookie (400 days, kept
+  across sign-outs) that sign-in presents. Codes and secrets are stored only as hashes; a code works
+  once, for 30 minutes, and is rate-limited per address like a login. A session remembers its
+  device: revoking the device ends its sessions at their next refresh, and a session begun without
+  one does not outlive the requirement being switched on. The administrator is exempt - still
+  only on an allowed network - so a branch's first device can be registered. Checked after the
+  password, so the refusal tells nothing to someone without it. `DeviceIT` runs with registration
+  required; `devices.spec` follows a manager, a till and a revocation through the screens.
+  Rotating `WEB_SESSION_SECRET` makes every device's cookie unreadable: each must be registered
+  again.
+- **Found on the way:** the gateway's `forward-headers-strategy: framework` took the *leftmost*
+  `X-Forwarded-For` entry as the client, so anyone could choose their own address - dodging the
+  per-address login limit, and fooling the M-Pesa callback IP check where it is enabled. It is
+  now `native`: Tomcat reads the header from the right, past our own proxies.
+
 ---
 
 ## Phase 16 — Hardening & production deployment
@@ -1546,7 +1595,7 @@ Security:
 
 Production:
 - Multi-stage distroless images, non-root users, pinned digests, resource limits, restart policies
-- `docker-compose.prod.yml` + Traefik with automatic TLS
+- ~~`docker-compose.prod.yml` + Traefik with automatic TLS~~ - done with site access, above
 - Docker secrets rather than `.env`; documented rotation procedure
 - Nightly `pg_dump` off-site **with a restore actually rehearsed**, Kafka retention per topic
 - Runbooks: deploy, rollback, restore, DLT replay, key rotation, incident response

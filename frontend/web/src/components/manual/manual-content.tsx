@@ -1,8 +1,10 @@
+import { FileDown } from "lucide-react";
 import Link from "next/link";
 import Markdown from "react-markdown";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
 
+import { buttonVariants } from "@/components/ui/button";
 import { manualHref } from "@/lib/manuals";
 
 /**
@@ -36,5 +38,18 @@ export function ManualContent({ markdown }: { markdown: string }) {
         {markdown}
       </Markdown>
     </article>
+  );
+}
+
+/**
+ * A manual as a PDF. A plain link with no `download` attribute: the handler answers
+ * `Content-Disposition: attachment`, and the attribute makes Chrome cancel such downloads.
+ */
+export function PdfLink({ slug, label = "Download PDF" }: { slug: string; label?: string }) {
+  return (
+    <a href={`/api/manuals/${slug}`} className={buttonVariants({ variant: "outline" })} data-testid={`manual-pdf-${slug}`}>
+      <FileDown aria-hidden />
+      {label}
+    </a>
   );
 }

@@ -8,6 +8,7 @@ New to the system? Read [Getting started](getting-started.md) first.
 
 - [What only you can do](#what-only-you-can-do)
 - [Setting up a new branch](#setting-up-a-new-branch)
+- [Devices](#devices)
 - [People and roles](#people-and-roles)
 - [Suppliers](#suppliers)
 - [Tax classes and rates](#tax-classes-and-rates)
@@ -33,11 +34,21 @@ Your role holds every permission, including these no other seeded role has:
 | Receipt text, email wording, the expense approval limit | **Settings** |
 | Record head office's expenses | **Expenses** → Head office |
 | Act at any branch without being assigned to it | everywhere |
+| Sign in on a device that is not registered (on a branch or head office network) | sign-in |
+
+Signing in from an unregistered device is what lets you register a branch's first devices, and
+replace one when a manager cannot. Everyone else - managers included - signs in only on a
+registered device.
 
 The first administrator account is created when the system is installed. Keep at least two
 administrators, so one can always reach the other's account.
 
 ## Setting up a new branch
+
+Before it opens, get the branch's **internet address** from its internet provider - a **static**
+one, and the backup line's too if it has one - and have whoever runs the server add it to the
+allowed networks. Until then the POS will not open at that branch: staff can use it only from a
+branch or head office connection.
 
 1. **Branches** (Alt+B) → create it with a **code** (permanent) and a **name**. Set its **time zone**
    (Africa/Nairobi) and tick **Open for trading**.
@@ -46,8 +57,51 @@ administrators, so one can always reach the other's account.
    phone and tax PIN. The preview shows it as the till prints it.
 4. **Cash**: the branch's default **cash limit** for tills.
 5. **Pricing**: a branch price list, only if its prices differ from the base prices.
-6. Tills number themselves (Till 1, Till 2…) the first time a device opens a shift there; rename them
+6. **Devices** (Alt+3): register at least the branch manager's computer - see
+   [Devices](#devices) below. Until one is registered, nobody but you can sign in there; the
+   manager can register the tills after that.
+7. Tills number themselves (Till 1, Till 2…) the first time a device opens a shift there; rename them
    under **Cash → Tills** if you like.
+
+## Devices
+
+Staff sign in only on tills and computers registered under **Devices** (Alt+3). Branch managers
+register their own branches' devices; you can register them at any branch, and you are the only
+one who can sign in on a device that is **not** registered - which is how a branch gets its first.
+
+### Registering a device
+1. Sign in - on any computer, as long as it is on a branch or head office connection.
+2. Menu → **Devices** → choose the **Branch** → type a **Name** staff will recognise (Till 1,
+   Back office PC, HQ Accounts laptop) → **Register**.
+3. A **code** (eight characters, like `K7RM-2QXP`) is shown **once**. Write it down or keep the
+   window open; choose **Done** when you have it.
+4. On the device itself, open the POS. On the sign-in page choose **Register it** (below the
+   **Sign in** button), type the code - capitals, spaces and the dash don't matter - and choose
+   **Register device**. The page says **Device registered** - "This device is Till 1 at
+   Westlands".
+5. **Sign in** there as usual. The sign-in page and **Account** now name the device.
+
+The code works **once** and for **30 minutes**. If it runs out, **Cancel** that entry and register
+again. To register the computer you are sitting at, do steps 2-4 on it: go to **Register this
+device** (the sign-in page's **Register it** link, or `/register-device`) while signed in.
+
+### A new branch's first device
+The branch manager cannot sign in until the branch has a registered device, so register one for
+them - their office computer is usual - by either:
+- going to the branch and doing the steps above on that computer, or
+- registering it from head office and giving the manager the code (by phone is fine); they type it
+  on that computer within 30 minutes.
+
+The manager then registers the tills themselves (see the
+[branch manager manual](branch-manager.md#devices)).
+
+### Revoking a device
+**Revoke** on its row, and say why (replaced, lost, stolen). Everyone signed in on it is signed out
+within minutes and nobody can sign in on it again; to use it again, register it anew. Every
+registration and revocation is in **Audit** as `device.registered`, `device.enrolled` and
+`device.revoked`.
+
+Register only the business's own equipment - never a personal phone.
 
 ## People and roles
 
@@ -122,6 +176,15 @@ count once, in the business-wide profit and loss - never shared out over the bra
 
 **A till charges the wrong tax.** Check the product's tax class and the class's rates in Catalog
 setup. A new rate applies from its start date; it cannot be backdated.
+
+**Nobody at a branch can open the POS** ("can only be used from a branch or head office
+network"). The branch's internet address has changed - a new provider, a new line, or the backup
+line taking over. Get the address it now has and have it added to the allowed networks; ask the
+provider for a static address if it keeps changing.
+
+**"This device is not registered for the POS"** on a till that used to work. Its registration was
+revoked, or the browser's data was cleared. **Devices**: revoke the old entry if it is still there,
+register the till again and type the new code on it.
 
 **A new branch can't sell.** It must be **open for trading**, and the cashier assigned to it. The
 till gets its number on its first shift there.

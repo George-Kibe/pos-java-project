@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { clientHeaders } from "@/lib/api/client-headers";
 import { clearedCookies } from "@/lib/session/cookies";
 import { currentSession } from "@/lib/session/current";
-import { CHANGE_PASSWORD_PATH, isPublicPath } from "@/lib/session/redirects";
+import { CHANGE_PASSWORD_PATH, isAnySessionPath, isPublicPath } from "@/lib/session/redirects";
 
 /**
  * The one place a session is refreshed.
@@ -36,7 +36,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!session) {
-    if (publicPath) {
+    if (publicPath || isAnySessionPath(pathname)) {
       return NextResponse.next();
     }
     const response = api

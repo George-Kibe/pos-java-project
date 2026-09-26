@@ -1,0 +1,67 @@
+# Production overlay: `make prod-up`, on top of docker-compose.yml and docker-compose.services.yml.
+#
+# Traefik is the only door. Staff reach the POS from a branch or head office network only
+# (ALLOWED_CLIENT_NETWORKS, enforced at the edge and again by the gateway), and sign in only on a
+# registered device. Nothing else is published: the web app and the gateway are reachable on the
+# private network alone.
+
+services:
+  traefik:
+    image: traefik:v3.7.13
+    container_name: pos-traefik
+    restart: unless-stopped
+    networks: [pos]
+    ports:
+      - "80:80"
+      - "443:443"
+    command: ["--configFile=/etc/traefik/traefik.yml"]
+    environment:
+      POS_DOMAIN: ${POS_DOMAIN:?POS_DOMAIN is required in production - the address staff open}
+      ALLOWED_CLIENT_NETWORKS: ${ALLOWED_CLIENT_NETWORKS:?ALLOWED_CLIENT_NETWORKS is required in production - the branch and head office router addresses}
+      TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required in production - for the TLS certificate}
+    volumes:
+      - ../traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ../traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - traefik_certificates:/letsencrypt
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      web:
+        condition: service_healthy
+
+  # Staff sign in only on the tills and computers a manager has registered (Devices).
+  auth-service:
+    environment:
+      DEVICE_REGISTRATION_REQUIRED: "true"
+      # A signing key that survives restarts: without it auth-service makes a new one each start,
+      # and every session's access token stops verifying. See docs/DEPLOYMENT.md for keytool.
+      JWT_KEYSTORE_PATH: /run/secrets/jwt-keystore.p12
+      JWT_KEYSTORE_PASSWORD: ${JWT_KEYSTORE_PASSWORD:?JWT_KEYSTORE_PASSWORD is required in production - the keystore's password}
+    secrets:
+      - source: jwt-keystore
+        target: jwt-keystore.p12
+
+  # Links in emails (password resets) point at the real site, not localhost.
+  notification-service:
+    environment:
+      APP_BASE_URL: https://${POS_DOMAIN}
+
+  web:
+    ports: !reset []
+
+  api-gateway:
+    ports: !reset []
+    environment:
+      ALLOWED_CLIENT_NETWORKS: ${ALLOWED_CLIENT_NETWORKS:?ALLOWED_CLIENT_NETWORKS is required in production}
+
+secrets:
+  jwt-keystore:
+    # secrets/ at the repository root is git-ignored.
+    file: ../../secrets/jwt-keystore.p12
+
+volumes:
+  traefik_certificates:
+    name: pos-traefik-certificates

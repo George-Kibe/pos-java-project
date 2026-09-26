@@ -36,7 +36,7 @@ spring:
             - id: auth-service
               uri: ${AUTH_SERVICE_URI:http://localhost:8081}
               predicates:
-                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/roles/**,/api/v1/permissions/**,/api/v1/branches/**,/api/v1/audit/**
+                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/roles/**,/api/v1/permissions/**,/api/v1/branches/**,/api/v1/audit/**,/api/v1/devices/**,/api/v1/device-enrolments
               filters:
                 - name: CircuitBreaker
                   args:
@@ -199,7 +199,11 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
-  forward-headers-strategy: framework
+  # Tomcat's RemoteIpValve: it reads X-Forwarded-For from the right, past proxies on the private
+  # networks (Traefik, the web app), so the client is the address the edge really saw. The
+  # "framework" strategy took the leftmost entry - one the client writes itself - and so let anyone
+  # choose their own address past the network allowlist, the login limit and the callback check.
+  forward-headers-strategy: native
   error:
     whitelabel:
       enabled: false
@@ -272,6 +276,8 @@ pos:
       - /api/v1/auth/logout
       - /api/v1/auth/forgot-password
       - /api/v1/auth/reset-password
+      # A device's enrolment code is its credential, typed before anyone can sign in there.
+      - /api/v1/device-enrolments
       # Daraja cannot present a token; payment-service authenticates these by a secret path segment.
       - /api/v1/payments/mpesa/callbacks/**
       - /.well-known/jwks.json
@@ -284,6 +290,11 @@ pos:
       issuer: ${JWT_ISSUER:http://localhost:8081}
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    client-access:
+      # The branches' and head office's router addresses (or CIDR ranges), comma-separated. Traefik
+      # enforces the same list at the edge; empty admits every network, as in development, where
+      # the published ports are bound to this machine instead.
+      allowed-networks: ${ALLOWED_CLIENT_NETWORKS:}
     rate-limit:
       enabled: true
       # Tight: these are the endpoints worth brute forcing, and a person signs in a few times a day.

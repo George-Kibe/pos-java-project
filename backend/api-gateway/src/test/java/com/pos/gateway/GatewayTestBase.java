@@ -61,7 +61,11 @@ public abstract class GatewayTestBase {
 
     /** Stands in for auth-service: serves the JWKS and any downstream endpoint under test. */
     static final WireMockServer DOWNSTREAM =
-            new WireMockServer(WireMockConfiguration.options().dynamicPort());
+            // HTTP/1.1 only, like the Tomcat services it stands in for: the JDK client offers every
+            // plain-HTTP call an h2c upgrade, which Tomcat ignores but WireMock's Jetty accepts and
+            // then intermittently resets - an EOF the circuit breaker reports as the service down.
+            new WireMockServer(
+                    WireMockConfiguration.options().dynamicPort().http2PlainDisabled(true));
 
     private static final RSAKey SIGNING_KEY = generateSigningKey();
 

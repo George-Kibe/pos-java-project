@@ -18,12 +18,35 @@ public class AuthProperties {
     private final PasswordReset passwordReset = new PasswordReset();
     private final Bootstrap bootstrap = new Bootstrap();
     private final Approval approval = new Approval();
+    private final Devices devices = new Devices();
 
     /**
      * Role granted to a self-registered user once verified. Empty by default: a new account should
      * be able to do nothing at all until an administrator assigns it a role.
      */
     private String defaultRole = "";
+
+    /** The devices staff may sign in from. */
+    @Getter
+    @Setter
+    public static class Devices {
+        /**
+         * Whether a sign-in must come from a registered device. On in production; off in
+         * development, where every port is bound to this machine instead.
+         */
+        private boolean required = false;
+
+        /**
+         * Roles that may sign in from any device on an allowed network. The administrator, so the
+         * first device can be registered and a lost one replaced - never a role that serves at a
+         * till.
+         */
+        private java.util.List<String> exemptRoles =
+                new java.util.ArrayList<>(java.util.List.of("SUPER_ADMIN"));
+
+        /** How long a registration's code may be typed on the device: time to walk to it. */
+        private Duration enrolmentTtl = Duration.ofMinutes(30);
+    }
 
     /** Supervisor approvals at the lane. */
     @Getter

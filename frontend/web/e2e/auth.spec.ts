@@ -99,7 +99,7 @@ test("a cashier and a manager see different navigation", async ({ page }) => {
   await signIn(page, cashier.email, PASSWORD);
   await expect(page).toHaveURL(/\/lane$/);
   const cashierNav = page.getByRole("navigation", { name: "Main" });
-  await expect(cashierNav.getByRole("link")).toHaveText([/Till/, /Account/]);
+  await expect(cashierNav.getByRole("link")).toHaveText([/Till/, /Manual/, /Account/]);
   await expect(page.getByTestId("branch-name")).toBeVisible();
   await page.goto("/dashboard");
   await expect(page.getByText("Not available to you")).toBeVisible();
@@ -124,7 +124,7 @@ test("a cashier and a manager see different navigation", async ({ page }) => {
   // Everything BRANCH_MANAGER grants, and nothing it does not: no permission for roles to be
   // changed is needed to view them, so Roles shows; there is no report:view, only :branch.
   await expect(managerNav.getByRole("link")).toHaveText([
-    /Till/, /Dashboard/, /Reports/, /Pricing/, /Stock/, /Purchasing/, /Expenses/, /Suppliers/, /Customers/, /Cash/, /Users/, /Roles/, /Branches/, /Audit/, /Account/,
+    /Till/, /Dashboard/, /Reports/, /Pricing/, /Stock/, /Purchasing/, /Expenses/, /Suppliers/, /Customers/, /Cash/, /Users/, /Roles/, /Branches/, /Audit/, /Devices/, /Manual/, /Account/,
   ]);
   await expect(page.getByTestId("dashboard-figures")).toBeVisible();
 });

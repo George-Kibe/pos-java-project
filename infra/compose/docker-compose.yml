@@ -61,7 +61,7 @@ services:
       REPORTING_DB_USER: ${REPORTING_DB_USER:-reporting_user}
       REPORTING_DB_PASSWORD: ${REPORTING_DB_PASSWORD:?required}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       # Postgres 18 keeps its data under a versioned directory inside /var/lib/postgresql and
       # refuses to start with a volume on the old .../data path. A major upgrade cannot reuse the
@@ -104,7 +104,7 @@ services:
       KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_HEAP_OPTS: "-Xmx1G -Xms512M"
     ports:
-      - "${KAFKA_EXTERNAL_PORT:-29092}:29092"
+      - "127.0.0.1:${KAFKA_EXTERNAL_PORT:-29092}:29092"
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
@@ -170,7 +170,7 @@ services:
       - --maxmemory-policy
       - noeviction
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:

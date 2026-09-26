@@ -143,19 +143,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * The originating client, honouring {@code X-Forwarded-For}.
-     *
-     * <p>Behind Traefik every request would otherwise appear to come from the proxy, collapsing all
-     * per-IP limits into one shared bucket and making them useless.
+     * The originating client, as Tomcat's RemoteIpValve found it: X-Forwarded-For read from the
+     * right, past our own proxies. Behind Traefik and the web app every request would otherwise
+     * come from a proxy, collapsing every per-IP limit into one bucket; and the leftmost entry,
+     * which the client writes itself, would let anyone pick a fresh bucket per attempt.
      */
     private static String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            String first = forwarded.split(",")[0].trim();
-            if (!first.isEmpty()) {
-                return first;
-            }
-        }
         return request.getRemoteAddr();
     }
 }

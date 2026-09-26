@@ -214,6 +214,9 @@ sale, **P** print, **E** email.
 
 ## When something goes wrong
 
+**"This device is not registered for the POS."** You can sign in only on the shop's own tills.
+If this is one, its registration has been lost: call your manager to register it again.
+
 **An item won't scan and can't be found.** It may not be in the catalogue yet, or its barcode was
 never added. Set it aside and tell your supervisor - you cannot sell an item the system doesn't
 know.
@@ -225,8 +228,8 @@ price is corrected.
 **"Cash payments paused".** Your drawer is over its limit. Call your supervisor for a deposit
 (**Alt+C**). Card and M-Pesa still work meanwhile.
 
-**The M-Pesa prompt never arrived, or timed out.** Check the number with the customer and try again
-- or take another payment. Don't send prompt after prompt: if the customer thinks they paid, call
+**The M-Pesa prompt never arrived, or timed out.** Check the number with the customer and try
+again, or take another payment. Don't send prompt after prompt: if the customer thinks they paid, call
 your supervisor.
 
 **The card terminal declined.** Choose **Declined**, then take another payment.

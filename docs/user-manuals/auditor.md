@@ -18,7 +18,11 @@ New to the system? Read [Getting started](getting-started.md) first.
 ## What you can see
 
 Your menu: **Dashboard**, **Reports**, **Stock**, **Purchasing**, **Expenses**, **Suppliers**,
-**Users**, **Roles**, **Branches**, **Audit**, **Account**.
+**Users**, **Roles**, **Branches**, **Audit**, **Devices**, **Manual**, **Account**.
+
+**Devices** lists the tills and computers each of your branches may sign in on, and when each was
+last used; `device.registered`, `device.enrolled` and `device.revoked` in the audit trail say who
+registered or revoked one, and why.
 
 **Reports** cover every branch. **Stock** and **Purchasing** show the branches you are assigned
 to - ask the administrator to assign you to each branch you audit. Buttons that change things

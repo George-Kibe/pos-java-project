@@ -4,7 +4,7 @@ A guide for everyone who works with the Realhive POS, one per role. Keep yours t
 are stuck on a screen, look up what you were trying to do in your manual.
 
 **Inside the POS:** choose **Manual** in the menu (Alt+2), or the manual button on the dashboard,
-to read your manual on screen.
+to read your manual on screen or download it as a PDF.
 
 **Start here if you are new:** [Getting started](getting-started.md) covers signing in, your
 password, the menu and its keyboard shortcuts - things every role shares.

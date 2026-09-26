@@ -139,6 +139,15 @@ Rules:
 - Forward the caller's token to a downstream service with `AuthenticatedUser.bearerToken()` - the
   token the resource server verified - rather than re-reading the `Authorization` header.
 - Services validate the JWT themselves via JWKS. The gateway is not the only line of defence.
+- **Staff work only from a branch's or head office's network.** Production's Traefik admits
+  `ALLOWED_CLIENT_NETWORKS` alone and the gateway's `ClientNetworkFilter` checks the same list;
+  M-Pesa's callbacks are the one open path (`pos.gateway.client-access.open-paths`). A new
+  public path that a provider calls needs listing there and as a Traefik route. Development binds
+  every published port to `127.0.0.1` instead - do not publish one on all interfaces.
+- **And only on registered devices** (production, `pos.auth.devices.required`). The device's
+  secret lives in the `pos_device` cookie, which sign-out never clears; the login route presents
+  it, and a refresh re-checks the session's device. A new way to start a session must do the same,
+  or it is a way round the rule.
 - Never log tokens, OTPs, passwords, M-Pesa credentials, or full customer phone numbers. The
   logging masker in `common-lib` covers the known fields — extend it when adding new sensitive ones.
 - Never store card data. Card payments record a terminal reference and approval code only.
@@ -412,6 +421,15 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   database needs `ALTER EXTENSION ... SET SCHEMA` by hand, like any other init-script change.
   Default operator classes (catalog's `btree_gist`) are found without this; a named one is not.
 
+- **`forward-headers-strategy: framework` believes the leftmost `X-Forwarded-For`**, which the
+  client writes itself: anyone could name their own address past the network allowlist, the login
+  rate limit and the callback IP check. The gateway uses `native` - Tomcat's RemoteIpValve reads
+  the header from the right, past proxies on the private networks - and `getRemoteAddr()` is then
+  the address the edge saw. Never read `X-Forwarded-For` by hand for a security decision.
+- **WireMock's Jetty accepts the JDK client's h2c upgrade and then resets streams**, which the
+  circuit breaker reports as the service down (a 503 from the fallback) - intermittently, and
+  first in a fresh context. Tomcat ignores the upgrade, so production is unaffected; the gateway's
+  stub runs with `http2PlainDisabled(true)`.
 - **Kafka listeners must not run on virtual threads (Java 21).** `spring.threads.virtual.enabled`
   puts listener containers on virtual threads, and the consumer coordinator works - and logs -
   inside `synchronized` methods. In a rebalance every listener blocks there on the log appender's
