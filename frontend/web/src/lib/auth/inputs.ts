@@ -43,4 +43,13 @@ export const ChangePasswordInput = z.object({
     .max(128),
 });
 
+/** The token from the reset email's link, and the new password. */
+export const ResetPasswordInput = z.object({
+  token: z.string().min(1, "This link is incomplete. Open the one in the email again.").max(512),
+  newPassword: z
+    .string()
+    .min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters`)
+    .max(128),
+});
+
 export const BranchInput = z.object({ branchId: z.uuid() });

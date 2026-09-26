@@ -19,7 +19,8 @@ export function NavLinks({ items }: { items: NavItem[] }) {
     function onKeyDown(event: KeyboardEvent) {
       if (!event.altKey || event.ctrlKey || event.metaKey) return;
       // The physical key, not the character: on a Mac, Alt+A types "å".
-      const item = items.find((candidate) => event.code === `Key${candidate.shortcut.toUpperCase()}`);
+      const code = (shortcut: string) => (/^\d$/.test(shortcut) ? `Digit${shortcut}` : `Key${shortcut.toUpperCase()}`);
+      const item = items.find((candidate) => event.code === code(candidate.shortcut));
       if (item) {
         event.preventDefault();
         router.push(item.href);

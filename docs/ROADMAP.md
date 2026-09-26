@@ -1498,6 +1498,29 @@ met; `make api-smoke` with no 5xx:**
 
 ---
 
+## User manuals (after profit and loss) ✅
+
+A manual per role in [docs/user-manuals](user-manuals/README.md) - cashier, supervisor, branch
+manager, stock controller, accountant, auditor, administrator - plus a shared getting-started guide,
+written from the screens as they are: menus, labels, shortcuts, and what to do when stuck.
+
+Writing them against the running system found two gaps, fixed with them:
+- **A password reset led nowhere.** The reset email linked to `/reset-password`, which did not
+  exist, and there was no "Forgot your password?" - so a forced reset locked a person out. Both
+  pages now exist, through BFF routes that never hold a token; `access.spec` follows the emailed
+  link, signs in with the new password and checks the link works once. The forms read their fields
+  on submit, so text typed before the page finishes loading is not lost.
+- **Alt+E meant two things on the till**: exchanging notes, and (since profit and loss) the
+  Expenses page. Expenses is Alt+1, and the navigation test now reads the till's own shortcuts.
+
+The manuals are also read in the POS: **Manual** in the menu (Alt+2, everyone, the till included)
+lists the reader's own manual first, and the dashboard links straight to it. The pages render
+`docs/user-manuals` itself - the web image copies the folder in as a named build context and reads
+it at `MANUALS_DIR` - so the screen and the repository cannot disagree. `manual.spec` follows both
+ways in.
+
+---
+
 ## Phase 16 — Hardening & production deployment
 
 **Goal:** it survives contact with the real world.

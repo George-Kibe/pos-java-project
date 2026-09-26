@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { SHORTCUTS } from "@/components/lane/checkout";
+
 import { homeFor, NAV, visibleNav } from "./nav";
 
 // The permissions auth-service seeds for these roles (V2__seed_roles_and_permissions.sql).
@@ -11,25 +13,25 @@ const labels = (permissions: string[]) => visibleNav(permissions).map((item) => 
 
 describe("navigation by permission", () => {
   it("shows a cashier the till, and not the reports", () => {
-    expect(labels(CASHIER)).toEqual(["Till", "Account"]);
+    expect(labels(CASHIER)).toEqual(["Till", "Manual", "Account"]);
   });
 
   it("shows a branch manager the till and the dashboard", () => {
-    expect(labels(BRANCH_MANAGER)).toEqual(["Till", "Dashboard", "Reports", "Users", "Account"]);
+    expect(labels(BRANCH_MANAGER)).toEqual(["Till", "Dashboard", "Reports", "Users", "Manual", "Account"]);
   });
 
   it("shows the suppliers to whoever buys, and to the administrator who adds them", () => {
-    expect(labels(["purchase:view"])).toEqual(["Purchasing", "Suppliers", "Account"]);
-    expect(labels(["supplier:create"])).toEqual(["Suppliers", "Account"]);
+    expect(labels(["purchase:view"])).toEqual(["Purchasing", "Suppliers", "Manual", "Account"]);
+    expect(labels(["supplier:create"])).toEqual(["Suppliers", "Manual", "Account"]);
   });
 
   it("shows a stock controller the catalogue to manage, and not the prices", () => {
-    expect(labels(["product:view", "product:manage", "inventory:view"])).toEqual(["Products", "Catalog setup", "Stock", "Account"]);
-    expect(labels(["price:manage"])).toEqual(["Pricing", "Account"]);
+    expect(labels(["product:view", "product:manage", "inventory:view"])).toEqual(["Products", "Catalog setup", "Stock", "Manual", "Account"]);
+    expect(labels(["price:manage"])).toEqual(["Pricing", "Manual", "Account"]);
   });
 
-  it("shows someone with no role only their account", () => {
-    expect(labels([])).toEqual(["Account"]);
+  it("shows someone with no role only the manual and their account", () => {
+    expect(labels([])).toEqual(["Manual", "Account"]);
   });
 
   it("starts each person where their work is", () => {
@@ -47,13 +49,15 @@ describe("navigation by permission", () => {
   it("gives every item a distinct shortcut, clear of the lane's own", () => {
     const shortcuts = NAV.map((item) => item.shortcut);
     expect(new Set(shortcuts).size).toBe(shortcuts.length);
-    // Alt+C, L, V, R, X, P and Y belong to the checkout.
-    expect(shortcuts.filter((key) => "clvrxpy".includes(key))).toEqual([]);
+    // Every Alt key the checkout uses: Alt+E exchanging notes once went to Expenses instead.
+    const checkout = SHORTCUTS.flatMap(([keys]) => [...keys.matchAll(/Alt\+([A-Z])/g)].map((m) => m[1].toLowerCase()));
+    expect(checkout).toEqual(expect.arrayContaining(["c", "e", "f"]));
+    expect(shortcuts.filter((key) => checkout.includes(key))).toEqual([]);
   });
 
   it("shows expenses to whoever records, approves or reads them", () => {
     for (const permission of ["expense:record", "expense:approve", "expense:view"]) {
-      expect(labels([permission])).toEqual(["Expenses", "Account"]);
+      expect(labels([permission])).toEqual(["Expenses", "Manual", "Account"]);
     }
   });
 });

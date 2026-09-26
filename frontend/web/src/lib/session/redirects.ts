@@ -9,7 +9,7 @@ export function safeNext(next: string | null | undefined): string {
   return next;
 }
 
-export const PUBLIC_PATHS = ["/login", "/register"] as const;
+export const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"] as const;
 export const CHANGE_PASSWORD_PATH = "/account/password";
 
 export function isPublicPath(pathname: string): boolean {

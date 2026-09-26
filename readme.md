@@ -63,7 +63,10 @@ Scope decisions that shape everything else:
 | Frontend | **Next.js** cashier lane (offline-capable, barcode + thermal printer) and back-office admin. |
 | Build & run | **Maven multi-module**, **Docker Compose** for dev and production, Kubernetes-ready layout. |
 
-Full detail: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md).
+Full detail: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md). For the people who use it, there is a
+manual per role - cashier, supervisor, branch manager, stock controller, accountant, auditor and
+administrator - in [docs/user-manuals](docs/user-manuals/README.md), also readable in the POS from
+the **Manual** menu entry and the dashboard.
 
 ---
 
@@ -195,7 +198,8 @@ pos-java-project/
 ├── docs/
 │   ├── REQUIREMENTS.md
 │   ├── ROADMAP.md
-│   └── ARCHITECTURE.md
+│   ├── ARCHITECTURE.md
+│   └── user-manuals/                # a guide per role, for the people who use the POS
 ├── .github/workflows/ci.yml
 ├── Makefile                         # developer entrypoint - run `make`
 ├── .env.example                     # env contract; `make env` generates .env

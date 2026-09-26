@@ -453,6 +453,9 @@ services:
     build:
       context: ../../frontend/web
       dockerfile: ../../infra/docker/web.Dockerfile
+      # The user manuals live outside the app; the Manual pages read them from this copy.
+      additional_contexts:
+        manuals: ../../docs/user-manuals
     image: pos/web:dev
     container_name: pos-web
     restart: unless-stopped
