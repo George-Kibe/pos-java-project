@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // A self-contained server in .next/standalone: the image carries only what it runs.
   output: "standalone",
   poweredByHeader: false,
+  // The manual PDFs: pdfmake reads its fonts from its own folder, so it is required, not bundled.
+  serverExternalPackages: ["pdfmake"],
+  outputFileTracingIncludes: { "/api/manuals/*": ["./node_modules/pdfmake/fonts/Roboto/*.ttf"] },
   async headers() {
     return [
       {

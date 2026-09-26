@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/admin/page-parts";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PdfLink } from "@/components/manual/manual-content";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth/dal";
 import { type Manual, MANUALS, manualsFor } from "@/lib/manuals";
 
@@ -44,7 +46,10 @@ export default async function ManualIndexPage() {
                 <Link href={`/manual/${manual.slug}`} className="inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline">
                   {manual.title}
                 </Link>
-                <span className="text-muted-foreground"> - {manual.summary}</span>
+                <span className="text-muted-foreground"> - {manual.summary} · </span>
+                <a href={`/api/manuals/${manual.slug}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                  PDF
+                </a>
               </li>
             ))}
           </ul>
@@ -56,13 +61,17 @@ export default async function ManualIndexPage() {
 
 function ManualCard({ manual }: { manual: Manual }) {
   return (
-    <Link href={`/manual/${manual.slug}`} className="rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">
-      <Card className="h-full transition-colors hover:bg-muted/50">
-        <CardHeader>
-          <CardTitle>{manual.title}</CardTitle>
-          <CardDescription>{manual.summary}</CardDescription>
-        </CardHeader>
-      </Card>
-    </Link>
+    <Card className="h-full" data-testid="manual-card">
+      <CardHeader>
+        <CardTitle>{manual.title}</CardTitle>
+        <CardDescription>{manual.summary}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-2">
+        <Link href={`/manual/${manual.slug}`} className={buttonVariants()}>
+          Read
+        </Link>
+        <PdfLink slug={manual.slug} label="PDF" />
+      </CardContent>
+    </Card>
   );
 }

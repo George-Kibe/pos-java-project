@@ -1519,6 +1519,12 @@ lists the reader's own manual first, and the dashboard links straight to it. The
 it at `MANUALS_DIR` - so the screen and the repository cannot disagree. `manual.spec` follows both
 ways in.
 
+Each manual also downloads as a PDF (`/api/manuals/<slug>`, signed-in users only), drawn by pdfmake
+from the same Markdown, so a printed copy is the current text with its print date. pdfmake is a
+server external package so its Roboto fonts ship in the standalone image; it may read no URL and no
+file but those fonts. Rendering the PDFs caught a wrapped line in the cashier manual that Markdown
+had turned into a list item.
+
 ---
 
 ## Phase 16 — Hardening & production deployment

@@ -225,8 +225,8 @@ price is corrected.
 **"Cash payments paused".** Your drawer is over its limit. Call your supervisor for a deposit
 (**Alt+C**). Card and M-Pesa still work meanwhile.
 
-**The M-Pesa prompt never arrived, or timed out.** Check the number with the customer and try again
-- or take another payment. Don't send prompt after prompt: if the customer thinks they paid, call
+**The M-Pesa prompt never arrived, or timed out.** Check the number with the customer and try
+again, or take another payment. Don't send prompt after prompt: if the customer thinks they paid, call
 your supervisor.
 
 **The card terminal declined.** Choose **Declined**, then take another payment.

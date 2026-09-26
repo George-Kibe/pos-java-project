@@ -90,6 +90,9 @@ Every manual is in the POS itself, so you never need to hunt for a copy.
 - **From the dashboard:** if you see the dashboard, the button at its top right opens your
   manual directly (for example **Branch manager manual**).
 
+**Download PDF** (or **PDF** on the list) saves a manual as a PDF to print or keep offline. A
+printed copy says the date it was printed; the one in the POS is always the latest.
+
 Links between manuals work as they do here, and **All manuals** takes you back to the list. If
 your role has no manual of its own, start with Getting started and read the one closest to your
 work.

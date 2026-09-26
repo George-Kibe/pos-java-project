@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { LoadFailure } from "@/components/admin/page-parts";
-import { ManualContent } from "@/components/manual/manual-content";
+import { ManualContent, PdfLink } from "@/components/manual/manual-content";
 import { buttonVariants } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
 import { findManual, readManual } from "@/lib/manuals";
@@ -20,10 +20,11 @@ export default async function ManualPage({ params }: PageProps<"/manual/[slug]">
   const markdown = await readManual(manual);
   return (
     <div className="grid gap-6">
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Link href="/manual" className={buttonVariants({ variant: "outline" })}>
           All manuals
         </Link>
+        {markdown === null ? null : <PdfLink slug={manual.slug} />}
       </div>
       {markdown === null ? <LoadFailure message="This manual could not be read. Ask an administrator." /> : <ManualContent markdown={markdown} />}
     </div>
