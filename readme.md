@@ -500,7 +500,8 @@ error rate, p95 latency, low disk and failed payment callbacks.
 **Development** — `docker-compose.yml` + `docker-compose.dev.yml`: hot reload via Spring DevTools,
 debug ports exposed, seed data; mail through Gmail. Every published port is bound to `127.0.0.1`.
 
-**Production** — `docker-compose.prod.yml` (`make prod-up`): Traefik is the only published
+**Production** — step by step, VPS to every branch tested: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+`docker-compose.prod.yml` (`make prod-up`): Traefik is the only published
 service, terminating TLS with automatic Let's Encrypt certificates and admitting branch and head
 office networks only (`POS_DOMAIN`, `ACME_EMAIL` and `ALLOWED_CLIENT_NETWORKS` in `.env`, all
 required). Still to come in Phase 16: multi-stage distroless images built by CI and pinned by

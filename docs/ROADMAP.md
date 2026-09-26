@@ -1543,6 +1543,12 @@ personal phone gets nobody in.
   a home, a forged header, a malformed one and the callbacks; Traefik and the whole chain were
   checked by hand against the running stack.
 - **Development** binds every published port to `127.0.0.1`.
+- **Deploying:** [DEPLOYMENT.md](DEPLOYMENT.md) runs from a bare VPS to each branch's acceptance
+  test. Writing it found two gaps in the production overlay, now closed: auth-service had no
+  signing keystore (a new key at every start, so a restart broke every signed-in session) - it
+  now reads `secrets/jwt-keystore.p12` as a Compose secret, and refuses to start without
+  `JWT_KEYSTORE_PASSWORD`; and email links pointed at `localhost` - `APP_BASE_URL` is now
+  `https://POS_DOMAIN`.
 - **Registered devices.** In production (`DEVICE_REGISTRATION_REQUIRED`) a sign-in must come from a
   till or computer a manager has registered, so a password on a personal phone on the shop's wifi
   is refused too. **Devices** (`device:manage`, branch managers) registers one and shows an

@@ -36,6 +36,18 @@ services:
   auth-service:
     environment:
       DEVICE_REGISTRATION_REQUIRED: "true"
+      # A signing key that survives restarts: without it auth-service makes a new one each start,
+      # and every session's access token stops verifying. See docs/DEPLOYMENT.md for keytool.
+      JWT_KEYSTORE_PATH: /run/secrets/jwt-keystore.p12
+      JWT_KEYSTORE_PASSWORD: ${JWT_KEYSTORE_PASSWORD:?JWT_KEYSTORE_PASSWORD is required in production - the keystore's password}
+    secrets:
+      - source: jwt-keystore
+        target: jwt-keystore.p12
+
+  # Links in emails (password resets) point at the real site, not localhost.
+  notification-service:
+    environment:
+      APP_BASE_URL: https://${POS_DOMAIN}
 
   web:
     ports: !reset []
@@ -44,6 +56,11 @@ services:
     ports: !reset []
     environment:
       ALLOWED_CLIENT_NETWORKS: ${ALLOWED_CLIENT_NETWORKS:?ALLOWED_CLIENT_NETWORKS is required in production}
+
+secrets:
+  jwt-keystore:
+    # secrets/ at the repository root is git-ignored.
+    file: ../../secrets/jwt-keystore.p12
 
 volumes:
   traefik_certificates:
