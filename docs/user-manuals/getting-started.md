@@ -8,6 +8,7 @@ you are locked out.
 - [If you forget your password](#if-you-forget-your-password)
 - [Changing your password](#changing-your-password)
 - [Finding your way around](#finding-your-way-around)
+- [Reading your manual in the POS](#reading-your-manual-in-the-pos)
 - [Your supervisor PIN](#your-supervisor-pin)
 - [When you are locked out](#when-you-are-locked-out)
 - [Creating your own account](#creating-your-own-account)
@@ -71,12 +72,27 @@ hold **Alt** and press the key. Hover over an entry to see its shortcut.
 | S | Stock | I | Audit |
 | H | Purchasing | A | Account |
 | 1 | Expenses | N | Suppliers |
+| 2 | Manual | | |
 
 On the till, **Alt+C, E, F, L, P, R, V, X and Y** belong to the till itself - see the
 [cashier manual](cashier.md#keyboard-shortcuts).
 
 **Lists and filters.** Most lists have filters at the top (branch, dates, category, a search box)
 and a **Show** button. Long lists are split into pages with **Previous** and **Next**.
+
+## Reading your manual in the POS
+
+Every manual is in the POS itself, so you never need to hunt for a copy.
+
+- **From the menu:** choose **Manual** (Alt+2). It is there for everyone, on the till too. The page
+  shows **Your manual** - the one written for your role, or one for each role if you have several -
+  with **Getting started** beside it. Manuals for the other roles are listed underneath.
+- **From the dashboard:** if you see the dashboard, the button at its top right opens your
+  manual directly (for example **Branch manager manual**).
+
+Links between manuals work as they do here, and **All manuals** takes you back to the list. If
+your role has no manual of its own, start with Getting started and read the one closest to your
+work.
 
 ## Your supervisor PIN
 

@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { Forbidden } from "@/components/forbidden";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError } from "@/lib/api/errors";
 import { gatewayJson } from "@/lib/api/gateway";
 import { type Dashboard, DashboardSchema } from "@/lib/api/schemas";
 import { can, getAccessToken, getActiveBranch, requireUser } from "@/lib/auth/dal";
+import { manualsFor } from "@/lib/manuals";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -39,12 +42,15 @@ export default async function DashboardPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          {branch.name}
-          {dashboard ? ` · ${dashboard.businessDate}` : ""}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            {branch.name}
+            {dashboard ? ` · ${dashboard.businessDate}` : ""}
+          </p>
+        </div>
+        <ManualLink roles={user.roles} />
       </div>
       {failure ? (
         <Alert variant="destructive" className="max-w-xl">
@@ -55,6 +61,17 @@ export default async function DashboardPage() {
         <DashboardFigures dashboard={dashboard} />
       ) : null}
     </div>
+  );
+}
+
+/** The way to the user's own manual: the one for their role, or the list when there are several. */
+function ManualLink({ roles }: { roles: readonly string[] }) {
+  const yours = manualsFor(roles);
+  const only = yours.length === 1 ? yours[0] : undefined;
+  return (
+    <Link href={only ? `/manual/${only.slug}` : "/manual"} className={buttonVariants({ variant: "outline" })} data-testid="dashboard-manual">
+      {only ? `${only.title} manual` : "Your manual"}
+    </Link>
   );
 }
 

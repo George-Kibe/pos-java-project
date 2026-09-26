@@ -1513,6 +1513,12 @@ Writing them against the running system found two gaps, fixed with them:
 - **Alt+E meant two things on the till**: exchanging notes, and (since profit and loss) the
   Expenses page. Expenses is Alt+1, and the navigation test now reads the till's own shortcuts.
 
+The manuals are also read in the POS: **Manual** in the menu (Alt+2, everyone, the till included)
+lists the reader's own manual first, and the dashboard links straight to it. The pages render
+`docs/user-manuals` itself - the web image copies the folder in as a named build context and reads
+it at `MANUALS_DIR` - so the screen and the repository cannot disagree. `manual.spec` follows both
+ways in.
+
 ---
 
 ## Phase 16 — Hardening & production deployment

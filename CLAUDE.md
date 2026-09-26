@@ -24,7 +24,9 @@ update the docs in the same commit.**
 - **Never invent credentials, shortcodes or keys.** If a secret is missing, stop and ask.
 - **The user manuals follow the screens.** `docs/user-manuals` describes, role by role, what each
   person sees and clicks. A change to a screen, a label, a shortcut or who may do something updates
-  the manual for every role it touches, in the same commit.
+  the manual for every role it touches, in the same commit. The POS renders these same files on
+  its **Manual** page; a new manual file is listed in `frontend/web/src/lib/manuals.ts` or the
+  page cannot show it.
 
 ## Commands
 

@@ -13,25 +13,25 @@ const labels = (permissions: string[]) => visibleNav(permissions).map((item) => 
 
 describe("navigation by permission", () => {
   it("shows a cashier the till, and not the reports", () => {
-    expect(labels(CASHIER)).toEqual(["Till", "Account"]);
+    expect(labels(CASHIER)).toEqual(["Till", "Manual", "Account"]);
   });
 
   it("shows a branch manager the till and the dashboard", () => {
-    expect(labels(BRANCH_MANAGER)).toEqual(["Till", "Dashboard", "Reports", "Users", "Account"]);
+    expect(labels(BRANCH_MANAGER)).toEqual(["Till", "Dashboard", "Reports", "Users", "Manual", "Account"]);
   });
 
   it("shows the suppliers to whoever buys, and to the administrator who adds them", () => {
-    expect(labels(["purchase:view"])).toEqual(["Purchasing", "Suppliers", "Account"]);
-    expect(labels(["supplier:create"])).toEqual(["Suppliers", "Account"]);
+    expect(labels(["purchase:view"])).toEqual(["Purchasing", "Suppliers", "Manual", "Account"]);
+    expect(labels(["supplier:create"])).toEqual(["Suppliers", "Manual", "Account"]);
   });
 
   it("shows a stock controller the catalogue to manage, and not the prices", () => {
-    expect(labels(["product:view", "product:manage", "inventory:view"])).toEqual(["Products", "Catalog setup", "Stock", "Account"]);
-    expect(labels(["price:manage"])).toEqual(["Pricing", "Account"]);
+    expect(labels(["product:view", "product:manage", "inventory:view"])).toEqual(["Products", "Catalog setup", "Stock", "Manual", "Account"]);
+    expect(labels(["price:manage"])).toEqual(["Pricing", "Manual", "Account"]);
   });
 
-  it("shows someone with no role only their account", () => {
-    expect(labels([])).toEqual(["Account"]);
+  it("shows someone with no role only the manual and their account", () => {
+    expect(labels([])).toEqual(["Manual", "Account"]);
   });
 
   it("starts each person where their work is", () => {
@@ -57,7 +57,7 @@ describe("navigation by permission", () => {
 
   it("shows expenses to whoever records, approves or reads them", () => {
     for (const permission of ["expense:record", "expense:approve", "expense:view"]) {
-      expect(labels([permission])).toEqual(["Expenses", "Account"]);
+      expect(labels([permission])).toEqual(["Expenses", "Manual", "Account"]);
     }
   });
 });

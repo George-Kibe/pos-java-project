@@ -65,7 +65,8 @@ Scope decisions that shape everything else:
 
 Full detail: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md). For the people who use it, there is a
 manual per role - cashier, supervisor, branch manager, stock controller, accountant, auditor and
-administrator - in [docs/user-manuals](docs/user-manuals/README.md).
+administrator - in [docs/user-manuals](docs/user-manuals/README.md), also readable in the POS from
+the **Manual** menu entry and the dashboard.
 
 ---
 
