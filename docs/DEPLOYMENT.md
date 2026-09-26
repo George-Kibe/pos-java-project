@@ -419,7 +419,10 @@ on the list.
 ## 13. M-Pesa in production
 
 Only when Safaricom has taken the shortcode live on Daraja and you have the production app's
-keys:
+keys. What differs from the sandbox you tested with in development, setting by setting, is in
+[MPESA-CALLBACKS.md section 3](MPESA-CALLBACKS.md#3-from-sandbox-to-production-what-changes). In short:
+every `MPESA_*` value is the production one, the callback URL is the domain rather than a tunnel,
+and the callback token is this server's own.
 
 ```bash
 setenv() { sed -i "s|^$1=.*|$1=$2|" .env; grep -q "^$1=" .env || echo "$1=$2" >> .env; }
@@ -446,10 +449,16 @@ callback.
 If the first push answers `404.001.03 Invalid Access Token` with fresh keys, the Daraja **app** is
 not subscribed to *M-Pesa Express* in the portal - it is not a code or `.env` problem.
 
-Test with a small real payment (acceptance test 9), and check the callback arrived:
+Then prove the callbacks reach the service - from outside the branch networks, then with a small
+real payment (acceptance test 9) settled by the callback rather than the status sweep. The full
+check, with what each answer means, is [MPESA-CALLBACKS.md](MPESA-CALLBACKS.md#4-in-production).
+The short version:
 
 ```bash
-pos logs --since 10m payment-service | grep -i callback
+# from outside every branch network (a phone hotspot): expect 404, not 403
+python3 scripts/mpesa/callback_probe.py --url https://pos.example.co.ke --wrong-token-only
+# on the VPS, while the test payment is made: expect "STK callback for ws_CO_...: result 0"
+pos logs -f --since 1m payment-service | grep -iE "stk|callback"
 ```
 
 ## 14. Day-to-day operations
@@ -569,7 +578,7 @@ echo | openssl s_client -connect pos.example.co.ke:443 -servername pos.example.c
 | Everyone signed out after a restart | auth-service generated a temporary key | `pos logs auth-service \| grep -E "signing key\|ephemeral"`; [section 7](#7-create-the-signing-key) |
 | Password reset emails link to `localhost` | `POS_DOMAIN` unset when notification-service started | Set it and `pos up -d --wait notification-service` |
 | No emails at all | SMTP settings | `pos logs notification-service \| grep -iE "mail\|smtp" \| tail` |
-| M-Pesa sales stay "waiting" | Callback not arriving | `MPESA_CALLBACK_URL` is `https://POS_DOMAIN` exactly; `pos logs payment-service \| grep -i callback` |
+| M-Pesa sales stay "waiting" | Callback not arriving | `MPESA_CALLBACK_URL` is `https://POS_DOMAIN` exactly; [MPESA-CALLBACKS.md](MPESA-CALLBACKS.md#5-troubleshooting) |
 | Containers restarting, `Killed` | Out of memory | `docker stats --no-stream`, add swap or RAM |
 | Docker stops answering | Disk full | `df -h /`; `docker builder prune -f`; `docker image prune -f` |
 

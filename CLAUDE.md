@@ -647,6 +647,10 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   a missing M-Pesa Express subscription in the portal, not a code or `.env` problem.
 - `.env` values cannot carry an inline comment on an otherwise empty value: `KEY= # note` is an
   empty `KEY`. Put the note on its own line.
+- **Sales' payment timeout is a backstop and must outlast the M-Pesa give-up.** Payment-service
+  times a push out at 3 minutes (`give-up-after`) and that `TIMEOUT` releases the lane; sales'
+  `payment-timeout` (4 minutes) only covers an answer that never comes. At 2 minutes it cancelled
+  sales whose prompt was still live, found in the first real sandbox run.
 - An STK Push that timed out is **never resent** - "no answer" includes "the prompt reached the
   phone". A payment that arrives after the intent was declared failed is recorded as a late payment
   and announced, never dropped: the customer paid.

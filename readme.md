@@ -236,7 +236,7 @@ Accounts and credentials needed before the phases that use them:
 | Outbound email (dev) | Gmail account with **2FA enabled** and an **App Password** (16 chars) | 5 |
 | Outbound email (prod) | **AWS SES**: a verified sending domain, production access (out of the sandbox), and SES **SMTP credentials** | 16 |
 | M-Pesa | Safaricom Daraja **sandbox** app: consumer key, consumer secret, shortcode, passkey. Production shortcode later. | 10 |
-| Public callbacks | A tunnel (`cloudflared` or `ngrok`) so Daraja can reach your local callback URL | 10 |
+| Public callbacks | An **ngrok** account and its authtoken, for `make tunnel` - how to test: [docs/MPESA-CALLBACKS.md](docs/MPESA-CALLBACKS.md) | 10 |
 | Deployment | A VPS (4 vCPU / 8 GB RAM minimum), a domain name, DNS access | 15 |
 
 Mail is real in every environment: development sends through **Gmail**, production through **AWS

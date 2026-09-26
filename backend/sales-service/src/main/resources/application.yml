@@ -90,9 +90,12 @@ pos:
     # be treated as absent quickly enough for the circuit breaker to be useful.
     pricing-timeout: ${PRICING_TIMEOUT:PT3S}
     reservation-timeout: ${RESERVATION_TIMEOUT:PT2S}
-    # How long a sale waits for a payment answer before the saga compensates. A customer who walks
-    # away from an M-Pesa prompt must not leave a lane held open.
-    payment-timeout: ${PAYMENT_TIMEOUT:PT2M}
+    # How long a sale waits for a payment answer before the saga compensates: a backstop for an
+    # answer that never comes. It must outlast payment-service's M-Pesa give-up (PT3M) plus its
+    # sweep: that TIMEOUT is what releases a lane a customer walked away from. Shorter, and a sale
+    # is cancelled while its push is still live - a customer paying at 2m30s paid for goods the
+    # till had already put back.
+    payment-timeout: ${PAYMENT_TIMEOUT:PT4M}
     payment-sweep-cron: ${PAYMENT_SWEEP_CRON:0 */1 * * * *}
     return-window-days: ${RETURN_WINDOW_DAYS:30}
     receipt-prefix: ${RECEIPT_PREFIX:R}

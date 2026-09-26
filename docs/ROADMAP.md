@@ -18,7 +18,7 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 | 7 | inventory-service | Stock, batches/expiry, FEFO, movements | ✅ done |
 | 8 | purchasing-service | Suppliers, PO, GRN, costing | ✅ done |
 | 9 | sales-service | Shifts, checkout saga, receipts, returns, offline sync | ✅ done |
-| 10 | payment-service | Cash, M-Pesa STK, card terminal, refunds | 🟡 built; M-Pesa sandbox run pending |
+| 10 | payment-service | Cash, M-Pesa STK, card terminal, refunds | ✅ sandbox STK Push run end to end (26 Sep 2026) |
 | 11 | customer-service | Customers, loyalty, member pricing | ✅ done |
 | 12 | reporting-service | CQRS projections, Z-report, dashboards | ✅ done |
 | 13 | Frontend: foundation & auth | Next.js app, BFF auth, shell, RBAC routing | ✅ done |
@@ -35,7 +35,8 @@ Estimates assume focused work by one developer plus Claude; they are sizing sign
 - [x] JDK 21, Node 24, Docker 29, Docker Compose v2 — verified present on this machine
 - [x] Gmail/Workspace account for sending: enable 2FA, generate a **16-character App Password**
 - [ ] Safaricom Daraja **sandbox** app: consumer key, consumer secret, shortcode, passkey
-- [ ] `cloudflared` or `ngrok` installed, for exposing the M-Pesa callback URL in dev
+- [x] `ngrok` installed, for exposing the M-Pesa callback URL in dev (`make tunnel`; see
+  [MPESA-CALLBACKS.md](MPESA-CALLBACKS.md))
 - [ ] GitHub repository created, with Actions enabled
 - [ ] Decide the sending domain and, for production email, add SPF and DKIM records
 
@@ -650,15 +651,14 @@ here cash and card settle at the till and M-Pesa is exercised through its events
 
 ---
 
-## Phase 10 — payment-service 🟡 built; sandbox run pending
+## Phase 10 — payment-service ✅
 
 **Goal:** money is taken, matched and reconciled.
 
-**Status:** built and verified against a local fake of Daraja and across the running services.
-Not ✅ until the one check that needs Safaricom is done: the Daraja sandbox credentials are not
-in `.env` yet (Phase 0's unchecked item), so no real STK Push has been sent. Fill in the
-`MPESA_*` values, add the callback token (`openssl rand -hex 24`) and a tunnel, then run a push
-end to end.
+**Status:** built, verified against a local fake of Daraja, and, since 26 Sep 2026, run against
+Daraja's sandbox end to end: a real prompt on a phone, the callback through an ngrok tunnel and
+the gateway, the sale paid. The production check is in
+[MPESA-CALLBACKS.md](MPESA-CALLBACKS.md#4-in-production).
 
 Delivered:
 - 8 tables: `payment_intents`, `payments`, `payment_events`, `mpesa_transactions`, `refunds`,
@@ -709,7 +709,11 @@ run through the gateway against the built images:**
 
 | Check | Result |
 |---|---|
-| Sandbox STK Push through a tunnel | ⏳ credentials in; OAuth works. Blocked: the Daraja app is not subscribed to M-Pesa Express (see below), and there is no callback URL or tunnel yet |
+| Sandbox STK Push through a tunnel | ✅ 26 Sep: KES 5 M-Pesa + KES 60 cash on a KES 65 sale; PIN entered, callback `result 0` with receipt, settled by `CALLBACK`, sale PAID in 14 s |
+| A real duplicated callback | ✅ Daraja's own callback replayed from ngrok's inspector: `Duplicate ... ignored`, one M-Pesa payment |
+| Customer cancels the prompt | ✅ callback `1032`, sale cancelled in 10 s (`CANCELLED_BY_USER`) |
+| Prompt unanswered | ✅ `1037` → `CUSTOMER_UNREACHABLE`, sale cancelled, basket released |
+| Callbacks through the ngrok tunnel and the gateway | ✅ 26 Sep: wrong token 404, right token accepted, duplicate ignored (`make mpesa-callback-probe`) |
 | Push: amount, MSISDN, callback URL, password | ✅ 1052.5377 pushed as 1053 to 254712345678, password = base64(shortcode+passkey+timestamp) |
 | Callback authorises to the cent asked for | ✅ 1052.5377 authorised, 0.4623 rounding recorded, receipt kept |
 | A duplicated callback | ✅ one payment, one `payment-authorized` |
@@ -760,6 +764,24 @@ That is a Daraja portal setting, not code: add the products to the app, or creat
 with them and use its key and secret. Separately, `MPESA_CALLBACK_URL` holds only an inline
 comment (so it is empty) and `MPESA_CALLBACK_TOKEN` is absent, so the service still reports M-Pesa
 unconfigured; both need a tunnel address and a generated token.
+
+**26 Sep 2026:** the tunnel is in (`make tunnel`, ngrok), with `MPESA_CALLBACK_URL` and a generated
+`MPESA_CALLBACK_TOKEN`. Callbacks sent through ngrok → gateway → payment-service are answered as
+they should be: 404 for a wrong token, accepted and parked for an unknown push, a duplicate
+ignored. STK Push still answers `404.001.03` to a token issued seconds earlier, so the
+subscription is unchanged. Note too that the sandbox needs the app's *test* shortcode and passkey;
+a live paybill number is refused there. How to run all of this, and the production check:
+[MPESA-CALLBACKS.md](MPESA-CALLBACKS.md).
+
+**Later on 26 Sep 2026, with a subscribed sandbox app:** the full run above passed. It found one
+bug. **Sales cancelled a sale while its M-Pesa prompt was still live**: sales' `payment-timeout`
+(2 minutes) was shorter than payment-service's M-Pesa give-up (3 minutes), so a customer paying
+between the two would have paid for a basket the till had already put back. Sales now waits
+4 minutes as a backstop, and a unit test holds it above the give-up. Also seen, and all sandbox
+behaviour rather than ours: a `1037` although the PIN was entered (a KES 65 push; KES 5
+worked), a cancel that sent no callback at all, and `Spike arrest` rate limits on status
+queries. `.env` had a second, production `MPESA_*` block below the sandbox one, which overrides
+it; development now keeps only the sandbox block.
 
 **Deferred with reason:** M-Pesa **B2C** (paying a partial refund to the customer's phone) needs a
 B2C shortcode and credentials of its own; until then a partial M-Pesa refund is settled by a
@@ -1159,8 +1181,8 @@ all 758 backend tests with every coverage gate met:**
 - **Serwist's default rules cache `/api/*`**, which would have answered the connectivity ping from
   cache. The worker's rules are our own.
 
-**Deferred with reason:** M-Pesa's lane path is built but, like Phase 10, not run against Daraja's
-sandbox. A real scale on a serial port and a customer display are not in scope; weights are typed.
+**Deferred with reason:** M-Pesa's lane path is built; Phase 10's sandbox run (26 Sep 2026)
+drove the same sales API the lane calls, not the lane screen itself. A real scale on a serial port and a customer display are not in scope; weights are typed.
 
 ---
 
