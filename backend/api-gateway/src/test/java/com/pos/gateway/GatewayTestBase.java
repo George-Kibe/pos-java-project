@@ -72,7 +72,11 @@ public abstract class GatewayTestBase {
     static {
         REDIS.start();
         DOWNSTREAM.start();
-        // The gateway fetches this to verify signatures, just as it would from auth-service.
+        stubJwks();
+    }
+
+    /** The gateway fetches this to verify signatures, just as it would from auth-service. */
+    private static void stubJwks() {
         DOWNSTREAM.stubFor(
                 WireMock.get(WireMock.urlEqualTo("/.well-known/jwks.json"))
                         .willReturn(
@@ -101,7 +105,10 @@ public abstract class GatewayTestBase {
     @AfterAll
     static void stopStub() {
         // Redis is left running for the JVM; the stub is cheap to restart and holds per-test state.
+        // The JWKS goes straight back: the next test class may have its own Spring context, whose
+        // decoder fetches the keys afresh - without it every token there is refused as invalid.
         DOWNSTREAM.resetAll();
+        stubJwks();
     }
 
     @LocalServerPort protected int port;

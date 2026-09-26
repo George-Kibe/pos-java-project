@@ -567,6 +567,12 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   product by the SKU's last digits, and a clock-derived code eventually matched an older run's SKU:
   the label went ambiguous and the lane refused it. Choose such codes by checking none exist.
 
+- **A class-level reset of a shared stub wipes what the next class's context needs.** The gateway's
+  `@AfterAll` called WireMock's `resetAll()`, which removed the JWKS stub too. Locally `GatewayIT`
+  ran first and passed; CI's filesystem order ran it after `ClientNetworkIT`, whose own
+  `@TestPropertySource` context fetched fresh keys and got a 404, so every token was refused.
+  Re-stub fixtures after a reset, and reproduce with `-Dfailsafe.runOrder=alphabetical`.
+
 - **Asynchronous retries continue after an assertion passes.** A second test truncating tables
   while the first message is still being retried produces rows belonging to neither. Follow one
   message to its end in one test.
