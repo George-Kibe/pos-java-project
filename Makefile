@@ -18,7 +18,7 @@ INFRA_SERVICES := postgres kafka redis
 .DEFAULT_GOAL := help
 .PHONY: help prod-up env env-sync doctor infra-up infra-down infra-restart infra-logs topics ps logs \
         up down images service-logs \
-        build fmt test it verify web-check web-e2e admin admin-check demo-seed demo-clear postman api-smoke psql redis-cli kafka-topics kafka-topics-sync clean nuke \
+        build fmt test it verify web-check web-e2e admin admin-check demo-seed demo-clear postman api-smoke psql redis-cli kafka-topics kafka-topics-sync tunnel mpesa-callback-probe clean nuke \
 		check-env
 
 ## ---------------------------------------------------------------------------
@@ -209,6 +209,23 @@ kafka-topics-sync: check-env ## Create any topics missing from the running broke
 	@# so this is safe to run at any time - and has to be run when the catalogue grows, or the
 	@# first event on the new topic sits in the outbox retrying against a topic that is not there.
 	@$(DC) run --rm --no-deps kafka-init
+
+## ---------------------------------------------------------------------------
+## M-Pesa callbacks (development)
+## ---------------------------------------------------------------------------
+tunnel: check-env ## Public HTTPS address for the local gateway, so Daraja can call back (ngrok)
+	@# Read with grep, never by sourcing .env (an unquoted value with spaces breaks the shell).
+	@token=$$(grep -E '^NGROK_AUTHTOKEN=' $(ENV_FILE) | cut -d= -f2- | sed 's/ #.*//;s/^"//;s/"$$//'); \
+	domain=$$(grep -E '^NGROK_DOMAIN=' $(ENV_FILE) | cut -d= -f2- | sed 's/ #.*//;s/^"//;s/"$$//'); \
+	command -v ngrok >/dev/null || { echo "ngrok is not installed: https://ngrok.com/download"; exit 1; }; \
+	[ -n "$$token" ] || ngrok config check >/dev/null 2>&1 || { \
+		echo "No ngrok authtoken: set NGROK_AUTHTOKEN in .env, or run 'ngrok config add-authtoken <token>'"; \
+		echo "(dashboard.ngrok.com, 'Your Authtoken')."; exit 1; }; \
+	echo "MPESA_CALLBACK_URL must be the https address ngrok shows below; recreate payment-service after changing it."; \
+	exec ngrok http 127.0.0.1:$${GATEWAY_PORT:-8080} $${token:+--authtoken "$$token"} $${domain:+--url "https://$$domain"}
+
+mpesa-callback-probe: check-env ## Send test STK callbacks to MPESA_CALLBACK_URL (or url=...): 404 wrong token, 200 right
+	@python3 scripts/mpesa/callback_probe.py $(if $(url),--url $(url))
 
 ## ---------------------------------------------------------------------------
 ## Cleanup
