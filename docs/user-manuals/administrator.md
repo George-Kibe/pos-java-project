@@ -8,6 +8,7 @@ New to the system? Read [Getting started](getting-started.md) first.
 
 - [What only you can do](#what-only-you-can-do)
 - [Setting up a new branch](#setting-up-a-new-branch)
+- [Devices](#devices)
 - [People and roles](#people-and-roles)
 - [Suppliers](#suppliers)
 - [Tax classes and rates](#tax-classes-and-rates)
@@ -56,10 +57,51 @@ branch or head office connection.
    phone and tax PIN. The preview shows it as the till prints it.
 4. **Cash**: the branch's default **cash limit** for tills.
 5. **Pricing**: a branch price list, only if its prices differ from the base prices.
-6. **Devices** (Alt+3): register each till and office computer and type its code on it - see the
-   [branch manager manual](branch-manager.md#devices). Until then only you can sign in there.
+6. **Devices** (Alt+3): register at least the branch manager's computer - see
+   [Devices](#devices) below. Until one is registered, nobody but you can sign in there; the
+   manager can register the tills after that.
 7. Tills number themselves (Till 1, Till 2…) the first time a device opens a shift there; rename them
    under **Cash → Tills** if you like.
+
+## Devices
+
+Staff sign in only on tills and computers registered under **Devices** (Alt+3). Branch managers
+register their own branches' devices; you can register them at any branch, and you are the only
+one who can sign in on a device that is **not** registered - which is how a branch gets its first.
+
+### Registering a device
+1. Sign in - on any computer, as long as it is on a branch or head office connection.
+2. Menu → **Devices** → choose the **Branch** → type a **Name** staff will recognise (Till 1,
+   Back office PC, HQ Accounts laptop) → **Register**.
+3. A **code** (eight characters, like `K7RM-2QXP`) is shown **once**. Write it down or keep the
+   window open; choose **Done** when you have it.
+4. On the device itself, open the POS. On the sign-in page choose **Register it** (below the
+   **Sign in** button), type the code - capitals, spaces and the dash don't matter - and choose
+   **Register device**. The page says **Device registered** - "This device is Till 1 at
+   Westlands".
+5. **Sign in** there as usual. The sign-in page and **Account** now name the device.
+
+The code works **once** and for **30 minutes**. If it runs out, **Cancel** that entry and register
+again. To register the computer you are sitting at, do steps 2-4 on it: go to **Register this
+device** (the sign-in page's **Register it** link, or `/register-device`) while signed in.
+
+### A new branch's first device
+The branch manager cannot sign in until the branch has a registered device, so register one for
+them - their office computer is usual - by either:
+- going to the branch and doing the steps above on that computer, or
+- registering it from head office and giving the manager the code (by phone is fine); they type it
+  on that computer within 30 minutes.
+
+The manager then registers the tills themselves (see the
+[branch manager manual](branch-manager.md#devices)).
+
+### Revoking a device
+**Revoke** on its row, and say why (replaced, lost, stolen). Everyone signed in on it is signed out
+within minutes and nobody can sign in on it again; to use it again, register it anew. Every
+registration and revocation is in **Audit** as `device.registered`, `device.enrolled` and
+`device.revoked`.
+
+Register only the business's own equipment - never a personal phone.
 
 ## People and roles
 

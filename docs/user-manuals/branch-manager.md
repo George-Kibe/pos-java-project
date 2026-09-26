@@ -69,15 +69,20 @@ account. **Roles** (Alt+O) shows what each role allows; changing roles is the ad
 
 ## Devices
 
-Your staff can sign in only on the tills and computers you register. Menu → **Devices** (Alt+3)
-lists your branch's: its name, whether it is **Registered**, **Waiting for its code**, **Code
-expired** or **Revoked**, and when someone last signed in on it.
+Your staff - and you - can sign in only on the tills and computers registered at your branch. Menu
+→ **Devices** (Alt+3) lists your branch's: its name, whether it is **Registered**, **Waiting for
+its code**, **Code expired** or **Revoked**, and when someone last signed in on it.
+
+**A new branch:** you cannot sign in until one device there is registered. The administrator
+registers your first (usually your office computer) and gives you its code, or does it with you;
+type it as in step 2 below. After that you register the tills yourself.
 
 ### Registering a till or computer
 1. **Devices** → choose the branch → type a **Name** staff will recognise (Till 3, Back office PC)
    → **Register**.
-2. The **code** is shown once. Go to the device, open the POS, choose **Register it** on the sign-in
-   page, type the code and choose **Register device**. It works once, for 30 minutes; if it runs
+2. The **code** (eight characters, like `K7RM-2QXP`) is shown once - write it down before choosing
+   **Done**. Go to the device, open the POS, choose **Register it** below the **Sign in** button,
+   type the code (capitals, spaces and the dash don't matter) and choose **Register device**. It works once, for 30 minutes; if it runs
    out, cancel that entry and register again.
 3. The sign-in page on that device now reads **This device: Till 3**.
 
