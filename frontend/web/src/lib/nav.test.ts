@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { SHORTCUTS } from "@/components/lane/checkout";
+
 import { homeFor, NAV, visibleNav } from "./nav";
 
 // The permissions auth-service seeds for these roles (V2__seed_roles_and_permissions.sql).
@@ -47,8 +49,10 @@ describe("navigation by permission", () => {
   it("gives every item a distinct shortcut, clear of the lane's own", () => {
     const shortcuts = NAV.map((item) => item.shortcut);
     expect(new Set(shortcuts).size).toBe(shortcuts.length);
-    // Alt+C, L, V, R, X, P and Y belong to the checkout.
-    expect(shortcuts.filter((key) => "clvrxpy".includes(key))).toEqual([]);
+    // Every Alt key the checkout uses: Alt+E exchanging notes once went to Expenses instead.
+    const checkout = SHORTCUTS.flatMap(([keys]) => [...keys.matchAll(/Alt\+([A-Z])/g)].map((m) => m[1].toLowerCase()));
+    expect(checkout).toEqual(expect.arrayContaining(["c", "e", "f"]));
+    expect(shortcuts.filter((key) => checkout.includes(key))).toEqual([]);
   });
 
   it("shows expenses to whoever records, approves or reads them", () => {

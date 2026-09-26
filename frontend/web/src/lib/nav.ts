@@ -8,7 +8,10 @@ export interface NavItem {
   href: string;
   label: string;
   permissions: readonly string[];
-  /** A single key, pressed with Alt, that jumps here. Kept clear of the lane's own Alt keys. */
+  /**
+   * A single key, a letter or a digit, pressed with Alt, that jumps here. Kept clear of the lane's
+   * own Alt keys (C, E, F, L, P, R, V, X, Y): the menu is live on the till too.
+   */
   shortcut: string;
 }
 
@@ -21,7 +24,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/pricing", label: "Pricing", permissions: ["price:manage", "promotion:manage"], shortcut: "w" },
   { href: "/stock", label: "Stock", permissions: ["inventory:view"], shortcut: "s" },
   { href: "/purchasing", label: "Purchasing", permissions: ["purchase:view"], shortcut: "h" },
-  { href: "/expenses", label: "Expenses", permissions: ["expense:record", "expense:approve", "expense:view"], shortcut: "e" },
+  { href: "/expenses", label: "Expenses", permissions: ["expense:record", "expense:approve", "expense:view"], shortcut: "1" },
   { href: "/suppliers", label: "Suppliers", permissions: ["purchase:view", "supplier:create"], shortcut: "n" },
   { href: "/customers", label: "Customers", permissions: ["customer:manage"], shortcut: "m" },
   { href: "/cash", label: "Cash", permissions: ["cash:intraday", "till:manage"], shortcut: "k" },

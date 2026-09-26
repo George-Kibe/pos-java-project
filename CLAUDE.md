@@ -22,6 +22,9 @@ update the docs in the same commit.**
 - **Finish the slice.** A feature is done when it has migrations, validation, tests, error handling,
   OpenAPI annotations, and its events wired — not when the happy path compiles.
 - **Never invent credentials, shortcodes or keys.** If a secret is missing, stop and ask.
+- **The user manuals follow the screens.** `docs/user-manuals` describes, role by role, what each
+  person sees and clicks. A change to a screen, a label, a shortcut or who may do something updates
+  the manual for every role it touches, in the same commit.
 
 ## Commands
 
@@ -481,6 +484,12 @@ rollback-only, so the commit fails anyway and takes the batch with it.
   purchasing forms listed `suppliers?size=100`, and the 101st supplier could never be chosen -
   found only when test runs had created that many. Choices from a table that grows are searched
   (`SupplierSelect`, `ProductPicker`), keeping the current choice in the list.
+
+- **The menu's Alt shortcuts are live on the till too**, so they must never take one of the
+  checkout's own (C, E, F, L, P, R, V, X, Y). Expenses was given Alt+E, which the till uses to
+  exchange notes: a manager at a till would have left a sale for the Expenses page. `nav.test.ts` now
+  reads the checkout's `SHORTCUTS` rather than a hand-kept list; every letter is taken, so a new
+  entry gets a digit (Alt+1).
 
 - **A file download is a plain link to `/api/gateway/...`, without a `download` attribute.** The
   service answers `Content-Disposition: attachment`, which is enough; with the attribute Chrome

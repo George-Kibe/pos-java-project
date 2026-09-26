@@ -96,6 +96,11 @@ export function LoginForm({ next, initialEmail }: { next: string; initialEmail: 
           <Button type="submit" size="lg" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </Button>
+          <p className="text-center text-sm">
+            <Link href={email ? `/forgot-password?email=${encodeURIComponent(email)}` : "/forgot-password"} className="font-medium underline">
+              Forgot your password?
+            </Link>
+          </p>
           <p className="text-center text-sm text-muted-foreground">
             New here?{" "}
             <Link href="/register" className="font-medium text-foreground underline">

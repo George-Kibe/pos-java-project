@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { admin, PASSWORD, replaceTemporaryPassword, signIn, staffMember } from "./support";
+import { admin, latestCapturedMessage, PASSWORD, replaceTemporaryPassword, signIn, staffMember } from "./support";
 
 /**
  * Phase 15, users and access: an administrator builds a role from the permission matrix, forces a
@@ -48,4 +48,41 @@ test("an administrator builds a role, forces a reset and finds it in the audit t
   await expect(page.getByTestId("audit-row").first()).toContainText(administrator.email);
   await page.goto(`/audit?${new URLSearchParams({ action: "user.password_reset_forced", actor: administrator.email, from: "2020-01-01", to: "2020-01-02" })}`);
   await expect(page.getByTestId("audit-row")).toHaveCount(0);
+
+  // The emailed link leads to a new password, which then signs in.
+  let link: string | undefined;
+  await expect
+    .poll(
+      () => {
+        link = latestCapturedMessage(cashier.email).match(/\/reset-password\?token=[^\s"'<>)\]]+/)?.[0];
+        return link;
+      },
+      { timeout: 30_000, message: "the reset email" },
+    )
+    .toBeTruthy();
+  await page.context().clearCookies();
+  await page.goto(link!);
+  const renewed = `Renewed-Password-${RUN}`;
+  await page.getByLabel("New password", { exact: true }).fill(renewed);
+  await page.getByLabel("New password again").fill(renewed);
+  await page.getByRole("button", { name: "Set password" }).click();
+  await expect(page.getByText("Your password has been changed. Sign in with the new one.")).toBeVisible();
+  await page.getByRole("link", { name: "Sign in" }).click();
+  await signIn(page, cashier.email, renewed);
+  await expect(page).not.toHaveURL(/\/login/);
+
+  // The link works once.
+  await page.context().clearCookies();
+  await page.goto(link!);
+  await page.getByLabel("New password", { exact: true }).fill(`${renewed}-again`);
+  await page.getByLabel("New password again").fill(`${renewed}-again`);
+  await page.getByRole("button", { name: "Set password" }).click();
+  await expect(page.getByRole("link", { name: "Ask for a new link" })).toBeVisible();
+
+  // Anyone can ask for a link from the sign-in page, and the answer gives nothing away.
+  await page.goto("/login");
+  await page.getByRole("link", { name: "Forgot your password?" }).click();
+  await page.getByLabel("Email").fill(cashier.email);
+  await page.getByRole("button", { name: "Send the link" }).click();
+  await expect(page.getByText(/If that email address belongs to an account, a reset link has been sent to it/)).toBeVisible();
 });
