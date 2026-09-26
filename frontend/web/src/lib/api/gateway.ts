@@ -1,5 +1,6 @@
 import "server-only";
 
+import { headers } from "next/headers";
 import type { z } from "zod";
 
 import { serverEnv } from "@/lib/env";
@@ -22,6 +23,13 @@ export async function gatewayFetch(
   if (accessToken) {
     outgoing.set("Authorization", `Bearer ${accessToken}`);
   }
+  // The browser's address, on every call: the gateway serves only branch and head office networks
+  // and would otherwise see this server's own address. Traefik wrote it; the gateway believes it
+  // because this server is on the private network.
+  if (!outgoing.has("X-Forwarded-For")) {
+    const forwarded = await browserAddress();
+    if (forwarded) outgoing.set("X-Forwarded-For", forwarded);
+  }
   try {
     return await fetch(`${serverEnv.gatewayUrl}${path}`, {
       ...rest,
@@ -34,6 +42,15 @@ export async function gatewayFetch(
       title: "Service unavailable",
       detail: "The POS services could not be reached. Nothing was changed; please try again.",
     });
+  }
+}
+
+/** The X-Forwarded-For of the request being served, or null outside one (a build, a test). */
+async function browserAddress(): Promise<string | null> {
+  try {
+    return (await headers()).get("x-forwarded-for");
+  } catch {
+    return null;
   }
 }
 

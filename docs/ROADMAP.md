@@ -1527,6 +1527,29 @@ had turned into a list item.
 
 ---
 
+## Site access: staff work only from branches and head office ✅
+
+The POS is reachable only from the business's own premises, so a password used at home or on a
+personal phone gets nobody in.
+
+- **The network.** Production runs behind Traefik (`docker-compose.prod.yml`, `make prod-up`),
+  brought forward from Phase 16 for this: TLS by Let's Encrypt, and an `ipAllowList` of the
+  branches' and head office's static router addresses (`ALLOWED_CLIENT_NETWORKS`) on the
+  connection's own address, which a client cannot forge. Routes come from a file, so Traefik never
+  needs the Docker socket. The gateway re-checks the same list (`ClientNetworkFilter`, a 403
+  `access.network_denied` before any token is read); M-Pesa's callbacks are the one open path, and
+  payment-service still authenticates them by their secret token. The web app forwards the
+  browser's address on every gateway call, not only on sign-in. `ClientNetworkIT` covers a branch,
+  a home, a forged header, a malformed one and the callbacks; Traefik and the whole chain were
+  checked by hand against the running stack.
+- **Development** binds every published port to `127.0.0.1`.
+- **Found on the way:** the gateway's `forward-headers-strategy: framework` took the *leftmost*
+  `X-Forwarded-For` entry as the client, so anyone could choose their own address - dodging the
+  per-address login limit, and fooling the M-Pesa callback IP check where it is enabled. It is
+  now `native`: Tomcat reads the header from the right, past our own proxies.
+
+---
+
 ## Phase 16 — Hardening & production deployment
 
 **Goal:** it survives contact with the real world.
@@ -1552,7 +1575,7 @@ Security:
 
 Production:
 - Multi-stage distroless images, non-root users, pinned digests, resource limits, restart policies
-- `docker-compose.prod.yml` + Traefik with automatic TLS
+- ~~`docker-compose.prod.yml` + Traefik with automatic TLS~~ - done with site access, above
 - Docker secrets rather than `.env`; documented rotation procedure
 - Nightly `pg_dump` off-site **with a restore actually rehearsed**, Kafka retention per topic
 - Runbooks: deploy, rollback, restore, DLT replay, key rotation, incident response

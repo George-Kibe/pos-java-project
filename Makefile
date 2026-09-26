@@ -4,8 +4,10 @@ SHELL := /bin/bash
 COMPOSE_FILE := infra/compose/docker-compose.yml
 ENV_FILE     := .env
 SERVICES_FILE := infra/compose/docker-compose.services.yml
+PROD_FILE    := infra/compose/docker-compose.prod.yml
 DC           := docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
 DC_ALL       := docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) -f $(SERVICES_FILE)
+DC_PROD      := $(DC_ALL) -f $(PROD_FILE)
 # Secrets the project generates itself (random values), as opposed to credentials you supply.
 GENERATED_SECRETS := [A-Z_]+PASSWORD|MPESA_CALLBACK_TOKEN|WEB_SESSION_SECRET
 MVN          := ./mvnw
@@ -14,7 +16,7 @@ BACKEND      := backend
 INFRA_SERVICES := postgres kafka redis
 
 .DEFAULT_GOAL := help
-.PHONY: help env env-sync doctor infra-up infra-down infra-restart infra-logs topics ps logs \
+.PHONY: help prod-up env env-sync doctor infra-up infra-down infra-restart infra-logs topics ps logs \
         up down images service-logs \
         build fmt test it verify web-check web-e2e admin admin-check demo-seed demo-clear postman api-smoke psql redis-cli kafka-topics kafka-topics-sync clean nuke \
 		check-env
@@ -115,6 +117,11 @@ images: check-env ## Rebuild the service images
 
 service-logs: check-env ## Tail application service logs
 	$(DC_ALL) logs -f auth-service catalog-service notification-service api-gateway
+
+prod-up: check-env ## Production: everything behind Traefik (TLS, branch/HQ networks only)
+	@# Refuses to start without POS_DOMAIN, ACME_EMAIL and ALLOWED_CLIENT_NETWORKS in .env.
+	$(DC_PROD) up -d --build --wait
+	@$(DC_PROD) ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}'
 
 ## ---------------------------------------------------------------------------
 ## Build and test

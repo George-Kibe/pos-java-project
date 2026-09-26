@@ -1,0 +1,51 @@
+# Routes and middlewares, templated from the environment when Traefik starts:
+#   POS_DOMAIN               the address staff open, e.g. pos.example.co.ke
+#   ALLOWED_CLIENT_NETWORKS  the branches' and head office's router addresses, comma-separated
+#                            (a single address, or a CIDR range such as 197.248.10.0/29)
+# The gateway checks the same list again; an address missing here is refused at the edge first.
+
+http:
+  routers:
+    pos:
+      rule: 'Host(`{{ env "POS_DOMAIN" }}`)'
+      entryPoints: [websecure]
+      service: web
+      middlewares: [premises-only, hsts]
+      tls:
+        certResolver: le
+
+    # Safaricom calls back from its own addresses, never a branch's. payment-service
+    # authenticates these by the secret path token, so they skip the allowlist and nothing else.
+    mpesa-callbacks:
+      rule: 'Host(`{{ env "POS_DOMAIN" }}`) && PathPrefix(`/api/v1/payments/mpesa/callbacks/`)'
+      priority: 100
+      entryPoints: [websecure]
+      service: gateway
+      middlewares: [hsts]
+      tls:
+        certResolver: le
+
+  middlewares:
+    premises-only:
+      ipAllowList:
+        # No ipStrategy: the connection's own address, which a client cannot forge.
+        sourceRange:
+        {{- range $network := splitList "," (env "ALLOWED_CLIENT_NETWORKS") }}
+        {{- if trim $network }}
+          - "{{ trim $network }}"
+        {{- end }}
+        {{- end }}
+    hsts:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+
+  services:
+    web:
+      loadBalancer:
+        servers:
+          - url: "http://web:3000"
+    gateway:
+      loadBalancer:
+        servers:
+          - url: "http://api-gateway:8080"

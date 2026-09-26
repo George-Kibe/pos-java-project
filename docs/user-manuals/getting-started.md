@@ -3,6 +3,7 @@
 For everyone. How to sign in, look after your password, find your way around, and what to do when
 you are locked out.
 
+- [Where you can use the POS](#where-you-can-use-the-pos)
 - [Your first sign-in](#your-first-sign-in)
 - [Signing in every day](#signing-in-every-day)
 - [If you forget your password](#if-you-forget-your-password)
@@ -14,6 +15,17 @@ you are locked out.
 - [Creating your own account](#creating-your-own-account)
 
 ---
+
+## Where you can use the POS
+
+Only at work: the POS opens on the internet connection of a branch or of head office, and nowhere
+else. At home, on mobile data or on public wifi the page does not open (the browser shows
+**Forbidden**), or signing in answers **"The POS can only be used from a branch or head office
+network."** That is on purpose - it is not a fault with your account.
+
+If a whole branch suddenly sees that message, its internet connection has probably changed (a new
+line, or the backup line taking over). Tell your manager; the administrator has the branch's new
+address added.
 
 ## Your first sign-in
 
@@ -123,6 +135,8 @@ in your name.
 - **"Your session has ended. Please sign in again."** Your password or roles changed, or you were
   signed out by an administrator. Sign in again.
 - **Your account is suspended or deactivated:** only whoever manages users can restore it.
+- **"The POS can only be used from a branch or head office network."** You are not on a work
+  connection - see [Where you can use the POS](#where-you-can-use-the-pos).
 
 ## Creating your own account
 

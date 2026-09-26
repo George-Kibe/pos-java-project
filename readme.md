@@ -279,7 +279,7 @@ Demo sign-in: any `...@demo.pos.local` user with `Demo-Password-2026` (see
 
 | URL | What |
 |---|---|
-| http://localhost:8080 | **API gateway — the only way in** (live now) |
+| http://localhost:8080 | **API gateway — the only way in** (live now). Every port here is bound to this machine only |
 | http://localhost:8080/api/v1/pricing/resolve | Price a basket, with the full tax and discount breakdown |
 | localhost:5432 | PostgreSQL (**live now**) |
 | localhost:29092 | Kafka, from the host (`kafka:9092` inside the network) (**live now**) |
@@ -404,6 +404,12 @@ rate limiting in Redis; strict CORS allowlist; Bean Validation on every DTO; JPA
 only; no card data ever stored (terminal reference only); full audit log of privileged actions
 (price override, void, refund, stock adjustment, role change); TLS everywhere in production.
 
+**Where staff may work from** — only a branch's or head office's own internet connection. In
+production Traefik refuses any other address (`ALLOWED_CLIENT_NETWORKS`, the sites' static router
+addresses), at the edge where the address cannot be forged, and the gateway checks the same list
+again; only M-Pesa's callbacks, which come from Safaricom, pass without it. In development every
+published port is bound to `127.0.0.1`, so nothing but this machine can reach the stack.
+
 ---
 
 ## Event-driven communication
@@ -490,11 +496,13 @@ error rate, p95 latency, low disk and failed payment callbacks.
 ## Deployment
 
 **Development** — `docker-compose.yml` + `docker-compose.dev.yml`: hot reload via Spring DevTools,
-debug ports exposed, seed data; mail through Gmail.
+debug ports exposed, seed data; mail through Gmail. Every published port is bound to `127.0.0.1`.
 
-**Production** — `docker-compose.prod.yml`: multi-stage distroless images built by CI and pinned by
-digest, Traefik terminating TLS with automatic Let's Encrypt certificates, Docker secrets rather
-than env files, resource limits and restart policies per service, healthcheck-gated startup order,
+**Production** — `docker-compose.prod.yml` (`make prod-up`): Traefik is the only published
+service, terminating TLS with automatic Let's Encrypt certificates and admitting branch and head
+office networks only (`POS_DOMAIN`, `ACME_EMAIL` and `ALLOWED_CLIENT_NETWORKS` in `.env`, all
+required). Still to come in Phase 16: multi-stage distroless images built by CI and pinned by
+digest, Docker secrets rather than env files, resource limits and restart policies per service, healthcheck-gated startup order,
 nightly `pg_dump` to off-site storage with a documented restore drill, and Kafka retention tuned per
 topic. Flyway migrations run on service startup and must be backwards compatible — expand, migrate,
 contract — so a rolling restart never breaks the previous version mid-deploy.

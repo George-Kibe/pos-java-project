@@ -39,6 +39,11 @@ administrators, so one can always reach the other's account.
 
 ## Setting up a new branch
 
+Before it opens, get the branch's **internet address** from its internet provider - a **static**
+one, and the backup line's too if it has one - and have whoever runs the server add it to the
+allowed networks. Until then the POS will not open at that branch: staff can use it only from a
+branch or head office connection.
+
 1. **Branches** (Alt+B) → create it with a **code** (permanent) and a **name**. Set its **time zone**
    (Africa/Nairobi) and tick **Open for trading**.
 2. **Users**: assign the branch's manager, supervisors and cashiers to it.
@@ -122,6 +127,11 @@ count once, in the business-wide profit and loss - never shared out over the bra
 
 **A till charges the wrong tax.** Check the product's tax class and the class's rates in Catalog
 setup. A new rate applies from its start date; it cannot be backdated.
+
+**Nobody at a branch can open the POS** ("can only be used from a branch or head office
+network"). The branch's internet address has changed - a new provider, a new line, or the backup
+line taking over. Get the address it now has and have it added to the allowed networks; ask the
+provider for a static address if it keeps changing.
 
 **A new branch can't sell.** It must be **open for trading**, and the cashier assigned to it. The
 till gets its number on its first shift there.

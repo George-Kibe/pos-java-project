@@ -12,6 +12,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -24,13 +25,14 @@ import com.pos.common.security.PermissionsJwtAuthenticationConverter;
 import com.pos.common.security.PosSecurityProperties;
 import com.pos.gateway.ratelimit.RateLimitFilter;
 import com.pos.gateway.ratelimit.RedisRateLimiter;
+import com.pos.gateway.security.ClientNetworkFilter;
 import com.pos.gateway.security.TokenVersionFilter;
 
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * The gateway's own filter chain, replacing the default one from common-lib because the gateway has
- * two extra concerns: rate limiting and token-version enforcement.
+ * three extra concerns: the networks it serves, rate limiting and token-version enforcement.
  *
  * <p>Both are placed after authentication and before authorization. That position is deliberate.
  * Rate limiting needs to know whether there is a principal in order to key on the user rather than
@@ -57,6 +59,12 @@ public class GatewaySecurityConfig {
     @Bean
     public RedisRateLimiter redisRateLimiter(StringRedisTemplate redis) {
         return new RedisRateLimiter(redis);
+    }
+
+    @Bean
+    public ClientNetworkFilter clientNetworkFilter(
+            GatewayClientAccessProperties properties, ObjectMapper objectMapper) {
+        return new ClientNetworkFilter(properties, objectMapper);
     }
 
     @Bean
@@ -124,6 +132,7 @@ public class GatewaySecurityConfig {
             PermissionsJwtAuthenticationConverter converter,
             AuthenticationEntryPoint authenticationEntryPoint,
             AccessDeniedHandler accessDeniedHandler,
+            ClientNetworkFilter clientNetworkFilter,
             RateLimitFilter rateLimitFilter,
             TokenVersionFilter tokenVersionFilter)
             throws Exception {
@@ -168,6 +177,9 @@ public class GatewaySecurityConfig {
                         ex ->
                                 ex.authenticationEntryPoint(authenticationEntryPoint)
                                         .accessDeniedHandler(accessDeniedHandler))
+                // Before anything reads a token: a request from outside the business's networks is
+                // refused whoever it claims to be.
+                .addFilterBefore(clientNetworkFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterBefore(rateLimitFilter, AuthorizationFilter.class)
                 .addFilterBefore(tokenVersionFilter, AuthorizationFilter.class);
 
