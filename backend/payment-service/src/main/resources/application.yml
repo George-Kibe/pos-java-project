@@ -113,6 +113,7 @@ pos:
       query-interval: PT30S
       max-query-attempts: 20
       # After this the lane is released (TIMEOUT); money that still arrives is recorded late.
+      # sales-service's payment-timeout (PT4M) is the backstop and must stay longer than this.
       give-up-after: PT3M
 
 management:

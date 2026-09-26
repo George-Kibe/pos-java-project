@@ -30,7 +30,7 @@ public record ServiceEndpointProperties(
     }
 
     public Duration paymentTimeoutOrDefault() {
-        return paymentTimeout == null ? Duration.ofMinutes(2) : paymentTimeout;
+        return paymentTimeout == null ? Duration.ofMinutes(4) : paymentTimeout;
     }
 
     public int returnWindowDaysOrDefault() {
