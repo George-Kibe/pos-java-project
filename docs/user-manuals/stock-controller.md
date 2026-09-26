@@ -24,7 +24,7 @@ New to the system? Read [Getting started](getting-started.md) first.
 ## What your role covers
 
 Your menu: **Dashboard**, **Reports**, **Products**, **Catalog setup**, **Stock**, **Purchasing**,
-**Suppliers**, **Account**.
+**Suppliers**, **Manual**, **Account**.
 
 You can receive goods, keep products and their barcodes, write stock off, transfer, count, send
 returns to suppliers and edit supplier details. Raising and approving **orders**, setting **branch

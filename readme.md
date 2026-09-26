@@ -409,6 +409,8 @@ production Traefik refuses any other address (`ALLOWED_CLIENT_NETWORKS`, the sit
 addresses), at the edge where the address cannot be forged, and the gateway checks the same list
 again; only M-Pesa's callbacks, which come from Safaricom, pass without it. In development every
 published port is bound to `127.0.0.1`, so nothing but this machine can reach the stack.
+Production also admits sign-in only on **registered devices**: a manager registers each till and
+office computer under **Devices** and types the code it is given on that device.
 
 ---
 

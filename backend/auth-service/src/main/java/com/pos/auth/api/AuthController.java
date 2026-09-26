@@ -79,7 +79,8 @@ public class AuthController {
                         request.email(),
                         request.password(),
                         ClientRequestInfo.ipOf(httpRequest),
-                        ClientRequestInfo.userAgentOf(httpRequest));
+                        ClientRequestInfo.userAgentOf(httpRequest),
+                        request.deviceSecret());
         return AuthDtos.TokenResponse.from(pair);
     }
 

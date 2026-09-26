@@ -59,6 +59,10 @@ public class RefreshToken {
     @Column(name = "replaced_by")
     private UUID replacedBy;
 
+    /** The registered device the session was started on; null where none was presented. */
+    @Column(name = "device_id")
+    private UUID deviceId;
+
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
 

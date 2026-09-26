@@ -33,6 +33,11 @@ Your role holds every permission, including these no other seeded role has:
 | Receipt text, email wording, the expense approval limit | **Settings** |
 | Record head office's expenses | **Expenses** → Head office |
 | Act at any branch without being assigned to it | everywhere |
+| Sign in on a device that is not registered (on a branch or head office network) | sign-in |
+
+Signing in from an unregistered device is what lets you register a branch's first devices, and
+replace one when a manager cannot. Everyone else - managers included - signs in only on a
+registered device.
 
 The first administrator account is created when the system is installed. Keep at least two
 administrators, so one can always reach the other's account.
@@ -51,7 +56,9 @@ branch or head office connection.
    phone and tax PIN. The preview shows it as the till prints it.
 4. **Cash**: the branch's default **cash limit** for tills.
 5. **Pricing**: a branch price list, only if its prices differ from the base prices.
-6. Tills number themselves (Till 1, Till 2…) the first time a device opens a shift there; rename them
+6. **Devices** (Alt+3): register each till and office computer and type its code on it - see the
+   [branch manager manual](branch-manager.md#devices). Until then only you can sign in there.
+7. Tills number themselves (Till 1, Till 2…) the first time a device opens a shift there; rename them
    under **Cash → Tills** if you like.
 
 ## People and roles
@@ -132,6 +139,10 @@ setup. A new rate applies from its start date; it cannot be backdated.
 network"). The branch's internet address has changed - a new provider, a new line, or the backup
 line taking over. Get the address it now has and have it added to the allowed networks; ask the
 provider for a static address if it keeps changing.
+
+**"This device is not registered for the POS"** on a till that used to work. Its registration was
+revoked, or the browser's data was cleared. **Devices**: revoke the old entry if it is still there,
+register the till again and type the new code on it.
 
 **A new branch can't sell.** It must be **open for trading**, and the cashier assigned to it. The
 till gets its number on its first shift there.

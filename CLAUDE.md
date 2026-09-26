@@ -144,6 +144,10 @@ Rules:
   M-Pesa's callbacks are the one open path (`pos.gateway.client-access.open-paths`). A new
   public path that a provider calls needs listing there and as a Traefik route. Development binds
   every published port to `127.0.0.1` instead - do not publish one on all interfaces.
+- **And only on registered devices** (production, `pos.auth.devices.required`). The device's
+  secret lives in the `pos_device` cookie, which sign-out never clears; the login route presents
+  it, and a refresh re-checks the session's device. A new way to start a session must do the same,
+  or it is a way round the rule.
 - Never log tokens, OTPs, passwords, M-Pesa credentials, or full customer phone numbers. The
   logging masker in `common-lib` covers the known fields — extend it when adding new sensitive ones.
 - Never store card data. Card payments record a terminal reference and approval code only.

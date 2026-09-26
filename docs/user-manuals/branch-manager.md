@@ -9,6 +9,7 @@ New to the system? Read [Getting started](getting-started.md) first, and set you
 - [What your role covers](#what-your-role-covers)
 - [Your day](#your-day)
 - [Staff](#staff)
+- [Devices](#devices)
 - [Prices and promotions](#prices-and-promotions)
 - [Price reviews and target margins](#price-reviews-and-target-margins)
 - [Buying: orders, deliveries, returns](#buying-orders-deliveries-returns)
@@ -26,7 +27,7 @@ New to the system? Read [Getting started](getting-started.md) first, and set you
 
 Your menu: **Till**, **Dashboard**, **Reports**, **Pricing**, **Stock**, **Purchasing**,
 **Expenses**, **Suppliers**, **Customers**, **Cash**, **Users**, **Roles**, **Branches**, **Audit**,
-**Account**.
+**Devices**, **Manual**, **Account**.
 
 You work at the branches you are assigned to. Things kept for the administrator: adding a **new
 supplier**, **new products** and the catalogue's categories and tax (unless you are also given
@@ -65,6 +66,28 @@ new password (valid 30 minutes, once).
 You can only give roles whose rights you hold yourself, and only change accounts whose rights you
 hold. So you cannot create an administrator, make yourself one, or edit the administrator's
 account. **Roles** (Alt+O) shows what each role allows; changing roles is the administrator's.
+
+## Devices
+
+Your staff can sign in only on the tills and computers you register. Menu → **Devices** (Alt+3)
+lists your branch's: its name, whether it is **Registered**, **Waiting for its code**, **Code
+expired** or **Revoked**, and when someone last signed in on it.
+
+### Registering a till or computer
+1. **Devices** → choose the branch → type a **Name** staff will recognise (Till 3, Back office PC)
+   → **Register**.
+2. The **code** is shown once. Go to the device, open the POS, choose **Register it** on the sign-in
+   page, type the code and choose **Register device**. It works once, for 30 minutes; if it runs
+   out, cancel that entry and register again.
+3. The sign-in page on that device now reads **This device: Till 3**.
+
+Register only the business's own equipment - never a personal phone. A registered device still
+works only on a branch or head office connection.
+
+### Revoking one
+A till replaced, lost or stolen: **Revoke**, and say why. Everyone signed in on it is signed out
+within minutes, and nobody can sign in on it again; to use it again, register it anew. A cleared
+browser also loses its registration - revoke the old entry and register the device again.
 
 ## Prices and promotions
 

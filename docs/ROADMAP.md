@@ -1543,6 +1543,20 @@ personal phone gets nobody in.
   a home, a forged header, a malformed one and the callbacks; Traefik and the whole chain were
   checked by hand against the running stack.
 - **Development** binds every published port to `127.0.0.1`.
+- **Registered devices.** In production (`DEVICE_REGISTRATION_REQUIRED`) a sign-in must come from a
+  till or computer a manager has registered, so a password on a personal phone on the shop's wifi
+  is refused too. **Devices** (`device:manage`, branch managers) registers one and shows an
+  eight-character code once; typed on the device's **Register this device** page, it makes the
+  device active and the BFF keeps its secret in an encrypted httpOnly cookie (400 days, kept
+  across sign-outs) that sign-in presents. Codes and secrets are stored only as hashes; a code works
+  once, for 30 minutes, and is rate-limited per address like a login. A session remembers its
+  device: revoking the device ends its sessions at their next refresh, and a session begun without
+  one does not outlive the requirement being switched on. The administrator is exempt - still
+  only on an allowed network - so a branch's first device can be registered. Checked after the
+  password, so the refusal tells nothing to someone without it. `DeviceIT` runs with registration
+  required; `devices.spec` follows a manager, a till and a revocation through the screens.
+  Rotating `WEB_SESSION_SECRET` makes every device's cookie unreadable: each must be registered
+  again.
 - **Found on the way:** the gateway's `forward-headers-strategy: framework` took the *leftmost*
   `X-Forwarded-For` entry as the client, so anyone could choose their own address - dodging the
   per-address login limit, and fooling the M-Pesa callback IP check where it is enabled. It is

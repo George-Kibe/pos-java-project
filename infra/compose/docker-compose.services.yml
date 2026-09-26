@@ -38,6 +38,9 @@ services:
       JWT_ISSUER: ${JWT_ISSUER:-http://auth-service:8081}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-PT15M}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-P7D}
+      # Sign-in only from registered tills and computers. Off in development; production's
+      # overlay turns it on.
+      DEVICE_REGISTRATION_REQUIRED: ${DEVICE_REGISTRATION_REQUIRED:-false}
       AUTH_BOOTSTRAP_EMAIL: ${AUTH_BOOTSTRAP_EMAIL:-}
       AUTH_BOOTSTRAP_PASSWORD: ${AUTH_BOOTSTRAP_PASSWORD:-}
     # Deliberately no `ports:` mapping. Reachable only as auth-service:8081 on the pos network.

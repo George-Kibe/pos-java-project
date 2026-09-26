@@ -39,6 +39,7 @@ public class AuthenticationService {
     private final AuditService audit;
     private final PasswordEncoder passwordEncoder;
     private final JwtProperties jwtProperties;
+    private final DeviceService devices;
 
     /**
      * A valid-looking hash to verify against when the account does not exist.
@@ -57,7 +58,8 @@ public class AuthenticationService {
             SessionRevocationService sessionRevocation,
             AuditService audit,
             PasswordEncoder passwordEncoder,
-            JwtProperties jwtProperties) {
+            JwtProperties jwtProperties,
+            DeviceService devices) {
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.accessTokenIssuer = accessTokenIssuer;
@@ -66,11 +68,18 @@ public class AuthenticationService {
         this.audit = audit;
         this.passwordEncoder = passwordEncoder;
         this.jwtProperties = jwtProperties;
+        this.devices = devices;
         this.dummyHash = passwordEncoder.encode("a-password-that-is-never-correct");
     }
 
+    /**
+     * Signs a person in. {@code deviceSecret} is the registered device's, or null; where this
+     * person must use a registered device, a sign-in without an active one is refused - after the
+     * password is checked, so the refusal says nothing to someone who does not know it.
+     */
     @Transactional
-    public TokenPair login(String email, String rawPassword, String ip, String userAgent) {
+    public TokenPair login(
+            String email, String rawPassword, String ip, String userAgent, String deviceSecret) {
         String normalized = User.normalizeEmail(email);
         Optional<User> found = users.findByEmailNormalized(normalized);
 
@@ -107,8 +116,12 @@ public class AuthenticationService {
                     "This account is not active. Verify your email or contact an administrator.");
         }
 
+        // Nothing is written before this can refuse: a refusal rolls back, and there is nothing
+        // here that must survive it (the password was right, so no failure is counted).
+        UUID deviceId = devices.admit(user, deviceSecret, ip);
+
         loginAttempts.recordSuccess(user, normalized, ip, userAgent);
-        return issuePair(user, UUID.randomUUID(), ip, userAgent);
+        return issuePair(user, UUID.randomUUID(), ip, userAgent, deviceId);
     }
 
     /**
@@ -156,7 +169,17 @@ public class AuthenticationService {
             throw invalidToken();
         }
 
-        TokenPair pair = issuePair(user, stored.getFamilyId(), ip, userAgent);
+        // A session lives only as long as its device is trusted, and one begun without a device
+        // does not outlast registration becoming required. Revoked in a transaction of its own,
+        // like reuse, so the refusal does not undo it.
+        if (stored.getDeviceId() != null
+                ? !devices.isActive(stored.getDeviceId())
+                : devices.requiredFor(user)) {
+            sessionRevocation.revokeFamily(stored.getFamilyId(), "device_not_trusted");
+            throw invalidToken();
+        }
+
+        TokenPair pair = issuePair(user, stored.getFamilyId(), ip, userAgent, stored.getDeviceId());
 
         stored.setUsedAt(Instant.now());
         refreshTokens.save(stored);
@@ -188,7 +211,8 @@ public class AuthenticationService {
         sessionRevocation.revokeAllForUser(userId, reason);
     }
 
-    private TokenPair issuePair(User user, UUID familyId, String ip, String userAgent) {
+    private TokenPair issuePair(
+            User user, UUID familyId, String ip, String userAgent, UUID deviceId) {
         AccessTokenIssuer.IssuedToken access = accessTokenIssuer.issue(user);
 
         String refreshValue = SecureTokens.generate();
@@ -200,6 +224,7 @@ public class AuthenticationService {
         token.setTokenHash(SecureTokens.hash(refreshValue));
         token.setExpiresAt(refreshExpiry);
         token.setIpAddress(ip);
+        token.setDeviceId(deviceId);
         token.setUserAgent(
                 userAgent != null && userAgent.length() > 255
                         ? userAgent.substring(0, 255)

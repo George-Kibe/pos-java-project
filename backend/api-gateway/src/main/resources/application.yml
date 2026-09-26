@@ -36,7 +36,7 @@ spring:
             - id: auth-service
               uri: ${AUTH_SERVICE_URI:http://localhost:8081}
               predicates:
-                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/roles/**,/api/v1/permissions/**,/api/v1/branches/**,/api/v1/audit/**
+                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/roles/**,/api/v1/permissions/**,/api/v1/branches/**,/api/v1/audit/**,/api/v1/devices/**,/api/v1/device-enrolments
               filters:
                 - name: CircuitBreaker
                   args:
@@ -276,6 +276,8 @@ pos:
       - /api/v1/auth/logout
       - /api/v1/auth/forgot-password
       - /api/v1/auth/reset-password
+      # A device's enrolment code is its credential, typed before anyone can sign in there.
+      - /api/v1/device-enrolments
       # Daraja cannot present a token; payment-service authenticates these by a secret path segment.
       - /api/v1/payments/mpesa/callbacks/**
       - /.well-known/jwks.json

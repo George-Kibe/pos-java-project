@@ -7,11 +7,13 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { can, requireUser } from "@/lib/auth/dal";
 import { APPROVER_PERMISSIONS } from "@/lib/lane/approvals";
+import { thisDevice } from "@/lib/session/device";
 
 export const metadata: Metadata = { title: "Account" };
 
 export default async function AccountPage() {
   const user = await requireUser();
+  const device = await thisDevice();
   return (
     <div className="grid max-w-2xl gap-6">
       <h1 className="text-3xl font-semibold tracking-tight">Account</h1>
@@ -44,6 +46,8 @@ export default async function AccountPage() {
             </dd>
             <dt className="text-muted-foreground">Branches</dt>
             <dd>{user.branches.length === 0 ? "None yet" : user.branches.map((b) => b.name).join(", ")}</dd>
+            <dt className="text-muted-foreground">This device</dt>
+            <dd data-testid="this-device">{device ? `${device.name}, ${device.branchName}` : "Not registered"}</dd>
           </dl>
           <div className="flex flex-wrap gap-2">
             <Link href="/account/password" className={buttonVariants({ variant: "outline" })}>

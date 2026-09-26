@@ -21,7 +21,8 @@ your first shift.
 
 ## What your role covers
 
-Your menu: **Till**, **Dashboard**, **Reports**, **Stock**, **Customers**, **Cash**, **Account**.
+Your menu: **Till**, **Dashboard**, **Reports**, **Stock**, **Customers**, **Cash**, **Manual**,
+**Account**.
 
 | You can | You cannot |
 |---|---|

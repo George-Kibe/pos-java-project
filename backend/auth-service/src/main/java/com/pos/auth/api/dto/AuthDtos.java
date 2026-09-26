@@ -36,8 +36,14 @@ public final class AuthDtos {
 
     public record EmailRequest(@NotBlank @Email String email) {}
 
+    /**
+     * @param deviceSecret the registered device's secret, which the web app keeps in the device's
+     *     browser; absent from a device that is not registered
+     */
     public record LoginRequest(
-            @NotBlank @Email String email, @NotBlank @Size(max = 128) String password) {}
+            @NotBlank @Email String email,
+            @NotBlank @Size(max = 128) String password,
+            @Size(max = 128) String deviceSecret) {}
 
     public record RefreshRequest(@NotBlank String refreshToken) {}
 

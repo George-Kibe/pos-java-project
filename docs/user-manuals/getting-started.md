@@ -4,6 +4,7 @@ For everyone. How to sign in, look after your password, find your way around, an
 you are locked out.
 
 - [Where you can use the POS](#where-you-can-use-the-pos)
+- [Registered devices](#registered-devices)
 - [Your first sign-in](#your-first-sign-in)
 - [Signing in every day](#signing-in-every-day)
 - [If you forget your password](#if-you-forget-your-password)
@@ -26,6 +27,26 @@ network."** That is on purpose - it is not a fault with your account.
 If a whole branch suddenly sees that message, its internet connection has probably changed (a new
 line, or the backup line taking over). Tell your manager; the administrator has the branch's new
 address added.
+
+## Registered devices
+
+You can sign in only on the shop's own tills and computers - ones your manager has **registered**.
+The sign-in page says which device you are on (**This device: Till 2, Westlands**), or that it is
+not registered. On any other device - your own phone, say, even on the shop's wifi - signing in
+answers **"This device is not registered for the POS."**
+
+To register a device (your manager does this with you):
+
+1. Your manager opens **Devices**, names the device and chooses **Register**. They are shown an
+   eight-character **code**.
+2. On the device, open the POS. On the sign-in page choose **Register it** (or go to **Register
+   this device**).
+3. Type the code - capitals, spaces and the dash don't matter - and choose **Register device**.
+4. **Sign in** as usual.
+
+A code works **once** and for **30 minutes**. The device stays registered until your manager
+revokes it - or until the browser's data is cleared, after which it needs registering again.
+**Menu → Account** also shows which device you are on.
 
 ## Your first sign-in
 
@@ -84,7 +105,7 @@ hold **Alt** and press the key. Hover over an entry to see its shortcut.
 | S | Stock | I | Audit |
 | H | Purchasing | A | Account |
 | 1 | Expenses | N | Suppliers |
-| 2 | Manual | | |
+| 2 | Manual | 3 | Devices |
 
 On the till, **Alt+C, E, F, L, P, R, V, X and Y** belong to the till itself - see the
 [cashier manual](cashier.md#keyboard-shortcuts).
@@ -135,6 +156,8 @@ in your name.
 - **"Your session has ended. Please sign in again."** Your password or roles changed, or you were
   signed out by an administrator. Sign in again.
 - **Your account is suspended or deactivated:** only whoever manages users can restore it.
+- **"This device is not registered for the POS."** Sign in on one of the shop's tills or computers,
+  or ask your manager to register this one - see [Registered devices](#registered-devices).
 - **"The POS can only be used from a branch or head office network."** You are not on a work
   connection - see [Where you can use the POS](#where-you-can-use-the-pos).
 

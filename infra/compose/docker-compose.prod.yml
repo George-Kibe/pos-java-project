@@ -1,8 +1,9 @@
 # Production overlay: `make prod-up`, on top of docker-compose.yml and docker-compose.services.yml.
 #
 # Traefik is the only door. Staff reach the POS from a branch or head office network only
-# (ALLOWED_CLIENT_NETWORKS, enforced at the edge and again by the gateway), and nothing else is
-# published: the web app and the gateway are reachable on the private network alone.
+# (ALLOWED_CLIENT_NETWORKS, enforced at the edge and again by the gateway), and sign in only on a
+# registered device. Nothing else is published: the web app and the gateway are reachable on the
+# private network alone.
 
 services:
   traefik:
@@ -30,6 +31,11 @@ services:
     depends_on:
       web:
         condition: service_healthy
+
+  # Staff sign in only on the tills and computers a manager has registered (Devices).
+  auth-service:
+    environment:
+      DEVICE_REGISTRATION_REQUIRED: "true"
 
   web:
     ports: !reset []

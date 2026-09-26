@@ -10,12 +10,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { bff } from "@/lib/api/client";
+import type { ThisDevice } from "@/lib/api/device-schemas";
 import { ApiError } from "@/lib/api/errors";
 import { LoginInput } from "@/lib/auth/inputs";
 
 const LoginAnswer = z.object({ mustChangePassword: z.boolean() });
 
-export function LoginForm({ next, initialEmail }: { next: string; initialEmail: string }) {
+export function LoginForm({ next, initialEmail, device }: { next: string; initialEmail: string; device: ThisDevice | null }) {
   const router = useRouter();
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
@@ -50,6 +51,7 @@ export function LoginForm({ next, initialEmail }: { next: string; initialEmail: 
   }
 
   const unverified = failure?.code === "auth.not_active";
+  const unregistered = failure?.code === "auth.device_not_registered";
 
   return (
     <Card>
@@ -69,6 +71,11 @@ export function LoginForm({ next, initialEmail }: { next: string; initialEmail: 
                     href={`/register?step=code&email=${encodeURIComponent(email)}`}
                   >
                     Enter your verification code
+                  </Link>
+                ) : null}
+                {unregistered ? (
+                  <Link className="font-medium underline" href="/register-device">
+                    Register this device
                   </Link>
                 ) : null}
               </AlertDescription>
@@ -100,6 +107,20 @@ export function LoginForm({ next, initialEmail }: { next: string; initialEmail: 
             <Link href={email ? `/forgot-password?email=${encodeURIComponent(email)}` : "/forgot-password"} className="font-medium underline">
               Forgot your password?
             </Link>
+          </p>
+          <p className="text-center text-sm text-muted-foreground" data-testid="this-device">
+            {device ? (
+              <>
+                This device: {device.name}, {device.branchName}
+              </>
+            ) : (
+              <>
+                This device is not registered.{" "}
+                <Link href="/register-device" className="font-medium text-foreground underline">
+                  Register it
+                </Link>
+              </>
+            )}
           </p>
           <p className="text-center text-sm text-muted-foreground">
             New here?{" "}

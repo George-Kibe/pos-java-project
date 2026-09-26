@@ -55,6 +55,12 @@ describe("navigation by permission", () => {
     expect(shortcuts.filter((key) => checkout.includes(key))).toEqual([]);
   });
 
+  it("shows the devices to whoever runs or reads them", () => {
+    for (const permission of ["device:view", "device:manage"]) {
+      expect(labels([permission])).toEqual(["Devices", "Manual", "Account"]);
+    }
+  });
+
   it("shows expenses to whoever records, approves or reads them", () => {
     for (const permission of ["expense:record", "expense:approve", "expense:view"]) {
       expect(labels([permission])).toEqual(["Expenses", "Manual", "Account"]);

@@ -13,6 +13,14 @@ export const LoginInput = z.object({
   password: z.string().min(1, "Enter your password").max(128),
 });
 
+/** A device's enrolment code as a person types it: case, spaces and the dash don't matter. */
+export const EnrolDeviceInput = z.object({
+  code: z
+    .string()
+    .transform((value) => value.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+    .pipe(z.string().length(8, "Enter the eight-character code from your manager")),
+});
+
 export const RegisterInput = z.object({
   fullName: z.string().trim().min(1, "Enter your name").max(150),
   email,
